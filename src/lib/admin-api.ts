@@ -317,6 +317,7 @@ export const adminApi = {
     name?: string;
     pms_type: string;
     operator_id?: number;
+    config?: { base_url?: string; username?: string; password?: string };
   }): Promise<PMSConnectionListItem> {
     return postJson<PMSConnectionListItem>("/api/admin/pms/connections/", data);
   },
@@ -329,7 +330,10 @@ export const adminApi = {
     return getJson<PMSConnectionDetail>(`/api/admin/pms/connections/${id}/`);
   },
 
-  async patchConnection(id: number, data: { is_active?: boolean }): Promise<PMSConnectionDetail> {
+  async patchConnection(
+    id: number,
+    data: { is_active?: boolean; config?: { base_url?: string; username?: string; password?: string } }
+  ): Promise<PMSConnectionDetail> {
     return patchJson<PMSConnectionDetail>(`/api/admin/pms/connections/${id}/`, data);
   },
 

@@ -7,6 +7,7 @@ import {
   CardBody,
   Button,
   Switch,
+  Input,
   Table,
   TableHeader,
   TableColumn,
@@ -33,6 +34,11 @@ export function ConnectionDetailClient() {
   const [patching, setPatching] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("synced");
   const [viewType, setViewType] = useState<"properties" | "room_types">("room_types");
+  const [editingConfig, setEditingConfig] = useState(false);
+  const [configBaseUrl, setConfigBaseUrl] = useState("");
+  const [configUsername, setConfigUsername] = useState("");
+  const [configPassword, setConfigPassword] = useState("");
+  const [savingConfig, setSavingConfig] = useState(false);
 
   useEffect(() => {
     if (Number.isNaN(id) || id <= 0) {
@@ -53,6 +59,14 @@ export function ConnectionDetailClient() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (connection?.pms_type === "generic" && connection?.config) {
+      const cfg = connection.config as Record<string, string>;
+      setConfigBaseUrl(cfg.base_url ?? cfg.url ?? "");
+      setConfigUsername(cfg.username ?? cfg.user ?? "");
+    }
+  }, [connection?.id, connection?.config]);
 
   async function handleSyncNow() {
     if (!canSyncConnection) return;
@@ -80,6 +94,25 @@ export function ConnectionDetailClient() {
       setConnection(updated);
     } finally {
       setPatching(false);
+    }
+  }
+
+  async function saveConfig() {
+    if (!connection || !canEditConnections || connection.pms_type !== "generic") return;
+    setSavingConfig(true);
+    try {
+      const updated = await adminApi.patchConnection(id, {
+        config: {
+          base_url: configBaseUrl.trim(),
+          username: configUsername.trim(),
+          password: configPassword || undefined,
+        },
+      });
+      setConnection(updated);
+      setEditingConfig(false);
+      setConfigPassword("");
+    } finally {
+      setSavingConfig(false);
     }
   }
 
@@ -133,6 +166,75 @@ export function ConnectionDetailClient() {
             <p className="text-sm">
               Operador: <span className="font-medium">{connection.operator_name}</span>
             </p>
+          )}
+          {connection.pms_type === "generic" && canEditConnections && (
+            <div className="rounded-lg border border-semantic-surface-border bg-semantic-surface-subdued/30 p-4 space-y-3 mt-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-newayzi-jet">Credenciales de la API</p>
+                {!editingConfig ? (
+                  <Button size="sm" variant="flat" onPress={() => setEditingConfig(true)}>
+                    Editar
+                  </Button>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      onPress={() => {
+                        setEditingConfig(false);
+                        const cfg = (connection.config ?? {}) as Record<string, string>;
+                        setConfigBaseUrl(cfg.base_url ?? cfg.url ?? "");
+                        setConfigUsername(cfg.username ?? cfg.user ?? "");
+                        setConfigPassword("");
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="sm"
+                      color="primary"
+                      onPress={saveConfig}
+                      isLoading={savingConfig}
+                      isDisabled={!configBaseUrl.trim() || !configUsername.trim()}
+                    >
+                      Guardar
+                    </Button>
+                  </div>
+                )}
+              </div>
+              {editingConfig ? (
+                <div className="space-y-3">
+                  <Input
+                    label="URL de la API"
+                    value={configBaseUrl}
+                    onValueChange={setConfigBaseUrl}
+                    placeholder="https://api.ejemplo.com"
+                    size="sm"
+                  />
+                  <Input
+                    label="Usuario"
+                    value={configUsername}
+                    onValueChange={setConfigUsername}
+                    placeholder="Usuario o API key"
+                    size="sm"
+                  />
+                  <Input
+                    label="Contraseña"
+                    type="password"
+                    value={configPassword}
+                    onValueChange={setConfigPassword}
+                    placeholder="Dejar vacío para mantener la actual"
+                    size="sm"
+                  />
+                </div>
+              ) : (
+                <div className="text-sm text-semantic-text-muted space-y-1">
+                  <p>URL: {configBaseUrl || "—"}</p>
+                  <p>Usuario: {configUsername || "—"}</p>
+                  <p>Contraseña: ••••••••</p>
+                </div>
+              )}
+            </div>
           )}
           <p className="text-sm text-semantic-text-muted">
             Última sincronización:{" "}

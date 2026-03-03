@@ -16,7 +16,7 @@ export default function AdminConnectionsPage() {
         <ConnectionCreateButton onCreated={() => setRefreshKey((k) => k + 1)} />
       </div>
       <p className="text-sm text-semantic-text-muted">
-        Gestiona las conexiones con sistemas PMS. Solo el super-admin puede crear y activar/desactivar. Cada operador puede sincronizar sus propias conexiones.
+        Integra cualquier PMS: desde APIs genéricas (URL + usuario + contraseña) hasta sistemas predefinidos como Kunas, CloudBeds o Stays. Solo el super-admin puede crear y activar/desactivar. Cada operador puede sincronizar sus propias conexiones.
       </p>
       <ConnectionTypesInfo />
       <ConnectionsList refreshKey={refreshKey} />

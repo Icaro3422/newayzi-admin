@@ -22,6 +22,9 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
   const [name, setName] = useState("");
   const [pmsType, setPmsType] = useState("");
   const [operatorId, setOperatorId] = useState<string>("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [connectionTypes, setConnectionTypes] = useState<PMSConnectionType[]>([]);
   const [operators, setOperators] = useState<Operator[]>([]);
@@ -33,26 +36,54 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
     }
   }, [open]);
 
+  const isGeneric = pmsType === "generic";
+
+  function resetForm() {
+    setName("");
+    setPmsType("");
+    setOperatorId("");
+    setBaseUrl("");
+    setUsername("");
+    setPassword("");
+  }
+
   if (!canAccess("connections")) return null;
 
   async function handleCreate() {
     if (!pmsType.trim()) return;
+    if (isGeneric && (!baseUrl.trim() || !username.trim() || !password)) return;
+
     setSaving(true);
     try {
-      await adminApi.createConnection({
+      const payload: {
+        name?: string;
+        pms_type: string;
+        operator_id?: number;
+        config?: { base_url: string; username: string; password: string };
+      } = {
         name: name.trim() || undefined,
         pms_type: pmsType.trim(),
         operator_id: operatorId && operatorId !== "none" ? parseInt(operatorId, 10) : undefined,
-      });
+      };
+      if (isGeneric) {
+        payload.config = {
+          base_url: baseUrl.trim(),
+          username: username.trim(),
+          password,
+        };
+      }
+      await adminApi.createConnection(payload);
       setOpen(false);
-      setName("");
-      setPmsType("");
-      setOperatorId("");
+      resetForm();
       onCreated?.();
     } finally {
       setSaving(false);
     }
   }
+
+  const canSubmit =
+    pmsType.trim() &&
+    (!isGeneric || (baseUrl.trim() && username.trim() && password));
 
   return (
     <>
@@ -63,25 +94,71 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
       >
         Nueva conexión
       </Button>
-      <Modal isOpen={open} onOpenChange={setOpen}>
+      <Modal isOpen={open} onOpenChange={(o) => (setOpen(o), !o && resetForm())} size="2xl">
         <ModalContent>
           <ModalHeader>Nueva conexión PMS</ModalHeader>
           <ModalBody className="space-y-4">
             <Select
-              label="Tipo PMS"
+              label="Tipo de conexión"
               selectedKeys={pmsType ? [pmsType] : []}
               onSelectionChange={(s) => setPmsType(Array.from(s)[0] as string ?? "")}
               isRequired
               items={connectionTypes}
+              description={
+                isGeneric
+                  ? "API genérica: integra cualquier PMS con URL, usuario y contraseña (Booking, OTAs, etc.)"
+                  : undefined
+              }
             >
               {(item) => <SelectItem key={item.code}>{item.label}</SelectItem>}
             </Select>
+
+            {isGeneric && (
+              <div className="rounded-lg border border-semantic-surface-border bg-semantic-surface-subdued/50 p-4 space-y-4">
+                <p className="text-sm font-medium text-newayzi-jet">
+                  Credenciales de la API
+                </p>
+                <Input
+                  label="URL de la API"
+                  placeholder="https://api.ejemplo.com"
+                  value={baseUrl}
+                  onValueChange={setBaseUrl}
+                  isRequired
+                  type="url"
+                  description="URL base del endpoint de la API (ej: https://api.booking.com/v1)"
+                />
+                <Input
+                  label="Usuario"
+                  placeholder="Usuario o API key"
+                  value={username}
+                  onValueChange={setUsername}
+                  isRequired
+                  autoComplete="username"
+                />
+                <Input
+                  label="Contraseña"
+                  placeholder="Contraseña o API secret"
+                  value={password}
+                  onValueChange={setPassword}
+                  isRequired
+                  type="password"
+                  autoComplete="new-password"
+                  description="Se almacena de forma segura. No se mostrará después de guardar."
+                />
+              </div>
+            )}
+
             <Input
               label="Nombre (opcional)"
-              placeholder="Ej: Mi conexión Kunas"
+              placeholder={
+                isGeneric
+                  ? "Ej: Booking.com - Hotel Central"
+                  : "Ej: Mi conexión Kunas"
+              }
               value={name}
               onValueChange={setName}
             />
+
             <Select
               label="Operador (opcional)"
               items={[{ id: "none", name: "Sin asignar" }, ...operators]}
@@ -105,9 +182,9 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
               color="primary"
               onPress={handleCreate}
               isLoading={saving}
-              isDisabled={!pmsType.trim()}
+              isDisabled={!canSubmit}
             >
-              Crear
+              Crear conexión
             </Button>
           </ModalFooter>
         </ModalContent>
