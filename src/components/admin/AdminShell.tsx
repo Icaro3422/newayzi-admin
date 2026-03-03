@@ -10,6 +10,7 @@ import { useAdmin } from "@/contexts/AdminContext";
 /** Mapea pathname a módulo para verificar acceso */
 function pathnameToModule(pathname: string): string | null {
   if (pathname === "/admin" || pathname === "/admin/") return "dashboard";
+  if (pathname.startsWith("/admin/profile")) return "profile";
   if (pathname.startsWith("/admin/properties")) return "properties";
   if (pathname.startsWith("/admin/connections")) return "connections";
   if (pathname.startsWith("/admin/operators")) return "operators";
@@ -22,6 +23,7 @@ function pathnameToModule(pathname: string): string | null {
 
 const navItems: { href: string; label: string; icon: string; module: string }[] = [
   { href: "/admin", label: "Dashboard", icon: "solar:home-2-outline", module: "dashboard" },
+  { href: "/admin/profile", label: "Mi perfil", icon: "solar:user-circle-outline", module: "profile" },
   { href: "/admin/properties", label: "Propiedades", icon: "solar:buildings-2-outline", module: "properties" },
   { href: "/admin/connections", label: "Conexiones PMS", icon: "solar:link-circle-outline", module: "connections" },
   { href: "/admin/operators", label: "Operadores", icon: "solar:users-group-rounded-outline", module: "operators" },

@@ -7,6 +7,19 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 export type AdminRole = "super_admin" | "visualizador" | "comercial" | "operador" | "agente";
 
+export interface AdminLoyalty {
+  level: string;
+  points: number;
+  completedBookings: number;
+  totalSpent: number;
+  monthlyBookings: number;
+  progressToNextLevel?: {
+    current: number;
+    required: number;
+    type: string;
+  } | null;
+}
+
 export interface AdminMe {
   profile: {
     id: number;
@@ -15,10 +28,16 @@ export interface AdminMe {
     first_name: string;
     last_name: string;
     full_name: string;
+    phone?: string;
+    image_url?: string;
+    created?: string | null;
+    updated?: string | null;
   };
   role: AdminRole;
   operator_id: number | null;
+  operator_name?: string | null;
   permissions: string[];
+  loyalty?: AdminLoyalty | null;
 }
 
 export interface PropertyPMSConnection {
@@ -458,6 +477,8 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
   if (!role) return false;
   if (role === "super_admin") return true;
   switch (module) {
+    case "profile":
+      return true; // Todos los roles pueden ver su propio perfil
     case "dashboard":
       return true;
     case "properties":
