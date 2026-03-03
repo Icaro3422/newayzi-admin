@@ -112,11 +112,9 @@ export function UsersList() {
                     size="sm"
                     className="w-40"
                     isLoading={patching === u.id}
+                    items={[{ value: "", label: "Sin rol" }, ...ROLES]}
                   >
-                    <SelectItem key="">Sin rol</SelectItem>
-                    {ROLES.map((r) => (
-                      <SelectItem key={r.value}>{r.label}</SelectItem>
-                    ))}
+                    {(item) => <SelectItem key={item.value}>{item.label}</SelectItem>}
                   </Select>
                 ) : (
                   <Chip size="sm">{u.role ?? "—"}</Chip>
@@ -133,11 +131,9 @@ export function UsersList() {
                     size="sm"
                     className="w-40"
                     isLoading={patching === u.id}
+                    items={[{ id: "", name: "Ninguno" }, ...operators]}
                   >
-                    <SelectItem key="">Ninguno</SelectItem>
-                    {operators.map((o) => (
-                      <SelectItem key={String(o.id)}>{o.name}</SelectItem>
-                    ))}
+                    {(item) => <SelectItem key={String(item.id)}>{item.name}</SelectItem>}
                   </Select>
                 ) : (
                   u.operator_name ?? "—"

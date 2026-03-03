@@ -118,13 +118,9 @@ export function PropertiesList() {
           className="w-52"
           size="sm"
           placeholder="Todas las conexiones"
+          items={[{ id: "all", name: "Todas las conexiones" }, ...connections.map((c) => ({ id: String(c.id), name: c.name || c.pms_type_display || c.pms_type }))]}
         >
-          <SelectItem key="all">Todas las conexiones</SelectItem>
-          {connections.map((c) => (
-            <SelectItem key={String(c.id)}>
-              {c.name || c.pms_type_display || c.pms_type}
-            </SelectItem>
-          ))}
+          {(item) => <SelectItem key={item.id}>{item.name}</SelectItem>}
         </Select>
       </div>
       {loading ? (
@@ -134,79 +130,85 @@ export function PropertiesList() {
       ) : (
         <Table aria-label="Propiedades" classNames={{ wrapper: "border border-semantic-surface-border rounded-lg" }}>
           <TableHeader>
-            <TableColumn>Nombre</TableColumn>
-            <TableColumn>Ciudad</TableColumn>
-            <TableColumn>Tipo</TableColumn>
-            <TableColumn>Operador / PMS</TableColumn>
-            <TableColumn>Activo</TableColumn>
-            <TableColumn>Publicado</TableColumn>
-            <TableColumn>Mascotas</TableColumn>
-            {canEditProperty && <TableColumn align="end">Acciones</TableColumn>}
+            {[
+              <TableColumn key="nombre">Nombre</TableColumn>,
+              <TableColumn key="ciudad">Ciudad</TableColumn>,
+              <TableColumn key="tipo">Tipo</TableColumn>,
+              <TableColumn key="operador">Operador / PMS</TableColumn>,
+              <TableColumn key="activo">Activo</TableColumn>,
+              <TableColumn key="publicado">Publicado</TableColumn>,
+              <TableColumn key="mascotas">Mascotas</TableColumn>,
+              ...(canEditProperty ? [<TableColumn key="acciones" align="end">Acciones</TableColumn>] : []),
+            ]}
           </TableHeader>
           <TableBody>
             {list.map((p) => (
               <TableRow key={p.id}>
-                <TableCell>
-                  <Link
-                    href={`/admin/properties/${p.id}`}
-                    className="font-medium text-newayzi-han-purple hover:underline"
-                  >
-                    {p.name}
-                  </Link>
-                </TableCell>
-                <TableCell>{p.city_name ?? "—"}</TableCell>
-                <TableCell>{p.property_type}</TableCell>
-                <TableCell>
-                  <div className="flex flex-col gap-0.5">
-                    {p.operator_name && (
-                      <span className="text-sm font-medium">{p.operator_name}</span>
-                    )}
-                    {p.pms_connections && p.pms_connections.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {p.pms_connections.map((c) => (
-                          <Chip key={c.id} size="sm" variant="flat" color="secondary">
-                            {c.name}
-                          </Chip>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-sm text-semantic-text-muted">—</span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Chip size="sm" color={p.is_active ? "success" : "default"}>
-                    {p.is_active ? "Sí" : "No"}
-                  </Chip>
-                </TableCell>
-                <TableCell>
-                  <Chip size="sm" color={p.is_published ? "primary" : "default"}>
-                    {p.is_published ? "Sí" : "No"}
-                  </Chip>
-                </TableCell>
-                <TableCell>{p.pets_allowed ? "Sí" : "No"}</TableCell>
-                {canEditProperty && (
-                  <TableCell className="flex justify-end gap-1">
-                    <Button
-                      size="sm"
-                      variant="flat"
-                      color={p.is_published ? "warning" : "primary"}
-                      isLoading={patching === p.id}
-                      onPress={() => togglePublished(p)}
+                {[
+                  <TableCell key="nombre">
+                    <Link
+                      href={`/admin/properties/${p.id}`}
+                      className="font-medium text-newayzi-han-purple hover:underline"
                     >
-                      {p.is_published ? "Ocultar" : "Publicar"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="flat"
-                      color={p.is_active ? "danger" : "success"}
-                      isLoading={patching === p.id}
-                      onPress={() => toggleActive(p)}
-                    >
-                      {p.is_active ? "Desactivar" : "Activar"}
-                    </Button>
-                  </TableCell>
-                )}
+                      {p.name}
+                    </Link>
+                  </TableCell>,
+                  <TableCell key="ciudad">{p.city_name ?? "—"}</TableCell>,
+                  <TableCell key="tipo">{p.property_type}</TableCell>,
+                  <TableCell key="operador">
+                    <div className="flex flex-col gap-0.5">
+                      {p.operator_name && (
+                        <span className="text-sm font-medium">{p.operator_name}</span>
+                      )}
+                      {p.pms_connections && p.pms_connections.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {p.pms_connections.map((c) => (
+                            <Chip key={c.id} size="sm" variant="flat" color="secondary">
+                              {c.name}
+                            </Chip>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-semantic-text-muted">—</span>
+                      )}
+                    </div>
+                  </TableCell>,
+                  <TableCell key="activo">
+                    <Chip size="sm" color={p.is_active ? "success" : "default"}>
+                      {p.is_active ? "Sí" : "No"}
+                    </Chip>
+                  </TableCell>,
+                  <TableCell key="publicado">
+                    <Chip size="sm" color={p.is_published ? "primary" : "default"}>
+                      {p.is_published ? "Sí" : "No"}
+                    </Chip>
+                  </TableCell>,
+                  <TableCell key="mascotas">{p.pets_allowed ? "Sí" : "No"}</TableCell>,
+                  ...(canEditProperty
+                    ? [
+                        <TableCell key="acciones" className="flex justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            color={p.is_published ? "warning" : "primary"}
+                            isLoading={patching === p.id}
+                            onPress={() => togglePublished(p)}
+                          >
+                            {p.is_published ? "Ocultar" : "Publicar"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            color={p.is_active ? "danger" : "success"}
+                            isLoading={patching === p.id}
+                            onPress={() => toggleActive(p)}
+                          >
+                            {p.is_active ? "Desactivar" : "Activar"}
+                          </Button>
+                        </TableCell>,
+                      ]
+                    : []),
+                ]}
               </TableRow>
             ))}
           </TableBody>

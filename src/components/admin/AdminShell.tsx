@@ -43,8 +43,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen bg-semantic-surface-subdued">
       <aside className="flex w-56 flex-col border-r border-semantic-surface-border bg-white">
-        <div className="flex h-14 items-center border-b border-semantic-surface-border px-4">
-          <span className="font-sora font-semibold text-newayzi-jet">Newayzi Admin</span>
+        <div className="flex h-14 items-center gap-2 border-b border-semantic-surface-border px-4">
+          <img
+            src="/brand/n-patron-black.svg"
+            alt="Newayzi"
+            width={28}
+            height={28}
+            className="flex-shrink-0"
+          />
+          <span className="font-sora font-semibold text-newayzi-jet">
+            Newayzi <span className="text-semantic-text-muted font-normal">|</span> Admin
+          </span>
         </div>
         <nav className="flex-1 space-y-0.5 p-2">
           {items.map((item) => {

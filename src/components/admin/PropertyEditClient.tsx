@@ -10,6 +10,7 @@ import {
   Textarea,
   Switch,
   Spinner,
+  Chip,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { adminApi, type PropertyDetail } from "@/lib/admin-api";
@@ -29,7 +30,8 @@ export function PropertyEditClient() {
   const [is_published, setIsPublished] = useState(true);
   const [pets_allowed, setPetsAllowed] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [amenitiesText, setAmenitiesText] = useState("");
+  const [amenities, setAmenities] = useState<string[]>([]);
+  const [newAmenity, setNewAmenity] = useState("");
 
   useEffect(() => {
     if (Number.isNaN(propertyId) || propertyId <= 0) {
@@ -46,9 +48,9 @@ export function PropertyEditClient() {
         setIsActive(p.is_active);
         setIsPublished(p.is_published);
         setPetsAllowed(p.pets_allowed);
-        setAmenitiesText(
-          Array.isArray(p.amenities) ? (p.amenities as string[]).join(", ") : ""
-        );
+        const am = Array.isArray(p.amenities) ? p.amenities : [];
+        const parsed = am.map((a) => (typeof a === "string" ? a : (a as { name?: string })?.name ?? "")).filter(Boolean);
+        setAmenities([...new Set(parsed)]);
       }
       setLoading(false);
     });
@@ -59,14 +61,20 @@ export function PropertyEditClient() {
 
   const initial = property;
 
+  function addAmenity() {
+    const v = newAmenity.trim();
+    if (v && !amenities.includes(v)) setAmenities([...amenities, v]);
+    setNewAmenity("");
+  }
+
+  function removeAmenity(a: string) {
+    setAmenities(amenities.filter((x) => x !== a));
+  }
+
   async function handleSave() {
     if (!canEditProperty || !initial) return;
     setSaving(true);
     try {
-      const amenities = amenitiesText
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
       await adminApi.patchProperty(propertyId, {
         name,
         description: description || undefined,
@@ -75,7 +83,7 @@ export function PropertyEditClient() {
         pets_allowed,
         amenities,
       });
-        setProperty((prev) => prev ? { ...prev, name, description, is_active, is_published, pets_allowed } : null);
+        setProperty((prev) => prev ? { ...prev, name, description, is_active, is_published, pets_allowed, amenities } : null);
         router.refresh();
     } finally {
       setSaving(false);
@@ -130,13 +138,28 @@ export function PropertyEditClient() {
             minRows={3}
             fullWidth
           />
-          <Input
-            label="Amenidades (separadas por coma)"
-            value={amenitiesText}
-            onValueChange={setAmenitiesText}
-            placeholder="WiFi, Aire acondicionado, Cocina..."
-            fullWidth
-          />
+          <div>
+            <label className="text-sm font-medium text-default-700 mb-2 block">Amenidades</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {amenities.map((a) => (
+                <Chip key={a} onClose={() => removeAmenity(a)} variant="flat" size="sm">
+                  {a}
+                </Chip>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={newAmenity}
+                onValueChange={setNewAmenity}
+                placeholder="WiFi, Aire acondicionado, Cocina..."
+                fullWidth
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAmenity())}
+              />
+              <Button size="sm" variant="flat" onPress={addAmenity}>
+                Añadir
+              </Button>
+            </div>
+          </div>
           <div className="flex flex-wrap gap-6">
             <Switch isSelected={is_active} onValueChange={setIsActive}>
               Activo (sistema)

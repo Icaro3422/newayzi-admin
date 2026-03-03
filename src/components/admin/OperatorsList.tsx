@@ -44,37 +44,43 @@ export function OperatorsList({ refreshKey = 0 }: { refreshKey?: number }) {
     <div className="space-y-4">
       <Table aria-label="Operadores" classNames={{ wrapper: "border border-semantic-surface-border rounded-lg" }}>
         <TableHeader>
-          <TableColumn>Nombre</TableColumn>
-          <TableColumn>Contacto</TableColumn>
-          <TableColumn>Conexiones</TableColumn>
-          <TableColumn>Estado</TableColumn>
-          {canEdit && <TableColumn align="end">Acciones</TableColumn>}
+          {[
+            <TableColumn key="nombre">Nombre</TableColumn>,
+            <TableColumn key="contacto">Contacto</TableColumn>,
+            <TableColumn key="conexiones">Conexiones</TableColumn>,
+            <TableColumn key="estado">Estado</TableColumn>,
+            ...(canEdit ? [<TableColumn key="acciones" align="end">Acciones</TableColumn>] : []),
+          ]}
         </TableHeader>
         <TableBody>
           {list.map((op) => (
             <TableRow key={op.id}>
-              <TableCell>
-                <Link
-                  href={`/admin/operators/${op.id}`}
-                  className="font-medium text-newayzi-han-purple hover:underline"
-                >
-                  {op.name}
-                </Link>
-              </TableCell>
-              <TableCell>{op.contact_email || op.contact_phone || "—"}</TableCell>
-              <TableCell>{op.connections_count ?? 0}</TableCell>
-              <TableCell>
-                <Chip size="sm" color={op.is_active ? "success" : "default"}>
-                  {op.is_active ? "Activo" : "Inactivo"}
-                </Chip>
-              </TableCell>
-              {canEdit && (
-                <TableCell className="text-right">
-                  <Button as={Link} href={`/admin/operators/${op.id}`} size="sm" variant="flat">
-                    Editar
-                  </Button>
-                </TableCell>
-              )}
+              {[
+                <TableCell key="nombre">
+                  <Link
+                    href={`/admin/operators/${op.id}`}
+                    className="font-medium text-newayzi-han-purple hover:underline"
+                  >
+                    {op.name}
+                  </Link>
+                </TableCell>,
+                <TableCell key="contacto">{op.contact_email || op.contact_phone || "—"}</TableCell>,
+                <TableCell key="conexiones">{op.connections_count ?? 0}</TableCell>,
+                <TableCell key="estado">
+                  <Chip size="sm" color={op.is_active ? "success" : "default"}>
+                    {op.is_active ? "Activo" : "Inactivo"}
+                  </Chip>
+                </TableCell>,
+                ...(canEdit
+                  ? [
+                      <TableCell key="acciones" className="text-right">
+                        <Button as={Link} href={`/admin/operators/${op.id}`} size="sm" variant="flat">
+                          Editar
+                        </Button>
+                      </TableCell>,
+                    ]
+                  : []),
+              ]}
             </TableRow>
           ))}
         </TableBody>

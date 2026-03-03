@@ -72,10 +72,9 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
               selectedKeys={pmsType ? [pmsType] : []}
               onSelectionChange={(s) => setPmsType(Array.from(s)[0] as string ?? "")}
               isRequired
+              items={connectionTypes}
             >
-              {connectionTypes.map((t) => (
-                <SelectItem key={t.code}>{t.label}</SelectItem>
-              ))}
+              {(item) => <SelectItem key={item.code}>{item.label}</SelectItem>}
             </Select>
             <Input
               label="Nombre (opcional)"

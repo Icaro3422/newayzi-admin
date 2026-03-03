@@ -7,7 +7,7 @@ export default function AdminAvailabilityPage() {
         Disponibilidad
       </h1>
       <p className="text-sm text-semantic-text-muted">
-        Vista de disponibilidad por propiedad y tipo de habitación. Filtros por fechas y propiedad. Los operadores solo ven sus unidades.
+        Mapa calendario y lista detallada. Filtra por operador, propiedad y fechas. Los operadores solo ven sus unidades.
       </p>
       <AvailabilityList />
     </div>

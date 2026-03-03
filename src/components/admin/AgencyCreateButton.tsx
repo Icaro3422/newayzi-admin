@@ -9,6 +9,7 @@ import { useAdmin } from "@/contexts/AdminContext";
 export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
   const { canAccess } = useAdmin();
   const [open, setOpen] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const [name, setName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
@@ -17,12 +18,12 @@ export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
   if (!canAccess("agents")) return null;
 
   async function handleCreate() {
-    if (!name.trim()) return;
+    if (!name.trim() || !contactEmail.trim()) return;
     setSaving(true);
     try {
-      await adminApi.createAgency({
+      const res = await adminApi.createAgency({
         name: name.trim(),
-        contact_email: contactEmail.trim() || undefined,
+        contact_email: contactEmail.trim(),
         contact_phone: contactPhone.trim() || undefined,
       });
       setOpen(false);
@@ -30,10 +31,15 @@ export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
       setContactEmail("");
       setContactPhone("");
       onCreated?.();
+      if (res.email_sent) {
+        setShowSuccess(true);
+      }
     } finally {
       setSaving(false);
     }
   }
+
+  const canSubmit = name.trim().length > 0 && contactEmail.trim().length > 0;
 
   return (
     <>
@@ -54,6 +60,8 @@ export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
               value={contactEmail}
               onValueChange={setContactEmail}
               type="email"
+              isRequired
+              description="Obligatorio para enviar la invitación"
             />
             <Input label="Teléfono de contacto" value={contactPhone} onValueChange={setContactPhone} />
           </ModalBody>
@@ -65,11 +73,29 @@ export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
               color="primary"
               onPress={handleCreate}
               isLoading={saving}
-              isDisabled={!name.trim()}
+              isDisabled={!canSubmit}
             >
               Crear
             </Button>
           </ModalFooter>
+        </ModalContent>
+      </Modal>
+      <Modal isOpen={showSuccess} onOpenChange={setShowSuccess}>
+        <ModalContent>
+          <ModalBody className="py-8">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="rounded-full bg-emerald-100 p-4">
+                <Icon icon="solar:letter-bold" width={48} className="text-emerald-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-newayzi-jet">Correo enviado exitosamente</h3>
+              <p className="text-sm text-semantic-text-muted">
+                El agente ha recibido un correo con sus credenciales temporales. Deberá cambiar la contraseña en su primer inicio de sesión.
+              </p>
+              <Button color="primary" onPress={() => setShowSuccess(false)}>
+                Entendido
+              </Button>
+            </div>
+          </ModalBody>
         </ModalContent>
       </Modal>
     </>

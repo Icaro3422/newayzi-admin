@@ -359,9 +359,9 @@ export const adminApi = {
 
   async createOperator(data: {
     name: string;
-    contact_email?: string;
+    contact_email: string;
     contact_phone?: string;
-  }): Promise<Operator> {
+  }): Promise<Operator & { email_sent?: boolean }> {
     return postJson<Operator>("/api/admin/operators/", data);
   },
 
@@ -378,9 +378,9 @@ export const adminApi = {
 
   async createAgency(data: {
     name: string;
-    contact_email?: string;
+    contact_email: string;
     contact_phone?: string;
-  }): Promise<Agency> {
+  }): Promise<Agency & { email_sent?: boolean }> {
     return postJson<Agency>("/api/admin/agencies/", data);
   },
 
@@ -467,7 +467,7 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
     case "payments":
     case "users":
     case "audit":
-      return role === "super_admin";
+      return false; // solo super_admin (ya retornó arriba)
     default:
       return false;
   }

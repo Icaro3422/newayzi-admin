@@ -102,24 +102,28 @@ export function PaymentsRegions() {
         </p>
         <Table aria-label="Pagos por región" classNames={{ wrapper: "border border-semantic-surface-border rounded-lg" }}>
           <TableHeader>
-            <TableColumn>Región</TableColumn>
-            {methods.map((m) => (
-              <TableColumn key={m.id}>{m.name}</TableColumn>
-            ))}
+            {[
+              <TableColumn key="region">Región</TableColumn>,
+              ...methods.map((m) => (
+                <TableColumn key={m.id}>{m.name}</TableColumn>
+              )),
+            ]}
           </TableHeader>
           <TableBody>
             {regions.map((r) => (
               <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.name} {r.country_code && `(${r.country_code})`}</TableCell>
-                {methods.map((m) => (
-                  <TableCell key={m.id}>
-                    <Switch
-                      isSelected={regionMethods[r.id]?.[m.id] ?? false}
-                      onValueChange={(v) => toggle(r.id, m.id, v)}
-                      isDisabled={!canEdit || toggling === `${r.id}-${m.id}`}
-                    />
-                  </TableCell>
-                ))}
+                {[
+                  <TableCell key="region" className="font-medium">{r.name} {r.country_code && `(${r.country_code})`}</TableCell>,
+                  ...methods.map((m) => (
+                    <TableCell key={m.id}>
+                      <Switch
+                        isSelected={regionMethods[r.id]?.[m.id] ?? false}
+                        onValueChange={(v) => toggle(r.id, m.id, v)}
+                        isDisabled={!canEdit || toggling === `${r.id}-${m.id}`}
+                      />
+                    </TableCell>
+                  )),
+                ]}
               </TableRow>
             ))}
           </TableBody>
