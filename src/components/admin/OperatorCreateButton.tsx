@@ -10,6 +10,7 @@ export function OperatorCreateButton({ onCreated }: { onCreated?: () => void }) 
   const { canAccess } = useAdmin();
   const [open, setOpen] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [successEmailSent, setSuccessEmailSent] = useState(false);
   const [name, setName] = useState("");
   const [contact_email, setContactEmail] = useState("");
   const [contact_phone, setContactPhone] = useState("");
@@ -31,9 +32,8 @@ export function OperatorCreateButton({ onCreated }: { onCreated?: () => void }) 
       setContactEmail("");
       setContactPhone("");
       onCreated?.();
-      if (res.email_sent) {
-        setShowSuccess(true);
-      }
+      setShowSuccess(true);
+      setSuccessEmailSent(!!res.email_sent);
     } finally {
       setSaving(false);
     }
@@ -73,12 +73,20 @@ export function OperatorCreateButton({ onCreated }: { onCreated?: () => void }) 
         <ModalContent>
           <ModalBody className="py-8">
             <div className="flex flex-col items-center gap-4 text-center">
-              <div className="rounded-full bg-emerald-100 p-4">
-                <Icon icon="solar:letter-bold" width={48} className="text-emerald-600" />
+              <div className={`rounded-full p-4 ${successEmailSent ? "bg-emerald-100" : "bg-amber-100"}`}>
+                <Icon
+                  icon={successEmailSent ? "solar:letter-bold" : "solar:user-check-bold"}
+                  width={48}
+                  className={successEmailSent ? "text-emerald-600" : "text-amber-600"}
+                />
               </div>
-              <h3 className="text-lg font-semibold text-newayzi-jet">Correo enviado exitosamente</h3>
+              <h3 className="text-lg font-semibold text-newayzi-jet">
+                {successEmailSent ? "Operador agregado exitosamente" : "Operador creado"}
+              </h3>
               <p className="text-sm text-semantic-text-muted">
-                El operador ha recibido un correo con sus credenciales temporales. Deberá cambiar la contraseña en su primer inicio de sesión.
+                {successEmailSent
+                  ? "El operador ha recibido un correo con sus credenciales temporales. Deberá cambiar la contraseña en su primer inicio de sesión."
+                  : "El operador se creó correctamente, pero no se pudo enviar el correo de invitación. Verifica que CLERK_SECRET_KEY y CHATIICO_API_KEY estén configurados en el backend, y que el email no esté ya registrado en Clerk."}
               </p>
               <Button color="primary" onPress={() => setShowSuccess(false)}>
                 Entendido

@@ -54,20 +54,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       if (data) {
         setMe(data);
       } else {
-        // Sin backend: permitir acceso como super_admin para desarrollo
-        setMe({
-          profile: {
-            id: 0,
-            clerk_user_id: "",
-            email: "",
-            first_name: "Admin",
-            last_name: "Dev",
-            full_name: "Admin Dev",
-          },
-          role: "super_admin",
-          operator_id: null,
-          permissions: ["*"],
-        });
+        // Backend no devolvió sesión (404 o vacío): no asumir super_admin
+        setMe(null);
+        setError("No se pudo cargar la sesión. Verifica que el backend esté activo y que tengas un perfil asignado.");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar sesión");

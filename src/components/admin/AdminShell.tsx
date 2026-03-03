@@ -1,10 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { UserButton } from "@clerk/nextjs";
 import { Icon } from "@iconify/react";
 import { useAdmin } from "@/contexts/AdminContext";
+
+/** Mapea pathname a módulo para verificar acceso */
+function pathnameToModule(pathname: string): string | null {
+  if (pathname === "/admin" || pathname === "/admin/") return "dashboard";
+  if (pathname.startsWith("/admin/properties")) return "properties";
+  if (pathname.startsWith("/admin/connections")) return "connections";
+  if (pathname.startsWith("/admin/operators")) return "operators";
+  if (pathname.startsWith("/admin/agents")) return "agents";
+  if (pathname.startsWith("/admin/availability")) return "availability";
+  if (pathname.startsWith("/admin/payments")) return "payments";
+  if (pathname.startsWith("/admin/users")) return "users";
+  return null;
+}
 
 const navItems: { href: string; label: string; icon: string; module: string }[] = [
   { href: "/admin", label: "Dashboard", icon: "solar:home-2-outline", module: "dashboard" },
@@ -19,8 +33,18 @@ const navItems: { href: string; label: string; icon: string; module: string }[] 
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { canAccess, loading, error } = useAdmin();
   const items = navItems.filter((item) => canAccess(item.module));
+
+  // Redirigir si accede a una ruta sin permiso (ej. /admin/users como operador)
+  useEffect(() => {
+    if (loading || error) return;
+    const module = pathnameToModule(pathname);
+    if (module && !canAccess(module)) {
+      router.replace("/admin");
+    }
+  }, [pathname, canAccess, loading, error, router]);
 
   if (loading) {
     return (
