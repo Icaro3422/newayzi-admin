@@ -74,7 +74,7 @@ export function UsersList() {
   }
 
   return (
-    <Table aria-label="Usuarios" classNames={{ wrapper: "border border-semantic-surface-border rounded-lg" }}>
+    <Table aria-label="Usuarios" classNames={{ wrapper: "border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm overflow-hidden" }}>
       <TableHeader>
         <TableColumn>Usuario</TableColumn>
         <TableColumn>Email</TableColumn>
@@ -85,7 +85,7 @@ export function UsersList() {
       <TableBody>
         {list.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={5} className="text-center text-semantic-text-muted">
+            <TableCell colSpan={5} className="text-center text-gray-500">
               No hay usuarios con perfil en el backend. El endpoint GET /api/admin/users/ debe devolver perfiles (CRM).
             </TableCell>
           </TableRow>

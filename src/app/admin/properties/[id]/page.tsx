@@ -1,11 +1,13 @@
 import { PropertyEditClient } from "@/components/admin/PropertyEditClient";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 
 export default function AdminPropertyEditPage() {
   return (
     <div className="space-y-6">
-      <h1 className="font-sora text-2xl font-semibold text-newayzi-jet">
-        Editar propiedad
-      </h1>
+      <AdminPageHeader
+        title="Editar propiedad"
+        subtitle="Modifica nombre, descripción, amenidades y visibilidad de la propiedad."
+      />
       <PropertyEditClient />
     </div>
   );

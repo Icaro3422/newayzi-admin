@@ -7,15 +7,14 @@ import {
   CardBody,
   Button,
   Input,
-  Textarea,
   Switch,
   Spinner,
-  Chip,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { adminApi, type PropertyDetail } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useRouter, useParams } from "next/navigation";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 
 export function PropertyEditClient() {
   const router = useRouter();
@@ -97,20 +96,23 @@ export function PropertyEditClient() {
       </div>
     );
   }
+  const CARD_STYLE =
+    "border border-gray-200/60 rounded-[28px] shadow-md bg-white/90 backdrop-blur-sm hover:shadow-lg transition-shadow duration-300";
+
   if (!property) {
     return (
-      <Card className="border border-semantic-surface-border">
+      <Card className={CARD_STYLE}>
         <CardBody>
-          <p className="text-semantic-text-muted">Propiedad no encontrada.</p>
+          <p className="text-gray-500 font-sora">Propiedad no encontrada.</p>
         </CardBody>
       </Card>
     );
   }
   if (!canEditProperty) {
     return (
-      <Card className="border border-semantic-surface-border">
+      <Card className={CARD_STYLE}>
         <CardBody>
-          <p className="text-semantic-text-muted">No tienes permiso para editar esta propiedad.</p>
+          <p className="text-gray-500 font-sora">No tienes permiso para editar esta propiedad.</p>
         </CardBody>
       </Card>
     );
@@ -118,33 +120,60 @@ export function PropertyEditClient() {
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2">
-        <Button as={Link} href="/admin/properties" variant="flat" startContent={<Icon icon="solar:arrow-left-outline" width={18} />}>
-          Volver
-        </Button>
-      </div>
-      <Card className="border border-semantic-surface-border">
-        <CardBody className="space-y-4">
+      <Button
+        as={Link}
+        href="/admin/properties"
+        variant="flat"
+        className="text-newayzi-jet hover:bg-gray-100 border border-gray-200/60 rounded-xl font-medium"
+        startContent={<Icon icon="solar:arrow-left-outline" width={18} />}
+      >
+        Volver
+      </Button>
+
+      <Card className={CARD_STYLE}>
+        <CardBody className="gap-6 p-6">
           <Input
             label="Nombre"
             value={name}
             onValueChange={setName}
             fullWidth
+            classNames={{
+              inputWrapper: "rounded-xl border-gray-200/80",
+            }}
           />
-          <Textarea
-            label="Descripción"
-            value={description}
-            onValueChange={setDescription}
-            minRows={3}
-            fullWidth
-          />
+
           <div>
-            <label className="text-sm font-medium text-default-700 mb-2 block">Amenidades</label>
-            <div className="flex flex-wrap gap-2 mb-2">
+            <label className="text-sm font-semibold text-newayzi-jet mb-2 block font-sora">
+              Descripción
+            </label>
+            <RichTextEditor
+              value={description}
+              onChange={setDescription}
+              placeholder="Describe la propiedad, ubicación, servicios y características..."
+              minHeight="220px"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-newayzi-jet mb-2 block font-sora">
+              Amenidades
+            </label>
+            <div className="flex flex-wrap gap-2 mb-3">
               {amenities.map((a) => (
-                <Chip key={a} onClose={() => removeAmenity(a)} variant="flat" size="sm">
+                <span
+                  key={a}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-newayzi-han-purple/15 to-newayzi-majorelle/10 border border-newayzi-majorelle/20 px-3 py-1.5 text-sm font-medium text-newayzi-jet"
+                >
                   {a}
-                </Chip>
+                  <button
+                    type="button"
+                    onClick={() => removeAmenity(a)}
+                    className="hover:bg-newayzi-majorelle/20 rounded-full p-0.5 transition-colors"
+                    aria-label="Quitar"
+                  >
+                    <Icon icon="solar:close-circle-outline" width={16} />
+                  </button>
+                </span>
               ))}
             </div>
             <div className="flex gap-2">
@@ -154,40 +183,82 @@ export function PropertyEditClient() {
                 placeholder="WiFi, Aire acondicionado, Cocina..."
                 fullWidth
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAmenity())}
+                classNames={{
+                  inputWrapper: "rounded-xl border-gray-200/80",
+                }}
               />
-              <Button size="sm" variant="flat" onPress={addAmenity}>
+              <Button
+                size="sm"
+                className="btn-newayzi-primary rounded-xl"
+                onPress={addAmenity}
+              >
                 Añadir
               </Button>
             </div>
           </div>
-          <div className="flex flex-wrap gap-6">
-            <Switch isSelected={is_active} onValueChange={setIsActive}>
-              Activo (sistema)
+
+          <div className="flex flex-wrap gap-8 pt-2">
+            <Switch
+              isSelected={is_active}
+              onValueChange={setIsActive}
+              color="primary"
+            >
+              <span className="text-sm font-medium text-newayzi-jet font-sora">
+                Activo (sistema)
+              </span>
             </Switch>
-            <Switch isSelected={is_published} onValueChange={setIsPublished}>
-              Publicado (visible en frontend)
+            <Switch
+              isSelected={is_published}
+              onValueChange={setIsPublished}
+              color="primary"
+            >
+              <span className="text-sm font-medium text-newayzi-jet font-sora">
+                Publicado (visible en frontend)
+              </span>
             </Switch>
-            <Switch isSelected={pets_allowed} onValueChange={setPetsAllowed}>
-              Mascotas permitidas
+            <Switch
+              isSelected={pets_allowed}
+              onValueChange={setPetsAllowed}
+              color="primary"
+            >
+              <span className="text-sm font-medium text-newayzi-jet font-sora">
+                Mascotas permitidas
+              </span>
             </Switch>
           </div>
+
           <div className="flex gap-2 pt-2">
-            <Button color="primary" onPress={handleSave} isLoading={saving} startContent={!saving ? <Icon icon="solar:diskette-outline" width={18} /> : undefined}>
+            <Button
+              className="btn-newayzi-primary rounded-xl"
+              onPress={handleSave}
+              isLoading={saving}
+              startContent={!saving ? <Icon icon="solar:diskette-outline" width={18} /> : undefined}
+            >
               Guardar cambios
             </Button>
           </div>
         </CardBody>
       </Card>
+
       {property.room_types?.length ? (
-        <Card className="border border-semantic-surface-border">
-          <CardBody>
-            <h3 className="font-sora font-medium text-newayzi-jet mb-2">Tipos de habitación</h3>
-            <ul className="list-disc list-inside text-sm text-semantic-text-muted">
+        <Card className={CARD_STYLE}>
+          <CardBody className="p-6">
+            <h3 className="font-sora text-lg font-bold text-newayzi-jet mb-3">
+              Tipos de habitación
+            </h3>
+            <ul className="space-y-2">
               {property.room_types.map((rt) => (
-                <li key={rt.id}>{rt.name} ({rt.code})</li>
+                <li
+                  key={rt.id}
+                  className="flex items-center gap-2 rounded-xl bg-gray-50/80 border border-gray-200/50 px-4 py-2.5 text-sm text-newayzi-jet font-sora"
+                >
+                  <Icon icon="solar:bed-outline" className="text-newayzi-majorelle flex-shrink-0" width={18} />
+                  {rt.name}
+                  <span className="text-xs text-gray-500 font-mono">({rt.code})</span>
+                </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-semantic-text-muted">
+            <p className="mt-4 text-xs text-gray-500">
               Los precios por temporada y descuentos por estancia se gestionan desde el backend (RoomTypeBaseRate, DynamicPricingRule, LengthOfStayDiscount).
             </p>
           </CardBody>

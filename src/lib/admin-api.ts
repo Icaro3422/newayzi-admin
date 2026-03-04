@@ -204,6 +204,8 @@ export interface AvailabilityItem {
   available: number;
   source: "internal" | "pms";
   block_reason?: string;
+  price_per_night?: string;
+  currency?: string;
 }
 
 export interface PaymentMethod {

@@ -4,34 +4,40 @@
 
 @layer base {
   :root {
+    /* Newayzi brand - alineado con frontend */
+    --newayzi-jet: #2d2d2d;
+    --newayzi-majorelle: #5e2cec;
+    --newayzi-han-purple: #422df6;
+    --newayzi-dark-orchid: #9430cf;
+
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 0 0% 17.6%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 0 0% 17.6%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --popover-foreground: 0 0% 17.6%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 262 83% 58%;
+    --secondary-foreground: 0 0% 100%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 262 83% 58%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    --ring: 262 83% 58%;
+    --radius: 0.75rem;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 17.6%;
+    --sidebar-primary: 262 83% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 262 83% 96%;
+    --sidebar-accent-foreground: 262 83% 58%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 262 83% 58%;
   }
 
   .dark {
@@ -71,4 +77,102 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-sora;
+  }
+}
+
+/* Botón primario Newayzi - alineado con frontend, alto contraste */
+@layer components {
+  .btn-newayzi-primary {
+    @apply bg-gradient-to-r from-[#3d21c4] to-newayzi-majorelle hover:from-newayzi-majorelle hover:to-[#3d21c4] font-bold rounded-xl shadow-[0_2px_12px_rgba(94,44,236,0.35)] transition-all disabled:opacity-50 disabled:cursor-not-allowed;
+    color: white !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  }
+  .btn-newayzi-primary * {
+    color: inherit !important;
+  }
+}
+
+/* HeroUI Button: forzar texto blanco en botones con fondos oscuros */
+button.btn-newayzi-primary,
+button.btn-action-amber,
+button.btn-action-red,
+button.btn-action-green {
+  color: white !important;
+}
+button.btn-newayzi-primary *,
+button.btn-action-amber *,
+button.btn-action-red *,
+button.btn-action-green * {
+  color: white !important;
+}
+
+/* Rich text editor (TipTap) */
+.rich-text-content .ProseMirror {
+  min-height: 200px;
+  padding: 1rem 1.25rem;
+  outline: none;
+  font-family: var(--font-heebo), system-ui, sans-serif;
+  color: #2d2d2d;
+}
+.rich-text-content .ProseMirror p.is-editor-empty:first-child::before {
+  color: #9ca3af;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.rich-text-content .ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+}
+.rich-text-content .ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+}
+.rich-text-content .ProseMirror h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  font-family: var(--font-sora), system-ui, sans-serif;
+}
+.rich-text-content .ProseMirror blockquote {
+  border-left: 4px solid hsl(262 83% 58%);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: #4b5563;
+  font-style: italic;
+}
+.rich-text-content .ProseMirror code {
+  background: #f3f4f6;
+  padding: 0.15em 0.4em;
+  border-radius: 0.25rem;
+  font-size: 0.9em;
+}
+.rich-text-content .ProseMirror pre {
+  background: #1f2937;
+  color: #e5e7eb;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+.rich-text-content .ProseMirror pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.rich-text-content .ProseMirror hr {
+  border: none;
+  border-top: 2px solid #e5e7eb;
+  margin: 1.5rem 0;
+}
+.rich-text-content .ProseMirror [style*="text-align: center"] {
+  text-align: center;
+}
+.rich-text-content .ProseMirror [style*="text-align: right"] {
+  text-align: right;
 }

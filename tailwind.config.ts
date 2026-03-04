@@ -75,7 +75,23 @@ const config: Config = {
       },
     },
   },
-  plugins: [tailwindcssAnimate, heroui(), addDynamicIconSelectors()],
+  plugins: [
+    tailwindcssAnimate,
+    heroui({
+      themes: {
+        light: {
+          colors: {
+            primary: {
+              DEFAULT: "#5E2CEC",
+              foreground: "#FFFFFF",
+            },
+            focus: "#5E2CEC",
+          },
+        },
+      },
+    }),
+    addDynamicIconSelectors(),
+  ],
 };
 
 export default config;
