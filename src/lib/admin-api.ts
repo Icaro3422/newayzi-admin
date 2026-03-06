@@ -470,7 +470,63 @@ export const adminApi = {
     const q = params?.limit != null ? `?limit=${params.limit}` : "";
     return getJson<{ results: unknown[] }>(`/api/admin/audit-logs/${q}`);
   },
+
+  async getCommunicationTemplates(): Promise<{ templates: CommunicationTemplate[] } | null> {
+    return getJson<{ templates: CommunicationTemplate[] }>("/api/admin/communications/templates/");
+  },
+
+  async getCommunicationGroups(): Promise<{ groups: CommunicationGroup[] } | null> {
+    return getJson<{ groups: CommunicationGroup[] }>("/api/admin/communications/groups/");
+  },
+
+  async fetchOgMetadata(url: string): Promise<{
+    title?: string;
+    description?: string;
+    image?: string;
+    url?: string;
+    error?: string;
+  }> {
+    return postJson("/api/admin/communications/fetch-og/", { url });
+  },
+
+  async getCommunicationPreview(data: {
+    template_id: string;
+    body_text?: string;
+    body_html?: string;
+    greeting?: string;
+  }): Promise<{ html: string }> {
+    return postJson<{ html: string }>("/api/admin/communications/preview/", data);
+  },
+
+  async sendMassCommunication(data: {
+    template_id: string;
+    group_id?: string;
+    custom_emails?: string;
+    subject: string;
+    body_text?: string;
+    body_html?: string;
+    greeting?: string;
+  }): Promise<{ sent: number; failed: number; total: number; errors: string[] }> {
+    return postJson<{ sent: number; failed: number; total: number; errors: string[] }>(
+      "/api/admin/communications/send/",
+      data
+    );
+  },
 };
+
+export interface CommunicationTemplate {
+  id: string;
+  name: string;
+  description: string;
+  params: string[];
+}
+
+export interface CommunicationGroup {
+  id: string;
+  name: string;
+  description: string;
+  recipients_count: number;
+}
 
 /** Permisos derivados del rol (plan: super_admin todo, operador solo suyo, agente solo dashboard/availability) */
 export function canAccessModule(role: AdminRole | null, module: string): boolean {
@@ -491,6 +547,7 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
     case "agents":
     case "payments":
     case "users":
+    case "communications":
     case "audit":
       return false; // solo super_admin (ya retornó arriba)
     default:

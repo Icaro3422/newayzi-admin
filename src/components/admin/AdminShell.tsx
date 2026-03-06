@@ -18,6 +18,7 @@ function pathnameToModule(pathname: string): string | null {
   if (pathname.startsWith("/admin/availability")) return "availability";
   if (pathname.startsWith("/admin/payments")) return "payments";
   if (pathname.startsWith("/admin/users")) return "users";
+  if (pathname.startsWith("/admin/communications")) return "communications";
   return null;
 }
 
@@ -31,6 +32,7 @@ const navItems: { href: string; label: string; icon: string; module: string }[] 
   { href: "/admin/availability", label: "Disponibilidad", icon: "solar:calendar-outline", module: "availability" },
   { href: "/admin/payments", label: "Pagos", icon: "solar:wallet-money-outline", module: "payments" },
   { href: "/admin/users", label: "Usuarios", icon: "solar:user-id-outline", module: "users" },
+  { href: "/admin/communications", label: "Comunicaciones", icon: "solar:letter-outline", module: "communications" },
 ];
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
