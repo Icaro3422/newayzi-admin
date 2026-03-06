@@ -45,6 +45,8 @@ export function CommunicationsClient() {
   const [bodyText, setBodyText] = useState("");
   const [bodyHtml, setBodyHtml] = useState("");
   const [greeting, setGreeting] = useState("Hola,");
+  const [ctaText, setCtaText] = useState("");
+  const [ctaUrl, setCtaUrl] = useState("");
   const [result, setResult] = useState<{
     sent: number;
     failed: number;
@@ -104,6 +106,8 @@ export function CommunicationsClient() {
         body_text: bodyText.trim() || undefined,
         body_html: bodyHtml.trim() || undefined,
         greeting: greeting.trim() || "Hola,",
+        cta_text: ctaText.trim() || undefined,
+        cta_url: ctaUrl.trim() || undefined,
       });
       setPreviewHtml(res.html);
     } catch (e) {
@@ -129,6 +133,8 @@ export function CommunicationsClient() {
         body_text: bodyText.trim() || undefined,
         body_html: bodyHtml.trim() || undefined,
         greeting: greeting.trim() || "Hola,",
+        cta_text: ctaText.trim() || undefined,
+        cta_url: ctaUrl.trim() || undefined,
       });
       setResult(res);
     } catch (e) {
@@ -385,6 +391,41 @@ export function CommunicationsClient() {
               El contenido se enviará con el formato de la plantilla Newayzi (logo, políticas, etc.)
             </p>
           </div>
+
+          <Card className="border border-dashed border-gray-300 bg-gray-50/50">
+            <CardBody className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:link-circle-bold" width={20} className="text-newayzi-han-purple" />
+                <span className="text-sm font-medium text-newayzi-jet">
+                  Botón CTA (opcional)
+                </span>
+              </div>
+              <p className="text-xs text-semantic-text-muted">
+                Añade un botón de llamada a la acción debajo del mensaje. Si ambos campos están vacíos, no se mostrará.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="Texto del botón"
+                  placeholder="Ej: Visitar sitio"
+                  value={ctaText}
+                  onValueChange={setCtaText}
+                  description="Ej: Ver más, Registrarse, Descargar"
+                />
+                <Input
+                  label="URL del botón"
+                  placeholder="https://ejemplo.com"
+                  value={ctaUrl}
+                  onValueChange={setCtaUrl}
+                  description="Enlace al que llevará el botón"
+                />
+              </div>
+              {(ctaText.trim() || ctaUrl.trim()) && !(ctaText.trim() && ctaUrl.trim()) && (
+                <p className="text-xs text-amber-600">
+                  Completa ambos campos para que el botón se muestre en el email.
+                </p>
+              )}
+            </CardBody>
+          </Card>
 
           <Button
             color="primary"

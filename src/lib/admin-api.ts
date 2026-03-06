@@ -494,6 +494,8 @@ export const adminApi = {
     body_text?: string;
     body_html?: string;
     greeting?: string;
+    cta_text?: string;
+    cta_url?: string;
   }): Promise<{ html: string }> {
     return postJson<{ html: string }>("/api/admin/communications/preview/", data);
   },
@@ -506,6 +508,8 @@ export const adminApi = {
     body_text?: string;
     body_html?: string;
     greeting?: string;
+    cta_text?: string;
+    cta_url?: string;
   }): Promise<{ sent: number; failed: number; total: number; errors: string[] }> {
     return postJson<{ sent: number; failed: number; total: number; errors: string[] }>(
       "/api/admin/communications/send/",
