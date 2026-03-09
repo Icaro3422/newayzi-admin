@@ -1,11 +1,13 @@
 import { ConnectionDetailClient } from "@/components/admin/ConnectionDetailClient";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 
 export default function AdminConnectionDetailPage() {
   return (
     <div className="space-y-6">
-      <h1 className="font-sora text-2xl font-semibold text-newayzi-jet">
-        Detalle de conexión PMS
-      </h1>
+      <AdminPageHeader
+        title="Detalle de conexión PMS"
+        subtitle="Revisa el estado de sincronización y configura las credenciales"
+      />
       <ConnectionDetailClient />
     </div>
   );
