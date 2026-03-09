@@ -125,9 +125,9 @@ export function ConnectionDetailClient() {
   }
   if (!connection) {
     return (
-      <Card className="border border-semantic-surface-border">
+      <Card className="border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm">
         <CardBody>
-          <p className="text-semantic-text-muted">Conexión no encontrada.</p>
+          <p className="text-gray-500">Conexión no encontrada.</p>
           <Button as={Link} href="/admin/connections" className="mt-2">
             Volver
           </Button>
@@ -143,11 +143,11 @@ export function ConnectionDetailClient() {
           Volver
         </Button>
       </div>
-      <Card className="border border-semantic-surface-border">
+      <Card className="border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm">
         <CardBody className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-sm text-semantic-text-muted">Nombre / Tipo</p>
+              <p className="text-sm text-gray-500">Nombre / Tipo</p>
               <p className="font-sora font-semibold text-newayzi-jet">
                 {connection.name || connection.pms_type} · {connection.pms_type}
               </p>
@@ -168,7 +168,7 @@ export function ConnectionDetailClient() {
             </p>
           )}
           {connection.pms_type === "generic" && canEditConnections && (
-            <div className="rounded-lg border border-semantic-surface-border bg-semantic-surface-subdued/30 p-4 space-y-3 mt-4">
+            <div className="rounded-xl border border-gray-200/60 bg-gray-50/80 p-4 space-y-3 mt-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-newayzi-jet">Credenciales de la API</p>
                 {!editingConfig ? (
@@ -192,7 +192,7 @@ export function ConnectionDetailClient() {
                     </Button>
                     <Button
                       size="sm"
-                      color="primary"
+                      className="btn-newayzi-primary"
                       onPress={saveConfig}
                       isLoading={savingConfig}
                       isDisabled={!configBaseUrl.trim() || !configUsername.trim()}
@@ -228,7 +228,7 @@ export function ConnectionDetailClient() {
                   />
                 </div>
               ) : (
-                <div className="text-sm text-semantic-text-muted space-y-1">
+                <div className="text-sm text-gray-500 space-y-1">
                   <p>URL: {configBaseUrl || "—"}</p>
                   <p>Usuario: {configUsername || "—"}</p>
                   <p>Contraseña: ••••••••</p>
@@ -236,7 +236,7 @@ export function ConnectionDetailClient() {
               )}
             </div>
           )}
-          <p className="text-sm text-semantic-text-muted">
+          <p className="text-sm text-gray-500">
             Última sincronización:{" "}
             {connection.last_sync_at
               ? new Date(connection.last_sync_at).toLocaleString("es")
@@ -244,7 +244,7 @@ export function ConnectionDetailClient() {
           </p>
           {canSyncConnection && (
             <Button
-              color="primary"
+              className="btn-newayzi-primary"
               onPress={handleSyncNow}
               isLoading={syncing}
               startContent={!syncing ? <Icon icon="solar:refresh-outline" width={18} /> : undefined}
@@ -255,9 +255,9 @@ export function ConnectionDetailClient() {
         </CardBody>
       </Card>
 
-      <Card className="border border-semantic-surface-border">
+      <Card className="border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm">
         <CardBody>
-          <div className="flex flex-wrap gap-2 border-b border-semantic-surface-border mb-4">
+          <div className="flex flex-wrap gap-2 border-b border-gray-200/60 mb-4">
             {(["synced", "pending", "disabled", "available"] as TabKey[]).map((tab) => {
               const counts = unitsSummary?.counts;
               const label =
@@ -280,7 +280,7 @@ export function ConnectionDetailClient() {
                   className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${
                     activeTab === tab
                       ? "border-newayzi-han-purple text-newayzi-han-purple"
-                      : "border-transparent text-semantic-text-muted"
+                      : "border-transparent text-gray-500"
                   }`}
                 >
                   {label} ({count})
@@ -295,7 +295,7 @@ export function ConnectionDetailClient() {
               className={`text-sm px-3 py-1 rounded ${
                 viewType === "properties"
                   ? "bg-newayzi-han-purple/10 text-newayzi-han-purple"
-                  : "text-semantic-text-muted"
+                  : "text-gray-500"
               }`}
             >
               Propiedades
@@ -306,7 +306,7 @@ export function ConnectionDetailClient() {
               className={`text-sm px-3 py-1 rounded ${
                 viewType === "room_types"
                   ? "bg-newayzi-han-purple/10 text-newayzi-han-purple"
-                  : "text-semantic-text-muted"
+                  : "text-gray-500"
               }`}
             >
               Tipos de habitación
@@ -339,7 +339,7 @@ export function ConnectionDetailClient() {
                 <TableBody>
                   {data.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isRoom ? 4 : 3} className="text-center text-semantic-text-muted">
+                      <TableCell className="text-center text-gray-500" colSpan={isRoom ? 4 : 3}>
                         No hay {activeTab === "synced" ? "sincronizadas" : activeTab === "pending" ? "pendientes" : activeTab === "disabled" ? "no disponibles" : "disponibles"}
                       </TableCell>
                     </TableRow>
@@ -347,18 +347,19 @@ export function ConnectionDetailClient() {
                     data.map((u, i) => (
                       <TableRow key={i}>
                         {isRoom ? (
-                          <>
-                            <TableCell>{u.local_property_name ?? u.local_property_id ?? "—"}</TableCell>
-                            <TableCell>{u.local_room_name ?? u.local_room_type_id ?? "—"}</TableCell>
-                            <TableCell>{u.pms_room_id ?? u.pms_property_id ?? "—"}</TableCell>
-                          </>
+                          [
+                            <TableCell key="a">{u.local_property_name ?? u.local_property_id ?? "—"}</TableCell>,
+                            <TableCell key="b">{u.local_room_name ?? u.local_room_type_id ?? "—"}</TableCell>,
+                            <TableCell key="c">{u.pms_room_id ?? u.pms_property_id ?? "—"}</TableCell>,
+                            <TableCell key="d">{u.status}</TableCell>,
+                          ]
                         ) : (
-                          <>
-                            <TableCell>{u.local_property_name ?? u.local_property_id ?? "—"}</TableCell>
-                            <TableCell>{u.pms_property_id ?? "—"}</TableCell>
-                          </>
+                          [
+                            <TableCell key="a">{u.local_property_name ?? u.local_property_id ?? "—"}</TableCell>,
+                            <TableCell key="b">{u.pms_property_id ?? "—"}</TableCell>,
+                            <TableCell key="c">{u.status}</TableCell>,
+                          ]
                         )}
-                        <TableCell>{u.status}</TableCell>
                       </TableRow>
                     ))
                   )}

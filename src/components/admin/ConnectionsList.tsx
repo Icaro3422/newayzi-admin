@@ -36,7 +36,7 @@ export function ConnectionsList({ refreshKey = 0 }: { refreshKey?: number }) {
   }
 
   return (
-    <Table aria-label="Conexiones PMS" classNames={{ wrapper: "border border-semantic-surface-border rounded-lg" }}>
+    <Table aria-label="Conexiones PMS" classNames={{ wrapper: "border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm overflow-hidden" }}>
       <TableHeader>
         <TableColumn>Nombre</TableColumn>
         <TableColumn>Tipo PMS</TableColumn>
@@ -54,7 +54,7 @@ export function ConnectionsList({ refreshKey = 0 }: { refreshKey?: number }) {
             <TableCell>{c.operator_name ?? "—"}</TableCell>
             <TableCell className="text-sm">
               {c.counts ? (
-                <span className="text-semantic-text-muted">
+                <span className="text-gray-500">
                   Prop: {c.counts.properties_synced} sinc. / {c.counts.properties_pending} pend. / {c.counts.properties_disabled} no disp.
                   <br />
                   Rooms: {c.counts.room_types_synced} sinc. / {c.counts.room_types_pending} pend. / {c.counts.room_types_disabled} no disp.

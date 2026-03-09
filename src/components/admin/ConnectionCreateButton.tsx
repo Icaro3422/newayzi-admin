@@ -88,7 +88,7 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
   return (
     <>
       <Button
-        color="primary"
+        className="btn-newayzi-primary"
         onPress={() => setOpen(true)}
         startContent={<Icon icon="solar:add-circle-outline" width={20} />}
       >
@@ -114,7 +114,7 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
             </Select>
 
             {isGeneric && (
-              <div className="rounded-lg border border-semantic-surface-border bg-semantic-surface-subdued/50 p-4 space-y-4">
+              <div className="rounded-xl border border-gray-200/60 bg-gray-50/80 p-4 space-y-4">
                 <p className="text-sm font-medium text-newayzi-jet">
                   Credenciales de la API
                 </p>
@@ -179,7 +179,7 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
               Cancelar
             </Button>
             <Button
-              color="primary"
+              className="btn-newayzi-primary"
               onPress={handleCreate}
               isLoading={saving}
               isDisabled={!canSubmit}

@@ -44,7 +44,7 @@ export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
   return (
     <>
       <Button
-        color="primary"
+        className="btn-newayzi-primary"
         onPress={() => setOpen(true)}
         startContent={<Icon icon="solar:add-circle-outline" width={20} />}
       >
@@ -70,7 +70,7 @@ export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
               Cancelar
             </Button>
             <Button
-              color="primary"
+              className="btn-newayzi-primary"
               onPress={handleCreate}
               isLoading={saving}
               isDisabled={!canSubmit}
@@ -88,10 +88,10 @@ export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
                 <Icon icon="solar:letter-bold" width={48} className="text-emerald-600" />
               </div>
               <h3 className="text-lg font-semibold text-newayzi-jet">Correo enviado exitosamente</h3>
-              <p className="text-sm text-semantic-text-muted">
+              <p className="text-sm text-gray-500">
                 El agente ha recibido un correo con sus credenciales temporales. Deberá cambiar la contraseña en su primer inicio de sesión.
               </p>
-              <Button color="primary" onPress={() => setShowSuccess(false)}>
+              <Button className="btn-newayzi-primary" onPress={() => setShowSuccess(false)}>
                 Entendido
               </Button>
             </div>
