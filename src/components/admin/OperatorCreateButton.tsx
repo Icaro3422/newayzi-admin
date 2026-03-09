@@ -86,7 +86,7 @@ export function OperatorCreateButton({ onCreated }: { onCreated?: () => void }) 
               <p className="text-sm text-semantic-text-muted">
                 {successEmailSent
                   ? "El operador ha recibido un correo con sus credenciales temporales. Deberá cambiar la contraseña en su primer inicio de sesión."
-                  : "El operador se creó correctamente, pero no se pudo enviar el correo de invitación. Verifica que CLERK_SECRET_KEY y CHATIICO_API_KEY estén configurados en el backend, y que el email no esté ya registrado en Clerk."}
+                  : "El operador se creó correctamente, pero no se pudo enviar el correo de invitación. Verifica que RESEND_API_KEY esté configurado en el backend."}
               </p>
               <Button color="primary" onPress={() => setShowSuccess(false)}>
                 Entendido
