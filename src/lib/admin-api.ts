@@ -3,7 +3,43 @@
  * Alineado con el plan: GET /api/admin/me/, properties, connections, operators, etc.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+function getApiBase(): string {
+  const env = process.env.NEXT_PUBLIC_API_URL?.trim();
+
+  if (env) {
+    const isLocalhostUrl =
+      env.includes("localhost") || env.includes("127.0.0.1");
+
+    if (typeof window === "undefined") {
+      // Server-side (SSR): usar env tal cual
+      return env.replace(/\/$/, "");
+    }
+
+    const h = window.location.hostname;
+    const isLocalBrowser = h === "localhost" || h === "127.0.0.1";
+
+    if (!isLocalhostUrl || isLocalBrowser) {
+      // URL apunta a producción, o estamos en local → usar env
+      return env.replace(/\/$/, "");
+    }
+    // env apunta a localhost pero el browser está en un host real
+    // → ignorar env y usar detección por hostname
+  }
+
+  // Detección automática por hostname del browser
+  if (typeof window !== "undefined") {
+    const h = window.location.hostname;
+    if (h === "portal.newayzi.com") return "https://api.newayzi.com";
+    if (h === "portal.staging.newayzi.com")
+      return "https://api.staging.newayzi.com";
+    if (h === "localhost" || h === "127.0.0.1") return "http://localhost:8000";
+  }
+  return "";
+}
+
+// Nota: se evalúa una vez en el browser al cargar el módulo.
+// En SSR nunca se hacen llamadas a la API (todo está en useEffect/useCallback).
+const API_BASE = getApiBase();
 
 export type AdminRole = "super_admin" | "visualizador" | "comercial" | "operador" | "agente";
 

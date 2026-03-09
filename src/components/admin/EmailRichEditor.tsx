@@ -69,7 +69,7 @@ const ToolbarIcons = {
   ),
 };
 
-const MenuBar = ({ editor }: { editor: ReturnType<typeof useEditor> }) => {
+const MenuBar = ({ editor, dark }: { editor: ReturnType<typeof useEditor>; dark?: boolean }) => {
   const [linkPopoverOpen, setLinkPopoverOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
 
@@ -151,15 +151,20 @@ const MenuBar = ({ editor }: { editor: ReturnType<typeof useEditor> }) => {
 
   if (!editor) return null;
 
+  const btnBase = dark ? "text-white/70 hover:bg-white/10" : "text-gray-700";
+  const btnActive = dark ? "bg-[#5e2cec]/30 text-[#b89eff]" : "bg-newayzi-han-purple/20 text-newayzi-han-purple";
+
   return (
-    <div className="flex flex-wrap gap-1 border-b border-semantic-surface-border bg-gray-50/80 p-2 rounded-t-lg">
+    <div className={`flex flex-wrap gap-1 border-b p-2 rounded-t-lg ${
+      dark ? "border-white/[0.12] bg-white/[0.04]" : "border-semantic-surface-border bg-gray-50/80"
+    }`}>
       <Button
         type="button"
         size="sm"
         variant="flat"
         isIconOnly
         onPress={() => editor.chain().focus().toggleBold().run()}
-        className={editor.isActive("bold") ? "bg-newayzi-han-purple/20 text-newayzi-han-purple" : "text-gray-700"}
+        className={editor.isActive("bold") ? btnActive : btnBase}
         aria-label="Negrita"
       >
         {ToolbarIcons.bold}
@@ -170,7 +175,7 @@ const MenuBar = ({ editor }: { editor: ReturnType<typeof useEditor> }) => {
         variant="flat"
         isIconOnly
         onPress={() => editor.chain().focus().toggleItalic().run()}
-        className={editor.isActive("italic") ? "bg-newayzi-han-purple/20 text-newayzi-han-purple" : "text-gray-700"}
+        className={editor.isActive("italic") ? btnActive : btnBase}
         aria-label="Cursiva"
       >
         {ToolbarIcons.italic}
@@ -181,19 +186,19 @@ const MenuBar = ({ editor }: { editor: ReturnType<typeof useEditor> }) => {
         variant="flat"
         isIconOnly
         onPress={() => editor.chain().focus().toggleStrike().run()}
-        className={editor.isActive("strike") ? "bg-newayzi-han-purple/20 text-newayzi-han-purple" : "text-gray-700"}
+        className={editor.isActive("strike") ? btnActive : btnBase}
         aria-label="Tachado"
       >
         {ToolbarIcons.strike}
       </Button>
-      <div className="w-px h-6 bg-gray-200 mx-1" />
+      <div className={`w-px h-6 mx-1 ${dark ? "bg-white/20" : "bg-gray-200"}`} />
       <Button
         type="button"
         size="sm"
         variant="flat"
         isIconOnly
         onPress={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-        className={editor.isActive("heading", { level: 2 }) ? "bg-newayzi-han-purple/20 text-newayzi-han-purple" : "text-gray-700"}
+        className={editor.isActive("heading", { level: 2 }) ? btnActive : btnBase}
         aria-label="Título"
       >
         {ToolbarIcons.h2}
@@ -204,7 +209,7 @@ const MenuBar = ({ editor }: { editor: ReturnType<typeof useEditor> }) => {
         variant="flat"
         isIconOnly
         onPress={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-        className={editor.isActive("heading", { level: 3 }) ? "bg-newayzi-han-purple/20 text-newayzi-han-purple" : "text-gray-700"}
+        className={editor.isActive("heading", { level: 3 }) ? btnActive : btnBase}
         aria-label="Subtítulo"
       >
         {ToolbarIcons.h3}
@@ -215,19 +220,19 @@ const MenuBar = ({ editor }: { editor: ReturnType<typeof useEditor> }) => {
         variant="flat"
         isIconOnly
         onPress={() => editor.chain().focus().setParagraph().run()}
-        className={editor.isActive("paragraph") ? "bg-newayzi-han-purple/20 text-newayzi-han-purple" : "text-gray-700"}
+        className={editor.isActive("paragraph") ? btnActive : btnBase}
         aria-label="Párrafo"
       >
         {ToolbarIcons.paragraph}
       </Button>
-      <div className="w-px h-6 bg-gray-200 mx-1" />
+      <div className={`w-px h-6 mx-1 ${dark ? "bg-white/20" : "bg-gray-200"}`} />
       <Button
         type="button"
         size="sm"
         variant="flat"
         isIconOnly
         onPress={() => editor.chain().focus().toggleBulletList().run()}
-        className={editor.isActive("bulletList") ? "bg-newayzi-han-purple/20 text-newayzi-han-purple" : "text-gray-700"}
+        className={editor.isActive("bulletList") ? btnActive : btnBase}
         aria-label="Lista"
       >
         {ToolbarIcons.bulletList}
@@ -238,7 +243,7 @@ const MenuBar = ({ editor }: { editor: ReturnType<typeof useEditor> }) => {
         variant="flat"
         isIconOnly
         onPress={() => editor.chain().focus().toggleOrderedList().run()}
-        className={editor.isActive("orderedList") ? "bg-newayzi-han-purple/20 text-newayzi-han-purple" : "text-gray-700"}
+        className={editor.isActive("orderedList") ? btnActive : btnBase}
         aria-label="Lista numerada"
       >
         {ToolbarIcons.orderedList}
@@ -249,12 +254,12 @@ const MenuBar = ({ editor }: { editor: ReturnType<typeof useEditor> }) => {
         variant="flat"
         isIconOnly
         onPress={() => editor.chain().focus().toggleBlockquote().run()}
-        className={editor.isActive("blockquote") ? "bg-newayzi-han-purple/20 text-newayzi-han-purple" : "text-gray-700"}
+        className={editor.isActive("blockquote") ? btnActive : btnBase}
         aria-label="Cita"
       >
         {ToolbarIcons.quote}
       </Button>
-      <div className="w-px h-6 bg-gray-200 mx-1" />
+      <div className={`w-px h-6 mx-1 ${dark ? "bg-white/20" : "bg-gray-200"}`} />
       <Popover isOpen={linkPopoverOpen} onOpenChange={setLinkPopoverOpen} placement="bottom-start">
         <PopoverTrigger>
           <Button
@@ -262,13 +267,13 @@ const MenuBar = ({ editor }: { editor: ReturnType<typeof useEditor> }) => {
             size="sm"
             variant="flat"
             isIconOnly
-            className={editor.isActive("link") ? "bg-newayzi-han-purple/20 text-newayzi-han-purple" : "text-gray-700"}
+            className={editor.isActive("link") ? btnActive : btnBase}
             aria-label="Insertar enlace"
           >
             {ToolbarIcons.link}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-80">
+        <PopoverContent className={`w-80 ${dark ? "bg-[#0f1220] border border-white/[0.1]" : ""}`}>
           <div className="p-3 space-y-3">
               <Input
                 label="URL del enlace"
@@ -277,6 +282,11 @@ const MenuBar = ({ editor }: { editor: ReturnType<typeof useEditor> }) => {
                 onValueChange={setLinkUrl}
                 onKeyDown={(e) => e.key === "Enter" && handleSetLink()}
                 autoFocus
+                classNames={dark ? {
+                  inputWrapper: "rounded-xl border bg-white/[0.08] border-white/[0.14]",
+                  input: "!text-white/95 placeholder:!text-white/38",
+                  label: "!text-white/70",
+                } : undefined}
               />
               <div className="flex gap-2 justify-end">
                 {editor.isActive("link") && (
@@ -284,21 +294,27 @@ const MenuBar = ({ editor }: { editor: ReturnType<typeof useEditor> }) => {
                     Quitar enlace
                   </Button>
                 )}
-                <Button size="sm" color="primary" onPress={handleSetLink} isLoading={linkLoading}>
+                <Button
+                  size="sm"
+                  color="primary"
+                  onPress={handleSetLink}
+                  isLoading={linkLoading}
+                  className={dark ? "bg-[#5e2cec] hover:bg-[#6d3cf5] text-white" : ""}
+                >
                   {linkLoading ? "Obteniendo vista previa…" : "Aplicar"}
                 </Button>
               </div>
             </div>
         </PopoverContent>
       </Popover>
-      <div className="w-px h-6 bg-gray-200 mx-1" />
+      <div className={`w-px h-6 mx-1 ${dark ? "bg-white/20" : "bg-gray-200"}`} />
       <Button
         type="button"
         size="sm"
         variant="flat"
         isIconOnly
         onPress={() => editor.chain().focus().setHorizontalRule().run()}
-        className="text-gray-700"
+        className={btnBase}
         aria-label="Línea horizontal"
       >
         {ToolbarIcons.hr}
@@ -312,6 +328,7 @@ interface EmailRichEditorProps {
   onChange: (html: string, text: string) => void;
   placeholder?: string;
   minHeight?: string;
+  theme?: "light" | "dark";
 }
 
 export function EmailRichEditor({
@@ -319,6 +336,7 @@ export function EmailRichEditor({
   onChange,
   placeholder = "Escribe el contenido del email. Usa negrita, listas y títulos para comunicaciones profesionales.",
   minHeight = "280px",
+  theme = "light",
 }: EmailRichEditorProps) {
   const editor = useEditor({
     immediatelyRender: false,
@@ -341,7 +359,9 @@ export function EmailRichEditor({
     editorProps: {
       attributes: {
         class:
-          "prose prose-sm max-w-none focus:outline-none px-4 py-3 min-h-[200px] text-newayzi-jet",
+          theme === "dark"
+            ? "prose prose-sm prose-invert max-w-none focus:outline-none px-4 py-3 min-h-[200px] text-white/90"
+            : "prose prose-sm max-w-none focus:outline-none px-4 py-3 min-h-[200px] text-newayzi-jet",
       },
     },
     onUpdate: ({ editor }) => {
@@ -357,10 +377,14 @@ export function EmailRichEditor({
 
   return (
     <div
-      className="rounded-lg border border-semantic-surface-border bg-white overflow-hidden"
+      className={`rounded-lg border overflow-hidden ${
+        theme === "dark"
+          ? "border-white/[0.12] bg-white/[0.04]"
+          : "border-semantic-surface-border bg-white"
+      }`}
       style={{ minHeight }}
     >
-      {editor && <MenuBar editor={editor} />}
+      {editor && <MenuBar editor={editor} dark={theme === "dark"} />}
       <EditorContent editor={editor} />
       <style jsx global>{`
         .ProseMirror p {
@@ -370,13 +394,13 @@ export function EmailRichEditor({
           font-size: 1.25rem;
           font-weight: 700;
           margin: 1em 0 0.5em;
-          color: #2d2d2d;
+          color: inherit;
         }
         .ProseMirror h3 {
           font-size: 1.1rem;
           font-weight: 600;
           margin: 0.75em 0 0.4em;
-          color: #2d2d2d;
+          color: inherit;
         }
         .ProseMirror ul,
         .ProseMirror ol {
@@ -384,31 +408,40 @@ export function EmailRichEditor({
           margin: 0.5em 0;
         }
         .ProseMirror blockquote {
-          border-left: 4px solid #7c3aed;
+          border-left: 4px solid #9b74ff;
           padding-left: 1em;
           margin: 1em 0;
-          color: #4a4a4a;
+          color: inherit;
           font-style: italic;
+          opacity: 0.9;
         }
         .ProseMirror a {
-          color: #7c3aed;
+          color: #9b74ff;
           text-decoration: underline;
           cursor: pointer;
         }
         .ProseMirror a:hover {
-          color: #6d28d9;
+          color: #b89eff;
         }
         .ProseMirror hr {
           border: none;
-          border-top: 1px solid #e5e7eb;
+          border-top: 1px solid rgba(255,255,255,0.15);
           margin: 1.5em 0;
+        }
+        .ProseMirror:not(.prose-invert) hr {
+          border-top-color: #e5e7eb;
         }
         .ProseMirror p.is-editor-empty:first-child::before {
           content: attr(data-placeholder);
           float: left;
-          color: #9ca3af;
           pointer-events: none;
           height: 0;
+        }
+        .ProseMirror.prose-invert p.is-editor-empty:first-child::before {
+          color: rgba(255,255,255,0.4);
+        }
+        .ProseMirror:not(.prose-invert) p.is-editor-empty:first-child::before {
+          color: #9ca3af;
         }
       `}</style>
     </div>

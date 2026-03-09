@@ -2,11 +2,29 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Card, CardBody, Button, Input, Switch, Spinner } from "@heroui/react";
+import { Button, Input, Switch, Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useParams } from "next/navigation";
 import { adminApi, type Operator } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
+
+function GlassCard({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6 transition-all duration-300 hover:border-white/[0.14] hover:bg-white/[0.065] ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+const inputDark = "rounded-xl border";
 
 export function OperatorDetailClient() {
   const params = useParams();
@@ -56,51 +74,97 @@ export function OperatorDetailClient() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <Spinner size="lg" color="primary" />
-      </div>
+      <GlassCard className="flex justify-center items-center py-16">
+        <Spinner
+          size="lg"
+          classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }}
+        />
+      </GlassCard>
     );
   }
   if (!operator) {
     return (
-      <Card className="border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm">
-        <CardBody>
-          <p className="text-gray-500">Operador no encontrado.</p>
-          <Button as={Link} href="/admin/operators" className="mt-2">Volver</Button>
-        </CardBody>
-      </Card>
+      <GlassCard>
+        <p className="text-white/70 font-sora">Operador no encontrado.</p>
+        <Button
+          as={Link}
+          href="/admin/operators"
+          className="mt-4 text-white/90 hover:bg-white/[0.1] border border-white/[0.15] rounded-xl font-medium bg-white/[0.06]"
+        >
+          Volver
+        </Button>
+      </GlassCard>
     );
   }
 
   return (
     <div className="space-y-6">
-      <Button as={Link} href="/admin/operators" variant="flat" startContent={<Icon icon="solar:arrow-left-outline" width={18} />}>
+      <Button
+        as={Link}
+        href="/admin/operators"
+        variant="flat"
+        className="text-white/90 hover:bg-white/[0.1] border border-white/[0.15] rounded-xl font-medium bg-white/[0.06]"
+        startContent={<Icon icon="solar:arrow-left-outline" width={18} />}
+      >
         Volver
       </Button>
-      <Card className="border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm">
-        <CardBody className="space-y-4">
-          <Input label="Nombre" value={name} onValueChange={setName} isReadOnly={!canEdit} />
-          <Input label="Email contacto" value={contact_email} onValueChange={setContactEmail} isReadOnly={!canEdit} />
-          <Input label="Teléfono contacto" value={contact_phone} onValueChange={setContactPhone} isReadOnly={!canEdit} />
+      <GlassCard>
+        <div className="flex flex-col gap-6">
+          <Input
+            label="Nombre"
+            value={name}
+            onValueChange={setName}
+            isReadOnly={!canEdit}
+            classNames={{
+              inputWrapper: inputDark,
+              input: "!text-white/95 placeholder:!text-white/38",
+              label: "!text-white/65",
+            }}
+          />
+          <Input
+            label="Email contacto"
+            value={contact_email}
+            onValueChange={setContactEmail}
+            isReadOnly={!canEdit}
+            classNames={{
+              inputWrapper: inputDark,
+              input: "!text-white/95 placeholder:!text-white/38",
+              label: "!text-white/65",
+            }}
+          />
+          <Input
+            label="Teléfono contacto"
+            value={contact_phone}
+            onValueChange={setContactPhone}
+            isReadOnly={!canEdit}
+            classNames={{
+              inputWrapper: inputDark,
+              input: "!text-white/95 placeholder:!text-white/38",
+              label: "!text-white/65",
+            }}
+          />
           {canEdit && (
-            <Switch isSelected={is_active} onValueChange={setIsActive}>
-              Activo
+            <Switch isSelected={is_active} onValueChange={setIsActive} color="primary">
+              <span className="text-sm font-medium text-white/85 font-sora">Activo</span>
             </Switch>
           )}
           {canEdit && (
-            <Button color="primary" onPress={handleSave} isLoading={saving}>
+            <Button
+              className="btn-newayzi-primary rounded-xl"
+              onPress={handleSave}
+              isLoading={saving}
+              startContent={!saving ? <Icon icon="solar:diskette-outline" width={18} /> : undefined}
+            >
               Guardar cambios
             </Button>
           )}
-        </CardBody>
-      </Card>
-      <Card className="border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm">
-        <CardBody>
-          <p className="text-sm text-gray-500">
-            Conexiones asignadas: {operator.connections_count ?? 0}. Para asignar o cambiar la conexión, edita cada conexión en Conexiones PMS.
-          </p>
-        </CardBody>
-      </Card>
+        </div>
+      </GlassCard>
+      <GlassCard>
+        <p className="text-sm text-white/60">
+          Conexiones asignadas: {operator.connections_count ?? 0}. Para asignar o cambiar la conexión, edita cada conexión en Conexiones PMS.
+        </p>
+      </GlassCard>
     </div>
   );
 }

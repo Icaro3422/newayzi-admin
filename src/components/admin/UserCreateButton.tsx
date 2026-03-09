@@ -23,6 +23,8 @@ const ROLES: { value: AdminRole; label: string }[] = [
   { value: "operador", label: "Operador" },
 ];
 
+const inputDark = "rounded-xl border";
+
 export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
   const { canAccess } = useAdmin();
   const [open, setOpen] = useState(false);
@@ -91,13 +93,27 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
   return (
     <>
       <Button
-        color="primary"
+        className="btn-newayzi-primary"
         onPress={handleOpen}
         startContent={<Icon icon="solar:add-circle-outline" width={20} />}
       >
         Agregar usuario
       </Button>
-      <Modal isOpen={open} onOpenChange={setOpen}>
+      <Modal
+        isOpen={open}
+        onOpenChange={setOpen}
+        size="lg"
+        backdrop="blur"
+        classNames={{
+          base: "admin-modal-dark !bg-[#0f1220] rounded-[28px] border border-white/[0.12] backdrop-blur-xl shadow-2xl shadow-black/50 max-h-[90vh] overflow-hidden flex flex-col",
+          header: "border-b border-white/[0.08] !text-white font-sora font-bold text-lg shrink-0",
+          body: "!text-white/95 !bg-transparent overflow-y-auto",
+          footer: "border-t border-white/[0.08] !bg-transparent gap-2 shrink-0",
+          closeButton: "!text-white/90 hover:!bg-white/10 hover:!text-white rounded-full",
+          backdrop: "!bg-black/70 backdrop-blur-md",
+          wrapper: "!bg-transparent",
+        }}
+      >
         <ModalContent>
           <ModalHeader>Agregar usuario</ModalHeader>
           <ModalBody className="space-y-4">
@@ -107,16 +123,31 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
               onValueChange={setEmail}
               type="email"
               isRequired
+              classNames={{
+                inputWrapper: inputDark,
+                input: "!text-white/95 placeholder:!text-white/38",
+                label: "!text-white/70",
+              }}
             />
             <Input
               label="Nombre"
               value={first_name}
               onValueChange={setFirstName}
+              classNames={{
+                inputWrapper: inputDark,
+                input: "!text-white/95 placeholder:!text-white/38",
+                label: "!text-white/70",
+              }}
             />
             <Input
               label="Apellido"
               value={last_name}
               onValueChange={setLastName}
+              classNames={{
+                inputWrapper: inputDark,
+                input: "!text-white/95 placeholder:!text-white/38",
+                label: "!text-white/70",
+              }}
             />
             <Input
               label="Contraseña temporal"
@@ -125,6 +156,12 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
               onValueChange={setPassword}
               isRequired
               description="Mínimo 8 caracteres. Clerk forzará el cambio en el primer inicio de sesión."
+              classNames={{
+                inputWrapper: inputDark,
+                input: "!text-white/95 placeholder:!text-white/38",
+                label: "!text-white/70",
+                description: "!text-white/50",
+              }}
             />
             <Select
               label="Rol"
@@ -135,8 +172,19 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
               }}
               isRequired
               items={ROLES}
+              classNames={{
+                trigger: inputDark,
+                value: "!text-white/92",
+                label: "!text-white/70",
+                selectorIcon: "!text-white/50",
+                popoverContent: "bg-[#0f1220] border border-white/[0.1]",
+              }}
             >
-              {(item) => <SelectItem key={item.value}>{item.label}</SelectItem>}
+              {(item) => (
+                <SelectItem key={item.value} className="text-white">
+                  {item.label}
+                </SelectItem>
+              )}
             </Select>
             {role === "operador" && (
               <Select
@@ -148,22 +196,35 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
                 }}
                 placeholder="Seleccionar operador"
                 items={[{ id: "", name: "Ninguno" }, ...operators]}
+                classNames={{
+                  trigger: inputDark,
+                  value: "!text-white/92",
+                  label: "!text-white/70",
+                  selectorIcon: "!text-white/50",
+                  popoverContent: "bg-[#0f1220] border border-white/[0.1]",
+                }}
               >
                 {(item) => (
-                  <SelectItem key={String(item.id)}>{item.name}</SelectItem>
+                  <SelectItem key={String(item.id)} className="text-white">
+                    {item.name}
+                  </SelectItem>
                 )}
               </Select>
             )}
             {error && (
-              <p className="text-sm text-red-600">{error}</p>
+              <p className="text-sm text-red-400">{error}</p>
             )}
           </ModalBody>
           <ModalFooter>
-            <Button variant="flat" onPress={() => setOpen(false)}>
+            <Button
+              variant="flat"
+              onPress={() => setOpen(false)}
+              className="text-white/80 hover:bg-white/10"
+            >
               Cancelar
             </Button>
             <Button
-              color="primary"
+              className="bg-[#5e2cec] hover:bg-[#6d3cf5] text-white"
               onPress={handleCreate}
               isLoading={saving}
               isDisabled={!canSubmit}
@@ -173,25 +234,39 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
           </ModalFooter>
         </ModalContent>
       </Modal>
-      <Modal isOpen={showSuccess} onOpenChange={setShowSuccess}>
+      <Modal
+        isOpen={showSuccess}
+        onOpenChange={setShowSuccess}
+        backdrop="blur"
+        classNames={{
+          base: "admin-modal-dark !bg-[#0f1220] rounded-[28px] border border-white/[0.12] backdrop-blur-xl shadow-2xl shadow-black/50",
+          body: "!text-white/95 !bg-transparent",
+          closeButton: "!text-white/90 hover:!bg-white/10 hover:!text-white rounded-full",
+          backdrop: "!bg-black/70 backdrop-blur-md",
+          wrapper: "!bg-transparent",
+        }}
+      >
         <ModalContent>
           <ModalBody className="py-8">
             <div className="flex flex-col items-center gap-4 text-center">
-              <div className="rounded-full bg-emerald-100 p-4">
+              <div className="rounded-2xl bg-emerald-500/25 border border-emerald-400/30 p-4">
                 <Icon
                   icon="solar:user-check-bold"
                   width={48}
-                  className="text-emerald-600"
+                  className="text-emerald-300"
                 />
               </div>
-              <h3 className="text-lg font-semibold text-newayzi-jet">
+              <h3 className="font-sora font-bold text-white text-lg">
                 Usuario creado
               </h3>
-              <p className="text-sm text-semantic-text-muted">
+              <p className="text-sm text-white/60 max-w-sm">
                 El usuario puede iniciar sesión con el email y contraseña indicados.
                 Clerk le pedirá cambiar la contraseña en su primer acceso.
               </p>
-              <Button color="primary" onPress={() => setShowSuccess(false)}>
+              <Button
+                className="btn-newayzi-primary"
+                onPress={() => setShowSuccess(false)}
+              >
                 Entendido
               </Button>
             </div>

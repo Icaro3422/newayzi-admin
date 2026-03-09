@@ -2,12 +2,6 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import {
-  Table,
-  TableHeader,
-  TableColumn,
-  TableBody,
-  TableRow,
-  TableCell,
   Input,
   Button,
   Spinner,
@@ -15,7 +9,6 @@ import {
   SelectItem,
   Tabs,
   Tab,
-  Chip,
   Modal,
   ModalContent,
   ModalHeader,
@@ -23,9 +16,26 @@ import {
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { adminApi, type AvailabilityItem, type PropertyListItem, type Operator } from "@/lib/admin-api";
-import { ModalPatternBg } from "@/components/ui/ModalPatternBg";
 
 type ViewMode = "calendar" | "table";
+
+function GlassCard({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6 transition-all duration-300 hover:border-white/[0.14] hover:bg-white/[0.065] ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+const inputDark = "rounded-xl border";
 
 type SlotDetail = {
   propertyName: string;
@@ -38,7 +48,7 @@ type SlotDetail = {
 
 function formatShortDate(d: string) {
   const date = new Date(d);
-  return date.toLocaleDateString("es-CO", { day: "2-digit", month: "short" });
+  return date.toLocaleDateString("es-CO", { day: "numeric", month: "short" });
 }
 
 function formatLongDate(d: string) {
@@ -47,8 +57,8 @@ function formatLongDate(d: string) {
 }
 
 function getAvailabilityColor(available: number): string {
-  if (available > 0) return "bg-emerald-500/20 text-emerald-800 border-emerald-300";
-  return "bg-slate-100 text-slate-500 border-slate-200";
+  if (available > 0) return "bg-emerald-500/25 text-emerald-300 border border-emerald-400/30";
+  return "bg-white/10 text-white/50 border border-white/[0.08]";
 }
 
 function formatPrice(value: string | number, currency = "COP"): string {
@@ -212,10 +222,20 @@ export function AvailabilityList() {
   }, [list]);
 
   return (
-    <div className="space-y-4">
-      {/* Filtros mejorados */}
-      <div className="rounded-[20px] border border-gray-200/60 bg-white/90 backdrop-blur-sm shadow-sm p-4">
-        <p className="mb-3 text-sm font-medium text-newayzi-jet">Filtros</p>
+    <div className="space-y-5">
+      {/* Filtros */}
+      <GlassCard className="p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
+            <Icon icon="solar:filter-bold-duotone" className="text-[#9b74ff] text-base" />
+          </div>
+          <div>
+            <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Filtros</p>
+            <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
+              Operador, propiedad y fechas
+            </p>
+          </div>
+        </div>
         <div className="flex flex-wrap items-end gap-4">
           <Select
             label="Operador"
@@ -228,8 +248,16 @@ export function AvailabilityList() {
             size="sm"
             className="w-48"
             items={[{ id: "__all__", name: "Todos los operadores" }, ...operators]}
+            classNames={{
+              trigger: inputDark,
+              label: "!text-white/65",
+              value: "!text-white/92 font-medium",
+              innerWrapper: "!text-white",
+              selectorIcon: "!text-white/50",
+              popoverContent: "bg-[#0f1220] border border-white/[0.1]",
+            }}
           >
-            {(item) => <SelectItem key={String(item.id)}>{item.name}</SelectItem>}
+            {(item) => <SelectItem key={String(item.id)} className="text-white">{item.name}</SelectItem>}
           </Select>
           <Select
             label="Propiedad"
@@ -243,8 +271,16 @@ export function AvailabilityList() {
             className="w-56"
             aria-label="Filtrar por propiedad"
             items={[{ id: "__all__", name: "Todas las propiedades" }, ...properties]}
+            classNames={{
+              trigger: inputDark,
+              label: "!text-white/65",
+              value: "!text-white/92 font-medium",
+              innerWrapper: "!text-white",
+              selectorIcon: "!text-white/50",
+              popoverContent: "bg-[#0f1220] border border-white/[0.1]",
+            }}
           >
-            {(item) => <SelectItem key={String(item.id)}>{item.name}</SelectItem>}
+            {(item) => <SelectItem key={String(item.id)} className="text-white">{item.name}</SelectItem>}
           </Select>
           <Input
             label="Desde"
@@ -253,6 +289,11 @@ export function AvailabilityList() {
             onValueChange={setDateFrom}
             size="sm"
             className="w-36"
+            classNames={{
+              inputWrapper: inputDark,
+              input: "!text-white/95 placeholder:!text-white/38",
+              label: "!text-white/65",
+            }}
           />
           <Input
             label="Hasta"
@@ -261,18 +302,29 @@ export function AvailabilityList() {
             onValueChange={setDateTo}
             size="sm"
             className="w-36"
+            classNames={{
+              inputWrapper: inputDark,
+              input: "!text-white/95 placeholder:!text-white/38",
+              label: "!text-white/65",
+            }}
           />
           <Button className="btn-newayzi-primary" size="sm" onPress={load} startContent={<Icon icon="solar:magnifer-outline" width={18} />}>
             Filtrar
           </Button>
         </div>
-      </div>
+      </GlassCard>
 
       {/* Tabs: Calendario / Tabla */}
       <Tabs
         selectedKey={viewMode}
         onSelectionChange={(k) => setViewMode(k as ViewMode)}
         size="sm"
+        classNames={{
+          tabList: "bg-white/[0.06] border border-white/[0.1] rounded-xl p-1",
+          cursor: "bg-[#5e2cec]/40 rounded-lg",
+          tab: "text-white/70 data-[selected=true]:text-white",
+          tabContent: "group-data-[selected=true]:text-white",
+        }}
       >
         <Tab
           key="calendar"
@@ -295,28 +347,29 @@ export function AvailabilityList() {
       </Tabs>
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <Spinner size="lg" color="primary" />
-        </div>
+        <GlassCard className="flex justify-center items-center py-16">
+          <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+        </GlassCard>
       ) : viewMode === "calendar" ? (
         /* Vista calendario */
-        <div className="overflow-x-auto rounded-[20px] border border-gray-200/60 bg-white/90 backdrop-blur-sm shadow-sm overflow-hidden">
+        <GlassCard className="p-0 overflow-hidden">
           {list.length === 0 ? (
-            <div className="py-12 text-center text-gray-500">
+            <div className="py-16 text-center text-white/50">
               No hay datos de disponibilidad. Ajusta filtros o espera sincronización PMS.
             </div>
           ) : (
-            <div className="min-w-max">
-              <table className="w-full border-collapse">
+            <>
+            <div className="calendar-scroll overflow-x-auto w-full max-w-full overscroll-x-contain">
+              <table className="border-collapse" style={{ minWidth: "max-content" }}>
                 <thead>
                   <tr>
-                    <th className="sticky left-0 z-10 min-w-[200px] border border-gray-200/60 bg-slate-50 px-3 py-2 text-left font-medium text-newayzi-jet">
+                    <th className="sticky left-0 z-10 min-w-[200px] border-b border-r border-white/[0.08] bg-[#0f1220] px-4 py-3 text-left text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold shadow-[4px_0_8px_-2px_rgba(0,0,0,0.3)]">
                       Propiedad
                     </th>
                     {dates.map((d) => (
                       <th
                         key={d}
-                        className="min-w-[80px] border border-gray-200/60 bg-slate-50 px-2 py-2 text-center text-xs font-medium text-slate-600"
+                        className="min-w-[120px] w-[120px] border-b border-white/[0.08] bg-white/[0.04] px-3 py-3 text-center text-xs font-medium text-white/60 whitespace-nowrap"
                       >
                         {formatShortDate(d)}
                       </th>
@@ -325,8 +378,8 @@ export function AvailabilityList() {
                 </thead>
                 <tbody>
                   {propertyRows.map((row) => (
-                    <tr key={row.id}>
-                      <td className="sticky left-0 z-10 border border-gray-200/60 bg-white px-3 py-2 font-medium text-newayzi-jet">
+                    <tr key={row.id} className="border-b border-white/[0.06] last:border-0 hover:bg-white/[0.02] transition-colors">
+                      <td className="sticky left-0 z-10 border-r border-white/[0.06] bg-[#0f1220] px-4 py-2 font-medium text-white/90 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.3)]">
                         {row.name}
                       </td>
                       {dates.map((d) => {
@@ -340,7 +393,7 @@ export function AvailabilityList() {
                         return (
                           <td
                             key={d}
-                            className={`border border-gray-200/60 px-2 py-2 text-center text-sm font-semibold ${getAvailabilityColor(avail)} ${hasDetail ? "cursor-pointer hover:ring-2 hover:ring-majorelle/40 hover:ring-inset transition-all" : ""}`}
+                            className={`border border-white/[0.06] px-3 py-3 text-center text-sm font-semibold align-top ${getAvailabilityColor(avail)} ${hasDetail ? "cursor-pointer hover:ring-2 hover:ring-[#5e2cec]/50 hover:ring-inset transition-all" : ""}`}
                             title={tooltip}
                             role={hasDetail ? "button" : undefined}
                             tabIndex={hasDetail ? 0 : undefined}
@@ -356,20 +409,20 @@ export function AvailabilityList() {
                                 : undefined
                             }
                           >
-                            <div className="flex flex-col items-center gap-0.5">
-                              <span>{avail}</span>
+                            <div className="flex flex-col items-center gap-1 min-w-0">
+                              <span className="text-base font-bold">{avail}</span>
                               {priceRange && (
-                                <span className="text-[9px] font-normal text-slate-600" title={`${formatPrice(priceRange.min, priceRange.currency)} - ${formatPrice(priceRange.max, priceRange.currency)}`}>
+                                <span className="text-[10px] font-medium text-white/70" title={`${formatPrice(priceRange.min, priceRange.currency)} - ${formatPrice(priceRange.max, priceRange.currency)}`}>
                                   {formatPriceRangeCompact(priceRange.min, priceRange.max, priceRange.currency)}
                                 </span>
                               )}
                               {hasDetail &&
                                 (detail.roomTypes.length === 1 ? (
-                                  <span className="max-w-[56px] truncate text-[9px] font-normal opacity-70" title={detail.roomTypes[0].roomTypeName}>
+                                  <span className="w-full text-[10px] font-normal opacity-80 leading-tight break-words line-clamp-2" title={detail.roomTypes[0].roomTypeName}>
                                     {detail.roomTypes[0].roomTypeName}
                                   </span>
                                 ) : (
-                                  <span className="text-[9px] font-normal opacity-60">{detail.roomTypes.length} tipos</span>
+                                  <span className="text-[10px] font-normal opacity-70">{detail.roomTypes.length} tipos</span>
                                 ))}
                             </div>
                           </td>
@@ -379,61 +432,71 @@ export function AvailabilityList() {
                   ))}
                 </tbody>
               </table>
-              {hasAvailability && (
-                <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-gray-200/60 px-4 py-2 text-xs text-slate-500">
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-3 w-3 rounded bg-emerald-500/30" /> Con disponibilidad
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-3 w-3 rounded bg-slate-100" /> Sin disponibilidad
-                  </span>
-                  <span className="flex items-center gap-1.5 text-majorelle">
-                    <Icon icon="solar:mouse-minimalistic-outline" width={14} /> Clic en un slot para ver detalle
-                  </span>
-                </div>
-              )}
             </div>
-          )}
-        </div>
-      ) : (
-        <Table aria-label="Disponibilidad" classNames={{ wrapper: "border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm overflow-hidden" }}>
-          <TableHeader>
-            <TableColumn>Propiedad</TableColumn>
-            <TableColumn>Tipo habitación</TableColumn>
-            <TableColumn>Fecha</TableColumn>
-            <TableColumn>Disponibles</TableColumn>
-            <TableColumn>Precio/noche</TableColumn>
-            <TableColumn>Fuente</TableColumn>
-          </TableHeader>
-          <TableBody>
-            {list.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-gray-500">
-                  No hay datos de disponibilidad. Ajusta filtros o espera sincronización PMS.
-                </TableCell>
-              </TableRow>
-            ) : (
-              list.map((a) => (
-                <TableRow key={`${a.property_id}-${a.room_type_id}-${a.date}`}>
-                  <TableCell>{a.property_name}</TableCell>
-                  <TableCell>{a.room_type_name}</TableCell>
-                  <TableCell>{a.date}</TableCell>
-                  <TableCell>
-                    <Chip size="sm" className={getAvailabilityColor(a.available)}>
-                      {a.available}
-                    </Chip>
-                  </TableCell>
-                  <TableCell>
-                    {a.price_per_night && a.currency
-                      ? formatPrice(a.price_per_night, a.currency)
-                      : "—"}
-                  </TableCell>
-                  <TableCell>{a.source}</TableCell>
-                </TableRow>
-              ))
+            {hasAvailability && (
+              <div className="flex flex-wrap items-center gap-4 border-t border-white/[0.08] px-4 py-3 text-xs text-white/50 shrink-0">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded bg-emerald-500/40" /> Con disponibilidad
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded bg-white/20" /> Sin disponibilidad
+                </span>
+                <span className="flex items-center gap-1.5 text-[#9b74ff]">
+                  <Icon icon="solar:mouse-minimalistic-outline" width={14} /> Clic en un slot para ver detalle
+                </span>
+              </div>
             )}
-          </TableBody>
-        </Table>
+            </>
+          )}
+        </GlassCard>
+      ) : (
+        <GlassCard className="p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/[0.08]">
+                  <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">Propiedad</th>
+                  <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">Tipo habitación</th>
+                  <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">Fecha</th>
+                  <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">Disponibles</th>
+                  <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">Precio/noche</th>
+                  <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">Fuente</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-16 text-center text-white/50">
+                      No hay datos de disponibilidad. Ajusta filtros o espera sincronización PMS.
+                    </td>
+                  </tr>
+                ) : (
+                  list.map((a) => (
+                    <tr
+                      key={`${a.property_id}-${a.room_type_id}-${a.date}`}
+                      className="border-b border-white/[0.06] last:border-0 hover:bg-white/[0.03] transition-colors"
+                    >
+                      <td className="py-4 px-5 text-white/85 font-medium">{a.property_name}</td>
+                      <td className="py-4 px-5 text-white/70 text-sm">{a.room_type_name}</td>
+                      <td className="py-4 px-5 text-white/70 text-sm">{a.date}</td>
+                      <td className="py-4 px-5">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.7rem] font-semibold ${getAvailabilityColor(a.available)}`}>
+                          {a.available}
+                        </span>
+                      </td>
+                      <td className="py-4 px-5 text-white/70 text-sm">
+                        {a.price_per_night && a.currency
+                          ? formatPrice(a.price_per_night, a.currency)
+                          : "—"}
+                      </td>
+                      <td className="py-4 px-5 text-white/60 text-sm">{a.source}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </GlassCard>
       )}
 
       <Modal
@@ -443,54 +506,58 @@ export function AvailabilityList() {
         backdrop="blur"
         scrollBehavior="inside"
         classNames={{
-          base: "max-h-[90vh] border border-gray-200/60 bg-white/90 backdrop-blur-sm rounded-[28px] shadow-md overflow-hidden",
-          backdrop: "backdrop-blur-sm",
-          header: "border-b border-gray-200/60 pb-4 shrink-0",
-          body: "relative",
+          base: "admin-modal-dark !bg-[#0f1220] max-h-[90vh] border border-white/[0.12] backdrop-blur-xl rounded-[28px] shadow-2xl shadow-black/50 overflow-hidden flex flex-col",
+          header: "border-b border-white/[0.08] !text-white pb-4 shrink-0",
+          body: "relative !text-white/95 !bg-transparent overflow-y-auto",
+          closeButton: "!text-white/90 hover:!bg-white/10 hover:!text-white rounded-full",
+          backdrop: "!bg-black/70 backdrop-blur-md",
+          wrapper: "!bg-transparent",
         }}
       >
         <ModalContent>
           <ModalHeader className="flex flex-col gap-1 pt-6 px-6">
-            <span className="font-sora font-semibold text-newayzi-jet">{slotDetail?.propertyName}</span>
-            <span className="text-sm font-normal text-slate-500">
+            <span className="font-sora font-semibold text-white">{slotDetail?.propertyName}</span>
+            <span className="text-sm font-normal text-white/60">
               {slotDetail && formatLongDate(slotDetail.date)}
             </span>
           </ModalHeader>
           <ModalBody className="py-6 px-6 overflow-y-auto max-h-[calc(90vh-12rem)]">
             {slotDetail && (
               <div className="relative space-y-4">
-                <ModalPatternBg size="small" />
-                <div className="flex items-center gap-2 rounded-2xl border border-emerald-200/60 bg-emerald-500/10 px-4 py-3 shrink-0">
-                  <Icon icon="solar:bed-outline" className="text-emerald-600 shrink-0" width={24} />
-                  <span className="font-semibold text-emerald-800">
+                <div className="absolute bottom-0 right-0 w-[28%] h-[35%] opacity-[0.06] select-none pointer-events-none z-[1]" aria-hidden>
+                  <img src="/brand/n-patron-black.svg" alt="" className="w-full h-full object-contain object-right-bottom invert" />
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-500/20 px-4 py-3 shrink-0">
+                  <Icon icon="solar:bed-outline" className="text-emerald-300 shrink-0" width={24} />
+                  <span className="font-semibold text-emerald-200">
                     {slotDetail.total} {slotDetail.total === 1 ? "unidad disponible" : "unidades disponibles"}
                   </span>
                 </div>
                 <div>
-                  <p className="mb-2 text-sm font-medium text-newayzi-jet">Por tipo de habitación</p>
+                  <p className="mb-2 text-sm font-medium text-white/80">Por tipo de habitación</p>
                   <ul className="space-y-2">
                     {slotDetail.roomTypes.map((rt, i) => (
                       <li
                         key={i}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-gray-200/60 bg-white/80 px-4 py-2.5 shadow-sm"
+                        className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.1] bg-white/[0.06] px-4 py-2.5"
                       >
-                        <span className="min-w-0 flex-1 font-medium text-newayzi-jet">{rt.roomTypeName}</span>
+                        <span className="min-w-0 flex-1 font-medium text-white/90">{rt.roomTypeName}</span>
                         <div className="flex shrink-0 items-center gap-2">
                           {rt.pricePerNight && (
-                            <span className="text-sm font-semibold text-newayzi-jet">
+                            <span className="text-sm font-semibold text-[#b89eff]">
                               {formatPrice(rt.pricePerNight, rt.currency ?? slotDetail.currency)}
                             </span>
                           )}
-                          <Chip size="sm" className={getAvailabilityColor(rt.available)}>
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.7rem] font-semibold ${getAvailabilityColor(rt.available)}`}>
                             {rt.available}
-                          </Chip>
-                          <span className="text-xs text-slate-500">{rt.source}</span>
+                          </span>
+                          <span className="text-xs text-white/50">{rt.source}</span>
                         </div>
                       </li>
                     ))}
                   </ul>
                 </div>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-white/50">
                   Los agentes pueden usar esta información para ofrecer paquetes y planes a sus clientes.
                 </p>
               </div>

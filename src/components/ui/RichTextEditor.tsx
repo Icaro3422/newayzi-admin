@@ -13,6 +13,7 @@ interface RichTextEditorProps {
   placeholder?: string;
   minHeight?: string;
   disabled?: boolean;
+  variant?: "light" | "dark";
 }
 
 const TOOLBAR_ICONS = {
@@ -117,6 +118,7 @@ function ToolbarButton({
   icon,
   disabled = false,
   label,
+  dark = false,
 }: {
   onClick: () => void;
   active?: boolean;
@@ -124,6 +126,7 @@ function ToolbarButton({
   icon: React.ReactNode;
   disabled?: boolean;
   label?: string;
+  dark?: boolean;
 }) {
   return (
     <button
@@ -132,9 +135,13 @@ function ToolbarButton({
       disabled={disabled}
       title={title}
       className={`flex flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1.5 min-w-[44px] transition-all duration-200 [&_svg]:shrink-0 ${
-        active
-          ? "bg-newayzi-majorelle text-white shadow-sm"
-          : "text-newayzi-jet hover:bg-newayzi-majorelle/10 hover:text-newayzi-majorelle"
+        dark
+          ? active
+            ? "bg-[#5e2cec] text-white shadow-sm"
+            : "text-white/70 hover:bg-white/[0.12] hover:text-white"
+          : active
+            ? "bg-newayzi-majorelle text-white shadow-sm"
+            : "text-newayzi-jet hover:bg-newayzi-majorelle/10 hover:text-newayzi-majorelle"
       } ${disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}
     >
       {icon}
@@ -143,15 +150,26 @@ function ToolbarButton({
   );
 }
 
-function ToolbarDivider() {
-  return <div className="h-8 w-px bg-gray-200" aria-hidden />;
+function ToolbarDivider({ dark = false }: { dark?: boolean }) {
+  return (
+    <div
+      className={`h-8 w-px ${dark ? "bg-white/20" : "bg-gray-200"}`}
+      aria-hidden
+    />
+  );
 }
 
-function Toolbar({ editor }: { editor: Editor | null }) {
+function Toolbar({ editor, dark = false }: { editor: Editor | null; dark?: boolean }) {
   if (!editor) return null;
 
   return (
-    <div className="flex flex-wrap items-stretch gap-1 border-b border-gray-200/60 bg-gray-50/50 px-3 py-2">
+    <div
+      className={`flex flex-wrap items-stretch gap-1 border-b px-3 py-2 ${
+        dark
+          ? "border-white/[0.08] bg-white/[0.06]"
+          : "border-gray-200/60 bg-gray-50/50"
+      }`}
+    >
       {/* Historial */}
       <ToolbarButton
         onClick={() => editor.chain().focus().undo().run()}
@@ -159,6 +177,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         icon={TOOLBAR_ICONS.undo}
         disabled={!editor.can().undo()}
         label="Deshacer"
+        dark={dark}
       />
       <ToolbarButton
         onClick={() => editor.chain().focus().redo().run()}
@@ -166,8 +185,9 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         icon={TOOLBAR_ICONS.redo}
         disabled={!editor.can().redo()}
         label="Rehacer"
+        dark={dark}
       />
-      <ToolbarDivider />
+      <ToolbarDivider dark={dark} />
 
       {/* Formato de texto */}
       <ToolbarButton
@@ -176,6 +196,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         title="Negrita (Ctrl+B)"
         icon={TOOLBAR_ICONS.bold}
         label="Negrita"
+        dark={dark}
       />
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleItalic().run()}
@@ -183,6 +204,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         title="Cursiva (Ctrl+I)"
         icon={TOOLBAR_ICONS.italic}
         label="Cursiva"
+        dark={dark}
       />
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleUnderline().run()}
@@ -190,6 +212,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         title="Subrayado (Ctrl+U)"
         icon={TOOLBAR_ICONS.underline}
         label="Subrayado"
+        dark={dark}
       />
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleStrike().run()}
@@ -197,8 +220,9 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         title="Tachado"
         icon={TOOLBAR_ICONS.strike}
         label="Tachado"
+        dark={dark}
       />
-      <ToolbarDivider />
+      <ToolbarDivider dark={dark} />
 
       {/* Títulos y párrafo */}
       <ToolbarButton
@@ -207,6 +231,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         title="Título principal"
         icon={TOOLBAR_ICONS.h1}
         label="Título 1"
+        dark={dark}
       />
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
@@ -214,6 +239,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         title="Subtítulo"
         icon={TOOLBAR_ICONS.h2}
         label="Título 2"
+        dark={dark}
       />
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
@@ -221,6 +247,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         title="Subtítulo menor"
         icon={TOOLBAR_ICONS.h3}
         label="Título 3"
+        dark={dark}
       />
       <ToolbarButton
         onClick={() => editor.chain().focus().setParagraph().run()}
@@ -228,8 +255,9 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         title="Párrafo normal"
         icon={TOOLBAR_ICONS.paragraph}
         label="Párrafo"
+        dark={dark}
       />
-      <ToolbarDivider />
+      <ToolbarDivider dark={dark} />
 
       {/* Listas */}
       <ToolbarButton
@@ -238,6 +266,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         title="Lista con viñetas"
         icon={TOOLBAR_ICONS.listBullet}
         label="Viñetas"
+        dark={dark}
       />
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
@@ -245,8 +274,9 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         title="Lista numerada"
         icon={TOOLBAR_ICONS.listOrdered}
         label="Numerada"
+        dark={dark}
       />
-      <ToolbarDivider />
+      <ToolbarDivider dark={dark} />
 
       {/* Alineación */}
       <ToolbarButton
@@ -255,6 +285,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         title="Alinear a la izquierda"
         icon={TOOLBAR_ICONS.alignLeft}
         label="Izq."
+        dark={dark}
       />
       <ToolbarButton
         onClick={() => editor.chain().focus().setTextAlign("center").run()}
@@ -262,6 +293,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         title="Centrar texto"
         icon={TOOLBAR_ICONS.alignCenter}
         label="Centro"
+        dark={dark}
       />
       <ToolbarButton
         onClick={() => editor.chain().focus().setTextAlign("right").run()}
@@ -269,8 +301,9 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         title="Alinear a la derecha"
         icon={TOOLBAR_ICONS.alignRight}
         label="Der."
+        dark={dark}
       />
-      <ToolbarDivider />
+      <ToolbarDivider dark={dark} />
 
       {/* Limpiar formato */}
       <ToolbarButton
@@ -278,6 +311,7 @@ function Toolbar({ editor }: { editor: Editor | null }) {
         title="Quitar todo el formato"
         icon={TOOLBAR_ICONS.clear}
         label="Limpiar"
+        dark={dark}
       />
     </div>
   );
@@ -289,7 +323,10 @@ export function RichTextEditor({
   placeholder = "Escribe la descripción...",
   minHeight = "200px",
   disabled = false,
+  variant = "light",
 }: RichTextEditorProps) {
+  const dark = variant === "dark";
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -305,8 +342,9 @@ export function RichTextEditor({
     },
     editorProps: {
       attributes: {
-        class:
-          "prose prose-sm max-w-none min-w-0 px-4 py-3 focus:outline-none font-sans text-newayzi-jet",
+        class: dark
+          ? "prose prose-sm prose-invert max-w-none min-w-0 px-4 py-3 focus:outline-none font-sans text-white/90 rich-text-dark"
+          : "prose prose-sm max-w-none min-w-0 px-4 py-3 focus:outline-none font-sans text-newayzi-jet",
       },
     },
   });
@@ -323,12 +361,18 @@ export function RichTextEditor({
 
   return (
     <div
-      className={`overflow-hidden rounded-xl border border-gray-200/60 bg-white shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-newayzi-majorelle/30 focus-within:border-newayzi-majorelle/50 ${
-        disabled ? "opacity-60" : ""
+      className={`overflow-hidden rounded-xl transition-shadow ${
+        dark
+          ? `border border-white/[0.12] bg-white/[0.06] focus-within:ring-2 focus-within:ring-[#5e2cec]/30 focus-within:border-[#5e2cec]/50 ${
+              disabled ? "opacity-60" : ""
+            }`
+          : `border border-gray-200/60 bg-white shadow-sm focus-within:ring-2 focus-within:ring-newayzi-majorelle/30 focus-within:border-newayzi-majorelle/50 ${
+              disabled ? "opacity-60" : ""
+            }`
       }`}
     >
-      <Toolbar editor={editor} />
-      <EditorContent editor={editor} style={{ minHeight }} className="rich-text-content" />
+      <Toolbar editor={editor} dark={dark} />
+      <EditorContent editor={editor} style={{ minHeight }} className={dark ? "rich-text-content rich-text-dark" : "rich-text-content"} />
     </div>
   );
 }

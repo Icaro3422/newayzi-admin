@@ -551,32 +551,75 @@ function BrandPanel() {
   );
 }
 
+/* ─── Resumen compacto para mobile ─── */
+function MobileBrandSummary() {
+  const [expanded, setExpanded] = useState(false);
+  const highlights = [
+    { icon: "solar:calendar-bold-duotone", text: "Calendario unificado" },
+    { icon: "solar:wallet-money-bold-duotone", text: "Cobros automáticos" },
+    { icon: "solar:gift-bold-duotone", text: "Rewards y lealtad" },
+  ];
+  return (
+    <div className="lg:hidden mt-8 pt-6 border-t border-gray-100">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between gap-2 text-left"
+      >
+        <span className="font-sora font-semibold text-gray-700 text-sm">
+          ¿Por qué Newayzi?
+        </span>
+        <Icon
+          icon={expanded ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
+          className="text-gray-400 text-lg shrink-0"
+        />
+      </button>
+      {expanded && (
+        <div className="mt-3 space-y-2 animate-fade-in">
+          <p className="font-sora text-gray-500 text-[0.8rem] leading-snug">
+            Nuevas formas de espacios. Tecnología para operadores y agentes.
+          </p>
+          {highlights.map((h, i) => (
+            <div key={i} className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-newayzi-majorelle/10 flex items-center justify-center shrink-0">
+                <Icon icon={h.icon} className="text-newayzi-majorelle text-sm" />
+              </div>
+              <span className="font-sora text-gray-700 text-[0.8rem]">{h.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Layout principal ─── */
 export function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen flex font-sora">
-      {/* Panel izquierdo */}
-      <div className="w-full lg:w-[48%] flex flex-col justify-center px-8 sm:px-12 lg:px-16 xl:px-20 bg-white">
-        <div className="mb-10">
+    <div className="min-h-screen flex flex-col lg:flex-row font-sora">
+      {/* Panel izquierdo / contenido principal */}
+      <div className="w-full lg:w-[48%] flex flex-col justify-center px-5 sm:px-8 lg:px-16 xl:px-20 py-8 sm:py-10 lg:py-0 bg-white min-h-[100dvh] lg:min-h-0 overflow-y-auto">
+        <div className="mb-6 sm:mb-8 lg:mb-10">
           <div className="flex items-center gap-2.5">
             <Image
               src="/brand/n-patron-black.svg"
-              width={36}
-              height={36}
+              width={32}
+              height={32}
               alt="Newayzi"
-              className="object-contain shrink-0"
+              className="object-contain shrink-0 sm:w-9 sm:h-9"
             />
-            <span className="font-black font-sora tracking-[-0.03em] text-newayzi-jet text-xl">
+            <span className="font-black font-sora tracking-[-0.03em] text-newayzi-jet text-lg sm:text-xl">
               Newayzi
             </span>
           </div>
         </div>
-        <div className="w-full max-w-[420px]">
+        <div className="w-full max-w-[420px] mx-auto">
           {children}
         </div>
+        <MobileBrandSummary />
       </div>
 
-      {/* Panel derecho interactivo */}
+      {/* Panel derecho interactivo — solo desktop */}
       <BrandPanel />
     </div>
   );
