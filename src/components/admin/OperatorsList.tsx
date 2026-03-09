@@ -42,7 +42,7 @@ export function OperatorsList({ refreshKey = 0 }: { refreshKey?: number }) {
 
   return (
     <div className="space-y-4">
-      <Table aria-label="Operadores" classNames={{ wrapper: "border border-semantic-surface-border rounded-lg" }}>
+      <Table aria-label="Operadores" classNames={{ wrapper: "border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm overflow-hidden" }}>
         <TableHeader>
           {[
             <TableColumn key="nombre">Nombre</TableColumn>,
@@ -86,7 +86,7 @@ export function OperatorsList({ refreshKey = 0 }: { refreshKey?: number }) {
         </TableBody>
       </Table>
       {list.length === 0 && (
-        <p className="text-center text-sm text-semantic-text-muted py-8">
+        <p className="text-center text-sm text-gray-500 py-8">
           No hay operadores. Solo el super-admin puede crear operadores.
         </p>
       )}

@@ -1,12 +1,10 @@
-import { SignUp } from "@clerk/nextjs";
+import { AuthLayout } from "@/components/auth/AuthLayout";
+import { CustomSignUp } from "@/components/auth/CustomSignUp";
 
 export default function SignUpPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-semantic-surface-subdued">
-      <SignUp
-        fallbackRedirectUrl="/admin"
-        signInUrl="/sign-in"
-      />
-    </div>
+    <AuthLayout>
+      <CustomSignUp />
+    </AuthLayout>
   );
 }

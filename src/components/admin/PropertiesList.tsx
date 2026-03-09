@@ -10,7 +10,6 @@ import {
   TableRow,
   TableCell,
   Button,
-  Chip,
   Select,
   SelectItem,
   Input,
@@ -89,46 +88,76 @@ export function PropertiesList() {
     }
   }
 
+  const FILTER_CARD =
+    "rounded-[28px] border border-gray-200/60 bg-white/90 backdrop-blur-sm shadow-md p-5";
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-4">
-        <Select
-          label="Estado"
-          selectedKeys={[filterActive]}
-          onSelectionChange={(s) => setFilterActive(Array.from(s)[0] as string)}
-          className="w-40"
-          size="sm"
-        >
-          <SelectItem key="all">Todos</SelectItem>
-          <SelectItem key="true">Activos</SelectItem>
-          <SelectItem key="false">Inactivos</SelectItem>
-        </Select>
-        <Input
-          label="Ciudad"
-          placeholder="Filtrar por ciudad"
-          value={filterCity}
-          onValueChange={setFilterCity}
-          className="w-48"
-          size="sm"
-        />
-        <Select
-          label="PMS"
-          selectedKeys={[filterPms]}
-          onSelectionChange={(s) => setFilterPms(Array.from(s)[0] as string)}
-          className="w-52"
-          size="sm"
-          placeholder="Todas las conexiones"
-          items={[{ id: "all", name: "Todas las conexiones" }, ...connections.map((c) => ({ id: String(c.id), name: c.name || c.pms_type_display || c.pms_type }))]}
-        >
-          {(item) => <SelectItem key={item.id}>{item.name}</SelectItem>}
-        </Select>
+    <div className="space-y-5">
+      <div className={`${FILTER_CARD}`}>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 font-sora">
+          Filtros
+        </p>
+        <div className="flex flex-wrap items-end gap-4">
+          <Select
+            label="Estado"
+            selectedKeys={[filterActive]}
+            onSelectionChange={(s) => setFilterActive(Array.from(s)[0] as string)}
+            className="w-40"
+            size="sm"
+            classNames={{
+              trigger: "rounded-xl border-gray-200/80",
+            }}
+          >
+            <SelectItem key="all">Todos</SelectItem>
+            <SelectItem key="true">Activos</SelectItem>
+            <SelectItem key="false">Inactivos</SelectItem>
+          </Select>
+          <Input
+            label="Ciudad"
+            placeholder="Filtrar por ciudad"
+            value={filterCity}
+            onValueChange={setFilterCity}
+            className="w-48"
+            size="sm"
+            classNames={{
+              inputWrapper: "rounded-xl border-gray-200/80",
+            }}
+          />
+          <Select
+            label="PMS"
+            selectedKeys={[filterPms]}
+            onSelectionChange={(s) => setFilterPms(Array.from(s)[0] as string)}
+            className="w-52"
+            size="sm"
+            placeholder="Todas las conexiones"
+            items={[{ id: "all", name: "Todas las conexiones" }, ...connections.map((c) => ({ id: String(c.id), name: c.name || c.pms_type_display || c.pms_type }))]}
+            classNames={{
+              trigger: "rounded-xl border-gray-200/80",
+            }}
+          >
+            {(item) => <SelectItem key={item.id}>{item.name}</SelectItem>}
+          </Select>
+        </div>
       </div>
       {loading ? (
-        <div className="flex justify-center py-8">
+        <div className="flex justify-center py-12">
           <Spinner size="lg" color="primary" />
         </div>
+      ) : list.length === 0 ? (
+        <div className="rounded-[28px] border border-dashed border-gray-300 bg-white/80 backdrop-blur-sm p-12 text-center">
+          <p className="font-sora font-medium text-newayzi-jet">Sin resultados</p>
+          <p className="mt-2 text-sm text-gray-500">
+            No hay propiedades que coincidan con los filtros.
+          </p>
+        </div>
       ) : (
-        <Table aria-label="Propiedades" classNames={{ wrapper: "border border-semantic-surface-border rounded-lg" }}>
+        <Table
+          aria-label="Propiedades"
+          classNames={{
+            wrapper:
+              "border border-gray-200/60 rounded-[28px] shadow-md bg-white/90 backdrop-blur-sm overflow-hidden hover:shadow-lg transition-shadow duration-300",
+          }}
+        >
           <TableHeader>
             {[
               <TableColumn key="nombre">Nombre</TableColumn>,
@@ -148,7 +177,7 @@ export function PropertiesList() {
                   <TableCell key="nombre">
                     <Link
                       href={`/admin/properties/${p.id}`}
-                      className="font-medium text-newayzi-han-purple hover:underline"
+                      className="font-medium text-newayzi-majorelle hover:text-newayzi-han-purple hover:underline"
                     >
                       {p.name}
                     </Link>
@@ -158,39 +187,57 @@ export function PropertiesList() {
                   <TableCell key="operador">
                     <div className="flex flex-col gap-0.5">
                       {p.operator_name && (
-                        <span className="text-sm font-medium">{p.operator_name}</span>
+                        <span className="text-sm font-medium text-newayzi-jet">{p.operator_name}</span>
                       )}
                       {p.pms_connections && p.pms_connections.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1.5">
                           {p.pms_connections.map((c) => (
-                            <Chip key={c.id} size="sm" variant="flat" color="secondary">
+                            <span
+                              key={c.id}
+                              className="inline-flex items-center rounded-full bg-gradient-to-r from-newayzi-han-purple/90 to-newayzi-majorelle/90 px-2.5 py-0.5 text-xs font-semibold text-white shadow-[0_1px_4px_rgba(94,44,236,0.25)]"
+                            >
                               {c.name}
-                            </Chip>
+                            </span>
                           ))}
                         </div>
                       ) : (
-                        <span className="text-sm text-semantic-text-muted">—</span>
+                        <span className="text-sm text-gray-500">—</span>
                       )}
                     </div>
                   </TableCell>,
                   <TableCell key="activo">
-                    <Chip size="sm" color={p.is_active ? "success" : "default"}>
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        p.is_active
+                          ? "bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-[0_1px_4px_rgba(16,185,129,0.3)]"
+                          : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
                       {p.is_active ? "Sí" : "No"}
-                    </Chip>
+                    </span>
                   </TableCell>,
                   <TableCell key="publicado">
-                    <Chip size="sm" color={p.is_published ? "primary" : "default"}>
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        p.is_published
+                          ? "bg-gradient-to-r from-newayzi-han-purple to-newayzi-majorelle text-white shadow-[0_1px_4px_rgba(94,44,236,0.25)]"
+                          : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
                       {p.is_published ? "Sí" : "No"}
-                    </Chip>
+                    </span>
                   </TableCell>,
                   <TableCell key="mascotas">{p.pets_allowed ? "Sí" : "No"}</TableCell>,
                   ...(canEditProperty
                     ? [
-                        <TableCell key="acciones" className="flex justify-end gap-1">
+                        <TableCell key="acciones" className="flex justify-end gap-2">
                           <Button
                             size="sm"
-                            variant="flat"
-                            color={p.is_published ? "warning" : "primary"}
+                            className={
+                              p.is_published
+                                ? "btn-action-amber bg-amber-600 hover:bg-amber-700 rounded-xl font-semibold shadow-[0_1px_4px_rgba(217,119,6,0.3)]"
+                                : "btn-newayzi-primary rounded-xl"
+                            }
                             isLoading={patching === p.id}
                             onPress={() => togglePublished(p)}
                           >
@@ -198,8 +245,11 @@ export function PropertiesList() {
                           </Button>
                           <Button
                             size="sm"
-                            variant="flat"
-                            color={p.is_active ? "danger" : "success"}
+                            className={
+                              p.is_active
+                                ? "btn-action-red bg-red-600 hover:bg-red-700 rounded-xl font-semibold shadow-[0_1px_4px_rgba(220,38,38,0.3)]"
+                                : "btn-action-green bg-emerald-600 hover:bg-emerald-700 rounded-xl font-semibold shadow-[0_1px_4px_rgba(5,150,105,0.3)]"
+                            }
                             isLoading={patching === p.id}
                             onPress={() => toggleActive(p)}
                           >
@@ -213,11 +263,6 @@ export function PropertiesList() {
             ))}
           </TableBody>
         </Table>
-      )}
-      {!loading && list.length === 0 && (
-        <p className="text-center text-sm text-semantic-text-muted py-8">
-          No hay propiedades que coincidan con los filtros.
-        </p>
       )}
     </div>
   );

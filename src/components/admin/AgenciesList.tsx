@@ -39,7 +39,7 @@ export function AgenciesList({ refreshKey = 0 }: { refreshKey?: number }) {
 
   return (
     <div className="space-y-4">
-      <Table aria-label="Agentes" classNames={{ wrapper: "border border-semantic-surface-border rounded-lg" }}>
+      <Table aria-label="Agentes" classNames={{ wrapper: "border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm overflow-hidden" }}>
         <TableHeader>
           <TableColumn>Nombre</TableColumn>
           <TableColumn>Contacto</TableColumn>
@@ -84,7 +84,7 @@ export function AgenciesList({ refreshKey = 0 }: { refreshKey?: number }) {
         </TableBody>
       </Table>
       {list.length === 0 && (
-        <p className="py-8 text-center text-sm text-semantic-text-muted">
+        <p className="py-8 text-center text-sm text-gray-500">
           No hay agencias. Usa &quot;Invitar agente&quot; para crear una nueva.
         </p>
       )}

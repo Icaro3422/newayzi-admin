@@ -61,7 +61,7 @@ export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
   return (
     <>
       <Button
-        color="primary"
+        className="btn-newayzi-primary"
         onPress={() => setOpen(true)}
         startContent={<Icon icon="solar:add-circle-outline" width={20} />}
       >
@@ -92,7 +92,7 @@ export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
               Cancelar
             </Button>
             <Button
-              color="primary"
+              className="btn-newayzi-primary"
               onPress={handleCreate}
               isLoading={saving}
               isDisabled={!canSubmit}
@@ -121,7 +121,7 @@ export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
                   ? "El agente ha recibido un correo con sus credenciales temporales. Deberá cambiar la contraseña en su primer inicio de sesión."
                   : "La agencia se creó correctamente, pero no se pudo enviar el correo de invitación. Verifica que RESEND_API_KEY esté configurado en el backend."}
               </p>
-              <Button color="primary" onPress={() => setShowSuccess(false)}>
+              <Button className="btn-newayzi-primary" onPress={() => setShowSuccess(false)}>
                 Entendido
               </Button>
             </div>
