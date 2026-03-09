@@ -41,11 +41,6 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!isLoaded || !getToken) return;
-    setAdminApiToken(getToken);
-  }, [isLoaded, getToken]);
-
   const refetchMe = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -54,7 +49,6 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       if (data) {
         setMe(data);
       } else {
-        // Backend no devolvió sesión (404 o vacío): no asumir super_admin
         setMe(null);
         setError("No se pudo cargar la sesión. Verifica que el backend esté activo y que tengas un perfil asignado.");
       }
@@ -66,10 +60,13 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Registrar el getter de token primero, luego cargar el perfil.
+  // Combinado en un solo efecto para garantizar el orden sin race condition.
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || !getToken) return;
+    setAdminApiToken(getToken);
     refetchMe();
-  }, [isLoaded, refetchMe]);
+  }, [isLoaded, getToken, refetchMe]);
 
   const canAccess = useCallback(
     (module: string) => canAccessModule(me?.role ?? null, module),

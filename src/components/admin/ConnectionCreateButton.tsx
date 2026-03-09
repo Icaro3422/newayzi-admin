@@ -16,6 +16,10 @@ import { Icon } from "@iconify/react";
 import { adminApi, type PMSConnectionType, type Operator } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 
+/* Fondo más claro para contraste: texto blanco siempre visible sobre fondo oscuro */
+const inputDark =
+  "bg-white/[0.2] border-white/[0.25] !text-white data-[hover=true]:bg-white/[0.24] focus:border-[#5e2cec]/60 data-[focus=true]:border-[#5e2cec]/60";
+
 export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }) {
   const { canAccess } = useAdmin();
   const [open, setOpen] = useState(false);
@@ -94,7 +98,20 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
       >
         Nueva conexión
       </Button>
-      <Modal isOpen={open} onOpenChange={(o) => (setOpen(o), !o && resetForm())} size="2xl">
+      <Modal
+        isOpen={open}
+        onOpenChange={(o) => (setOpen(o), !o && resetForm())}
+        size="2xl"
+        backdrop="blur"
+        classNames={{
+          base: "admin-modal-dark rounded-[28px] border border-white/[0.12] bg-[#0f1220]/95 backdrop-blur-xl",
+          header: "border-b border-white/[0.08] !text-white font-sora font-bold",
+          body: "!text-white/95",
+          footer: "border-t border-white/[0.08]",
+          closeButton: "!text-white/90 hover:bg-white/10 hover:!text-white",
+          backdrop: "bg-black/60 backdrop-blur-sm",
+        }}
+      >
         <ModalContent>
           <ModalHeader>Nueva conexión PMS</ModalHeader>
           <ModalBody className="space-y-4">
@@ -109,13 +126,22 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
                   ? "API genérica: integra cualquier PMS con URL, usuario y contraseña (Booking, OTAs, etc.)"
                   : undefined
               }
+              classNames={{
+                trigger: `rounded-xl ${inputDark}`,
+                label: "!text-white/90",
+                value: "!text-white font-medium",
+                innerWrapper: "!text-white",
+                selectorIcon: "!text-white/90",
+                description: "!text-white/70",
+                popoverContent: "bg-[#0f1220] border-white/10",
+              }}
             >
-              {(item) => <SelectItem key={item.code}>{item.label}</SelectItem>}
+              {(item) => <SelectItem key={item.code} className="text-white">{item.label}</SelectItem>}
             </Select>
 
             {isGeneric && (
-              <div className="rounded-xl border border-gray-200/60 bg-gray-50/80 p-4 space-y-4">
-                <p className="text-sm font-medium text-newayzi-jet">
+              <div className="rounded-xl border border-white/[0.12] bg-white/[0.1] p-4 space-y-4">
+                <p className="text-sm font-medium text-white">
                   Credenciales de la API
                 </p>
                 <Input
@@ -126,6 +152,12 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
                   isRequired
                   type="url"
                   description="URL base del endpoint de la API (ej: https://api.booking.com/v1)"
+                  classNames={{
+                    inputWrapper: `rounded-xl ${inputDark}`,
+                    input: "!text-white placeholder:!text-white/85",
+                    label: "!text-white/90",
+                    description: "!text-white/70",
+                  }}
                 />
                 <Input
                   label="Usuario"
@@ -134,6 +166,11 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
                   onValueChange={setUsername}
                   isRequired
                   autoComplete="username"
+                  classNames={{
+                    inputWrapper: `rounded-xl ${inputDark}`,
+                    input: "!text-white placeholder:!text-white/85",
+                    label: "!text-white/90",
+                  }}
                 />
                 <Input
                   label="Contraseña"
@@ -144,6 +181,12 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
                   type="password"
                   autoComplete="new-password"
                   description="Se almacena de forma segura. No se mostrará después de guardar."
+                  classNames={{
+                    inputWrapper: `rounded-xl ${inputDark}`,
+                    input: "!text-white placeholder:!text-white/85",
+                    label: "!text-white/90",
+                    description: "!text-white/70",
+                  }}
                 />
               </div>
             )}
@@ -157,6 +200,11 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
               }
               value={name}
               onValueChange={setName}
+              classNames={{
+                inputWrapper: `rounded-xl ${inputDark}`,
+                input: "!text-white placeholder:!text-white/85",
+                label: "!text-white/90",
+              }}
             />
 
             <Select
@@ -168,14 +216,26 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
                 setOperatorId(v === "none" ? "" : v ?? "");
               }}
               placeholder="Sin asignar"
+              classNames={{
+                trigger: `rounded-xl ${inputDark}`,
+                label: "!text-white/90",
+                value: "!text-white font-medium",
+                innerWrapper: "!text-white",
+                selectorIcon: "!text-white/90",
+                popoverContent: "bg-[#0f1220] border-white/10",
+              }}
             >
               {(item) => (
-                <SelectItem key={String(item.id)}>{item.name}</SelectItem>
+                <SelectItem key={String(item.id)} className="text-white">{item.name}</SelectItem>
               )}
             </Select>
           </ModalBody>
           <ModalFooter>
-            <Button variant="flat" onPress={() => setOpen(false)}>
+            <Button
+              variant="flat"
+              onPress={() => setOpen(false)}
+              className="!text-white hover:bg-white/[0.12] bg-white/[0.1] border border-white/[0.2]"
+            >
               Cancelar
             </Button>
             <Button

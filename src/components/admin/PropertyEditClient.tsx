@@ -3,8 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Card,
-  CardBody,
   Button,
   Input,
   Switch,
@@ -15,6 +13,20 @@ import { adminApi, type PropertyDetail } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useRouter, useParams } from "next/navigation";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
+
+/* ─── Primitivos (línea visual) ───────────────────────── */
+function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={`rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6 transition-all duration-300 hover:border-white/[0.14] hover:bg-white/[0.065] ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+const inputDark =
+  "bg-white/[0.14] border-white/[0.2] text-white data-[hover=true]:bg-white/[0.18] focus:border-[#5e2cec]/60 data-[focus=true]:border-[#5e2cec]/60";
 
 export function PropertyEditClient() {
   const router = useRouter();
@@ -91,30 +103,24 @@ export function PropertyEditClient() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <Spinner size="lg" color="primary" />
-      </div>
+      <GlassCard className="flex justify-center items-center py-16">
+        <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+      </GlassCard>
     );
   }
-  const CARD_STYLE =
-    "border border-gray-200/60 rounded-[28px] shadow-md bg-white/90 backdrop-blur-sm hover:shadow-lg transition-shadow duration-300";
 
   if (!property) {
     return (
-      <Card className={CARD_STYLE}>
-        <CardBody>
-          <p className="text-gray-500 font-sora">Propiedad no encontrada.</p>
-        </CardBody>
-      </Card>
+      <GlassCard>
+        <p className="text-white/70 font-sora">Propiedad no encontrada.</p>
+      </GlassCard>
     );
   }
   if (!canEditProperty) {
     return (
-      <Card className={CARD_STYLE}>
-        <CardBody>
-          <p className="text-gray-500 font-sora">No tienes permiso para editar esta propiedad.</p>
-        </CardBody>
-      </Card>
+      <GlassCard>
+        <p className="text-white/70 font-sora">No tienes permiso para editar esta propiedad.</p>
+      </GlassCard>
     );
   }
 
@@ -124,26 +130,28 @@ export function PropertyEditClient() {
         as={Link}
         href="/admin/properties"
         variant="flat"
-        className="text-newayzi-jet hover:bg-gray-100 border border-gray-200/60 rounded-xl font-medium"
+        className="text-white/90 hover:bg-white/[0.1] border border-white/[0.15] rounded-xl font-medium bg-white/[0.06]"
         startContent={<Icon icon="solar:arrow-left-outline" width={18} />}
       >
         Volver
       </Button>
 
-      <Card className={CARD_STYLE}>
-        <CardBody className="gap-6 p-6">
+      <GlassCard>
+        <div className="flex flex-col gap-6">
           <Input
             label="Nombre"
             value={name}
             onValueChange={setName}
             fullWidth
             classNames={{
-              inputWrapper: "rounded-xl border-gray-200/80",
+              inputWrapper: `rounded-xl ${inputDark}`,
+              input: "text-white placeholder:text-white/55",
+              label: "text-white/75",
             }}
           />
 
           <div>
-            <label className="text-sm font-semibold text-newayzi-jet mb-2 block font-sora">
+            <label className="text-sm font-semibold text-white/75 mb-2 block font-sora">
               Descripción
             </label>
             <RichTextEditor
@@ -151,24 +159,25 @@ export function PropertyEditClient() {
               onChange={setDescription}
               placeholder="Describe la propiedad, ubicación, servicios y características..."
               minHeight="220px"
+              variant="dark"
             />
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-newayzi-jet mb-2 block font-sora">
+            <label className="text-sm font-semibold text-white/75 mb-2 block font-sora">
               Amenidades
             </label>
             <div className="flex flex-wrap gap-2 mb-3">
               {amenities.map((a) => (
                 <span
                   key={a}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-newayzi-han-purple/15 to-newayzi-majorelle/10 border border-newayzi-majorelle/20 px-3 py-1.5 text-sm font-medium text-newayzi-jet"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#5e2cec]/25 border border-[#5e2cec]/30 px-3 py-1.5 text-sm font-medium text-[#b89eff]"
                 >
                   {a}
                   <button
                     type="button"
                     onClick={() => removeAmenity(a)}
-                    className="hover:bg-newayzi-majorelle/20 rounded-full p-0.5 transition-colors"
+                    className="hover:bg-[#5e2cec]/30 rounded-full p-0.5 transition-colors text-white/80"
                     aria-label="Quitar"
                   >
                     <Icon icon="solar:close-circle-outline" width={16} />
@@ -184,7 +193,8 @@ export function PropertyEditClient() {
                 fullWidth
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAmenity())}
                 classNames={{
-                  inputWrapper: "rounded-xl border-gray-200/80",
+                  inputWrapper: `rounded-xl ${inputDark}`,
+                  input: "text-white placeholder:text-white/55",
                 }}
               />
               <Button
@@ -203,7 +213,7 @@ export function PropertyEditClient() {
               onValueChange={setIsActive}
               color="primary"
             >
-              <span className="text-sm font-medium text-newayzi-jet font-sora">
+              <span className="text-sm font-medium text-white/85 font-sora">
                 Activo (sistema)
               </span>
             </Switch>
@@ -212,7 +222,7 @@ export function PropertyEditClient() {
               onValueChange={setIsPublished}
               color="primary"
             >
-              <span className="text-sm font-medium text-newayzi-jet font-sora">
+              <span className="text-sm font-medium text-white/85 font-sora">
                 Publicado (visible en frontend)
               </span>
             </Switch>
@@ -221,7 +231,7 @@ export function PropertyEditClient() {
               onValueChange={setPetsAllowed}
               color="primary"
             >
-              <span className="text-sm font-medium text-newayzi-jet font-sora">
+              <span className="text-sm font-medium text-white/85 font-sora">
                 Mascotas permitidas
               </span>
             </Switch>
@@ -237,32 +247,30 @@ export function PropertyEditClient() {
               Guardar cambios
             </Button>
           </div>
-        </CardBody>
-      </Card>
+        </div>
+      </GlassCard>
 
       {property.room_types?.length ? (
-        <Card className={CARD_STYLE}>
-          <CardBody className="p-6">
-            <h3 className="font-sora text-lg font-bold text-newayzi-jet mb-3">
-              Tipos de habitación
-            </h3>
-            <ul className="space-y-2">
-              {property.room_types.map((rt) => (
-                <li
-                  key={rt.id}
-                  className="flex items-center gap-2 rounded-xl bg-gray-50/80 border border-gray-200/50 px-4 py-2.5 text-sm text-newayzi-jet font-sora"
-                >
-                  <Icon icon="solar:bed-outline" className="text-newayzi-majorelle flex-shrink-0" width={18} />
-                  {rt.name}
-                  <span className="text-xs text-gray-500 font-mono">({rt.code})</span>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-4 text-xs text-gray-500">
-              Los precios por temporada y descuentos por estancia se gestionan desde el backend (RoomTypeBaseRate, DynamicPricingRule, LengthOfStayDiscount).
-            </p>
-          </CardBody>
-        </Card>
+        <GlassCard>
+          <h3 className="font-sora text-lg font-bold text-white mb-3">
+            Tipos de habitación
+          </h3>
+          <ul className="space-y-2">
+            {property.room_types.map((rt) => (
+              <li
+                key={rt.id}
+                className="flex items-center gap-2 rounded-xl bg-white/[0.06] border border-white/[0.1] px-4 py-2.5 text-sm text-white/85 font-sora"
+              >
+                <Icon icon="solar:bed-outline" className="text-[#9b74ff] flex-shrink-0" width={18} />
+                {rt.name}
+                <span className="text-xs text-white/50 font-mono">({rt.code})</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-xs text-white/50">
+            Los precios por temporada y descuentos por estancia se gestionan desde el backend (RoomTypeBaseRate, DynamicPricingRule, LengthOfStayDiscount).
+          </p>
+        </GlassCard>
       ) : null}
     </div>
   );

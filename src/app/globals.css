@@ -78,9 +78,60 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 
+  /* Scrollbar oscura para el admin panel */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
   h1, h2, h3, h4, h5, h6 {
     @apply font-sora;
   }
+}
+
+/* Admin panel: Select/Input con texto blanco para contraste en tema oscuro */
+.admin-panel [data-slot="trigger"],
+.admin-panel [data-slot="trigger"] *,
+.admin-panel [data-slot="trigger"] span,
+.admin-panel [data-slot="trigger"] p {
+  color: white !important;
+}
+.admin-panel [data-slot="input-wrapper"] input,
+.admin-panel [data-slot="input-wrapper"] input::placeholder {
+  color: white !important;
+}
+.admin-panel [data-slot="input-wrapper"] input::placeholder {
+  opacity: 0.7;
+}
+
+/* Modal admin oscuro: forzar contraste blanco sobre fondo negro */
+.admin-modal-dark [data-slot="trigger"],
+.admin-modal-dark [data-slot="trigger"] *,
+.admin-modal-dark [data-slot="trigger"] span,
+.admin-modal-dark [data-slot="trigger"] p {
+  color: white !important;
+}
+.admin-modal-dark [data-slot="input-wrapper"] input,
+.admin-modal-dark [data-slot="input-wrapper"] input::placeholder {
+  color: white !important;
+}
+.admin-modal-dark [data-slot="input-wrapper"] input::placeholder {
+  opacity: 0.85 !important;
+}
+.admin-modal-dark [data-slot="label"] {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+.admin-modal-dark [data-slot="value"] {
+  color: white !important;
+}
+.admin-modal-dark [data-slot="description"] {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+.admin-modal-dark .text-default-600,
+.admin-modal-dark .text-default-700,
+.admin-modal-dark .text-default-foreground,
+.admin-modal-dark .text-default-500 {
+  color: white !important;
 }
 
 /* Botón primario Newayzi - alineado con frontend, alto contraste */
@@ -123,6 +174,31 @@ button.btn-action-green * {
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/* Rich text editor - variante dark (admin) */
+.rich-text-dark .ProseMirror {
+  color: rgba(255, 255, 255, 0.9);
+}
+.rich-text-dark .ProseMirror p.is-editor-empty:first-child::before {
+  color: rgba(255, 255, 255, 0.5);
+}
+.rich-text-dark .ProseMirror h1,
+.rich-text-dark .ProseMirror h2,
+.rich-text-dark .ProseMirror h3 {
+  color: white;
+}
+.rich-text-dark .ProseMirror ul,
+.rich-text-dark .ProseMirror ol {
+  color: rgba(255, 255, 255, 0.9);
+}
+.rich-text-dark .ProseMirror blockquote {
+  color: rgba(255, 255, 255, 0.7);
+  border-left-color: rgba(94, 44, 236, 0.6);
+}
+.rich-text-dark .ProseMirror code {
+  background: rgba(255, 255, 255, 0.1);
+  color: #b89eff;
 }
 .rich-text-content .ProseMirror ul {
   list-style-type: disc;
