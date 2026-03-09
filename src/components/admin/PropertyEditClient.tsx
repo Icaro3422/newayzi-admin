@@ -25,8 +25,8 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
   );
 }
 
-const inputDark =
-  "bg-white/[0.14] border-white/[0.2] text-white data-[hover=true]:bg-white/[0.18] focus:border-[#5e2cec]/60 data-[focus=true]:border-[#5e2cec]/60";
+// Clases base que complementan los estilos globales en globals.css (.admin-panel)
+const inputDark = "rounded-xl border";
 
 export function PropertyEditClient() {
   const router = useRouter();
@@ -144,9 +144,9 @@ export function PropertyEditClient() {
             onValueChange={setName}
             fullWidth
             classNames={{
-              inputWrapper: `rounded-xl ${inputDark}`,
-              input: "text-white placeholder:text-white/55",
-              label: "text-white/75",
+              inputWrapper: inputDark,
+              input: "!text-white/95 placeholder:!text-white/38",
+              label: "!text-white/65",
             }}
           />
 
@@ -193,8 +193,8 @@ export function PropertyEditClient() {
                 fullWidth
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAmenity())}
                 classNames={{
-                  inputWrapper: `rounded-xl ${inputDark}`,
-                  input: "text-white placeholder:text-white/55",
+                  inputWrapper: inputDark,
+                  input: "!text-white/95 placeholder:!text-white/38",
                 }}
               />
               <Button

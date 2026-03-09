@@ -1,20 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Card,
-  CardBody,
-  Table,
-  TableHeader,
-  TableColumn,
-  TableBody,
-  TableRow,
-  TableCell,
-  Switch,
-  Spinner,
-} from "@heroui/react";
-import { adminApi, type PaymentMethod, type Region, type RegionPaymentMethod } from "@/lib/admin-api";
+import { Switch, Spinner } from "@heroui/react";
+import { Icon } from "@iconify/react";
+import { adminApi, type PaymentMethod, type Region } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
+
+function GlassCard({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6 transition-all duration-300 hover:border-white/[0.14] hover:bg-white/[0.065] ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
 
 export function PaymentsRegions() {
   const { canAccess } = useAdmin();
@@ -38,7 +44,6 @@ export function PaymentsRegions() {
 
   useEffect(() => {
     if (regions.length === 0) return;
-    const key = `${regions.length}-${methods.length}`;
     let cancelled = false;
     const loads = regions.map(async (r) => {
       const list = await adminApi.getRegionPaymentMethods(r.id);
@@ -76,59 +81,86 @@ export function PaymentsRegions() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-8">
-        <Spinner size="lg" color="primary" />
-      </div>
+      <GlassCard className="flex justify-center items-center py-16">
+        <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+      </GlassCard>
     );
   }
 
   if (regions.length === 0 || methods.length === 0) {
     return (
-      <Card className="border border-gray-200/60 bg-white/90 backdrop-blur-sm rounded-[20px] shadow-sm">
-        <CardBody>
-          <p className="text-gray-500">
-            No hay regiones o métodos de pago configurados en el backend. Crea los modelos Region, PaymentMethod y RegionPaymentMethod.
-          </p>
-        </CardBody>
-      </Card>
+      <GlassCard className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 flex items-center justify-center mb-4">
+          <Icon icon="solar:card-recive-bold-duotone" className="text-[#9b74ff] text-2xl" />
+        </div>
+        <p className="font-sora font-bold text-white text-base">No hay regiones o métodos de pago configurados</p>
+        <p className="mt-2 text-sm text-white/50 max-w-md">
+          Crea los modelos Region, PaymentMethod y RegionPaymentMethod en el backend.
+        </p>
+      </GlassCard>
     );
   }
 
   return (
-    <Card className="border border-gray-200/60 bg-white/90 backdrop-blur-sm rounded-[20px] shadow-sm">
-      <CardBody>
-        <p className="text-sm text-gray-500 mb-4">
-          Activa o desactiva cada método de pago por región. Solo super-admin.
-        </p>
-        <Table aria-label="Pagos por región" classNames={{ wrapper: "border border-gray-200/60 rounded-lg overflow-hidden" }}>
-          <TableHeader>
-            {[
-              <TableColumn key="region">Región</TableColumn>,
-              ...methods.map((m) => (
-                <TableColumn key={m.id}>{m.name}</TableColumn>
-              )),
-            ]}
-          </TableHeader>
-          <TableBody>
+    <GlassCard className="p-0 overflow-hidden">
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-white/[0.08]">
+        <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
+          <Icon icon="solar:card-recive-bold-duotone" className="text-[#9b74ff] text-base" />
+        </div>
+        <div>
+          <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Configuración</p>
+          <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
+            Activa o desactiva cada método por región
+          </p>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-white/[0.08]">
+              <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
+                Región
+              </th>
+              {methods.map((m) => (
+                <th
+                  key={m.id}
+                  className="text-center py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold"
+                >
+                  {m.name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
             {regions.map((r) => (
-              <TableRow key={r.id}>
-                {[
-                  <TableCell key="region" className="font-medium">{r.name} {r.country_code && `(${r.country_code})`}</TableCell>,
-                  ...methods.map((m) => (
-                    <TableCell key={m.id}>
-                      <Switch
-                        isSelected={regionMethods[r.id]?.[m.id] ?? false}
-                        onValueChange={(v) => toggle(r.id, m.id, v)}
-                        isDisabled={!canEdit || toggling === `${r.id}-${m.id}`}
-                      />
-                    </TableCell>
-                  )),
-                ]}
-              </TableRow>
+              <tr
+                key={r.id}
+                className="border-b border-white/[0.06] last:border-0 hover:bg-white/[0.03] transition-colors"
+              >
+                <td className="py-4 px-5 font-sora font-semibold text-white/90">
+                  {r.name}
+                  {r.country_code && (
+                    <span className="ml-1.5 text-white/50 text-sm font-normal">({r.country_code})</span>
+                  )}
+                </td>
+                {methods.map((m) => (
+                  <td key={m.id} className="py-4 px-5 text-center">
+                    <Switch
+                      isSelected={regionMethods[r.id]?.[m.id] ?? false}
+                      onValueChange={(v) => toggle(r.id, m.id, v)}
+                      isDisabled={!canEdit || toggling === `${r.id}-${m.id}`}
+                      color="primary"
+                      classNames={{
+                        wrapper: "group-data-[selected=true]:bg-[#5e2cec]",
+                      }}
+                    />
+                  </td>
+                ))}
+              </tr>
             ))}
-          </TableBody>
-        </Table>
-      </CardBody>
-    </Card>
+          </tbody>
+        </table>
+      </div>
+    </GlassCard>
   );
 }

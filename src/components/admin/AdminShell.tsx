@@ -137,9 +137,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* User button */}
-        <div className="border-t border-white/[0.07] p-4 flex items-center gap-3">
-          <UserButton afterSignOutUrl="/sign-in" />
-          <p className="text-white/40 text-xs truncate">Mi cuenta</p>
+        <div className="border-t border-white/[0.07] p-3">
+          <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-white/50 hover:bg-white/[0.05] hover:text-white/70 transition-all duration-200">
+            <div className="shrink-0">
+              <UserButton afterSignOutUrl="/sign-in" />
+            </div>
+            <span className="text-[0.8125rem] font-medium truncate min-w-0">Mi cuenta</span>
+          </div>
         </div>
       </aside>
 

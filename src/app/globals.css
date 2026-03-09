@@ -84,54 +84,163 @@
   ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 99px; }
   ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
 
+  /* Calendario disponibilidad: scrollbar horizontal más visible */
+  .calendar-scroll::-webkit-scrollbar { height: 10px; }
+  .calendar-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 99px; }
+  .calendar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 99px; }
+  .calendar-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+
   h1, h2, h3, h4, h5, h6 {
     @apply font-sora;
   }
 }
 
-/* Admin panel: Select/Input con texto blanco para contraste en tema oscuro */
-.admin-panel [data-slot="trigger"],
+/* ─── Admin panel: dark theme inputs / selects (HeroUI) ─────────────────── */
+
+/* Input wrapper: fondo oscuro profundo, borde sutil */
+.admin-panel [data-slot="input-wrapper"] {
+  background: rgba(10, 8, 24, 0.52) !important;
+  border-color: rgba(255, 255, 255, 0.11) !important;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s !important;
+}
+.admin-panel [data-slot="input-wrapper"][data-hover="true"] {
+  background: rgba(15, 12, 32, 0.65) !important;
+  border-color: rgba(255, 255, 255, 0.17) !important;
+}
+.admin-panel [data-slot="input-wrapper"][data-focus="true"] {
+  background: rgba(15, 12, 32, 0.72) !important;
+  border-color: rgba(94, 44, 236, 0.65) !important;
+  box-shadow: 0 0 0 3px rgba(94, 44, 236, 0.14) !important;
+}
+
+/* Texto del input y placeholder */
+.admin-panel [data-slot="input-wrapper"] input {
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+.admin-panel [data-slot="input-wrapper"] input::placeholder {
+  color: rgba(255, 255, 255, 0.38) !important;
+  opacity: 1 !important;
+}
+
+/* Label del input */
+.admin-panel [data-slot="label"] {
+  color: rgba(255, 255, 255, 0.65) !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+}
+
+/* Select trigger (mismo look que input) */
+.admin-panel [data-slot="trigger"] {
+  background: rgba(10, 8, 24, 0.52) !important;
+  border-color: rgba(255, 255, 255, 0.11) !important;
+  transition: background 0.15s, border-color 0.15s !important;
+}
+.admin-panel [data-slot="trigger"][data-hover="true"] {
+  background: rgba(15, 12, 32, 0.65) !important;
+  border-color: rgba(255, 255, 255, 0.17) !important;
+}
+.admin-panel [data-slot="trigger"][data-open="true"],
+.admin-panel [data-slot="trigger"][data-focus="true"] {
+  background: rgba(15, 12, 32, 0.72) !important;
+  border-color: rgba(94, 44, 236, 0.65) !important;
+  box-shadow: 0 0 0 3px rgba(94, 44, 236, 0.14) !important;
+}
 .admin-panel [data-slot="trigger"] *,
 .admin-panel [data-slot="trigger"] span,
 .admin-panel [data-slot="trigger"] p {
-  color: white !important;
+  color: rgba(255, 255, 255, 0.92) !important;
 }
-.admin-panel [data-slot="input-wrapper"] input,
-.admin-panel [data-slot="input-wrapper"] input::placeholder {
-  color: white !important;
+.admin-panel [data-slot="value"] {
+  color: rgba(255, 255, 255, 0.92) !important;
 }
-.admin-panel [data-slot="input-wrapper"] input::placeholder {
-  opacity: 0.7;
+.admin-panel [data-slot="selectorIcon"] {
+  color: rgba(255, 255, 255, 0.5) !important;
 }
 
-/* Modal admin oscuro: forzar contraste blanco sobre fondo negro */
-.admin-modal-dark [data-slot="trigger"],
+/* Icono del input type="date" (calendario nativo): forzar blanco en tema oscuro */
+.admin-panel input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.8;
+  cursor: pointer;
+}
+.admin-panel input[type="date"]::-webkit-datetime-edit {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+/* ─── Modal admin oscuro: contenedor y inputs sobre fondo #0f1220 ─────────── */
+
+/* Forzar fondo oscuro en todo el modal (HeroUI aplica bg-content1 por defecto) */
+.admin-modal-dark,
+.admin-modal-dark[data-slot="base"] {
+  background: #0f1220 !important;
+  background-color: #0f1220 !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+/* Inputs en modal: ligeramente más claros para contrastar con el fondo muy oscuro */
+.admin-modal-dark [data-slot="input-wrapper"] {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s !important;
+}
+.admin-modal-dark [data-slot="input-wrapper"][data-hover="true"] {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+.admin-modal-dark [data-slot="input-wrapper"][data-focus="true"] {
+  background: rgba(255, 255, 255, 0.11) !important;
+  border-color: rgba(94, 44, 236, 0.7) !important;
+  box-shadow: 0 0 0 3px rgba(94, 44, 236, 0.16) !important;
+}
+.admin-modal-dark [data-slot="input-wrapper"] input {
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+.admin-modal-dark [data-slot="input-wrapper"] input::placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+  opacity: 1 !important;
+}
+.admin-modal-dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.8;
+  cursor: pointer;
+}
+.admin-modal-dark [data-slot="label"] {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-weight: 500 !important;
+}
+.admin-modal-dark [data-slot="description"] {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+.admin-modal-dark [data-slot="trigger"] {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  transition: background 0.15s, border-color 0.15s !important;
+}
+.admin-modal-dark [data-slot="trigger"][data-hover="true"] {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+.admin-modal-dark [data-slot="trigger"][data-open="true"],
+.admin-modal-dark [data-slot="trigger"][data-focus="true"] {
+  border-color: rgba(94, 44, 236, 0.7) !important;
+  box-shadow: 0 0 0 3px rgba(94, 44, 236, 0.16) !important;
+}
 .admin-modal-dark [data-slot="trigger"] *,
 .admin-modal-dark [data-slot="trigger"] span,
 .admin-modal-dark [data-slot="trigger"] p {
-  color: white !important;
-}
-.admin-modal-dark [data-slot="input-wrapper"] input,
-.admin-modal-dark [data-slot="input-wrapper"] input::placeholder {
-  color: white !important;
-}
-.admin-modal-dark [data-slot="input-wrapper"] input::placeholder {
-  opacity: 0.85 !important;
-}
-.admin-modal-dark [data-slot="label"] {
-  color: rgba(255, 255, 255, 0.9) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
 }
 .admin-modal-dark [data-slot="value"] {
-  color: white !important;
+  color: rgba(255, 255, 255, 0.92) !important;
 }
-.admin-modal-dark [data-slot="description"] {
-  color: rgba(255, 255, 255, 0.75) !important;
+.admin-modal-dark [data-slot="selectorIcon"] {
+  color: rgba(255, 255, 255, 0.5) !important;
 }
 .admin-modal-dark .text-default-600,
 .admin-modal-dark .text-default-700,
 .admin-modal-dark .text-default-foreground,
 .admin-modal-dark .text-default-500 {
-  color: white !important;
+  color: rgba(255, 255, 255, 0.85) !important;
 }
 
 /* Botón primario Newayzi - alineado con frontend, alto contraste */

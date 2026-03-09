@@ -2,16 +2,12 @@
 
 import { useEffect, useState } from "react";
 import {
-  Card,
-  CardBody,
-  CardHeader,
   Button,
   Select,
   SelectItem,
   Input,
   Textarea,
   Spinner,
-  Chip,
   Modal,
   ModalContent,
   ModalHeader,
@@ -27,6 +23,24 @@ import { useAdmin } from "@/contexts/AdminContext";
 import { EmailRichEditor } from "./EmailRichEditor";
 
 type RecipientMode = "group" | "custom";
+
+const inputDark = "rounded-xl border";
+
+function GlassCard({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6 transition-all duration-300 hover:border-white/[0.14] hover:bg-white/[0.065] ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
 
 export function CommunicationsClient() {
   const { canAccess } = useAdmin();
@@ -112,7 +126,7 @@ export function CommunicationsClient() {
       setPreviewHtml(res.html);
     } catch (e) {
       setPreviewHtml(
-        `<p class="text-red-600">Error al cargar vista previa: ${e instanceof Error ? e.message : "Error desconocido"}</p>`
+        `<p class="text-red-400">Error al cargar vista previa: ${e instanceof Error ? e.message : "Error desconocido"}</p>`
       );
     } finally {
       setPreviewLoading(false);
@@ -151,96 +165,97 @@ export function CommunicationsClient() {
 
   if (!canSend) {
     return (
-      <Card className="border border-semantic-surface-border">
-        <CardBody>
-          <p className="text-semantic-text-muted">
-            No tienes permiso para acceder a comunicaciones. Solo el super-admin puede enviar emails masivos.
-          </p>
-        </CardBody>
-      </Card>
+      <GlassCard className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center mb-4">
+          <Icon icon="solar:shield-warning-bold-duotone" className="text-amber-400 text-2xl" />
+        </div>
+        <p className="font-sora font-bold text-white text-base">Sin permiso</p>
+        <p className="mt-2 text-sm text-white/50">
+          Solo el super-admin puede enviar emails masivos.
+        </p>
+      </GlassCard>
     );
   }
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <Spinner size="lg" color="primary" />
-      </div>
+      <GlassCard className="flex justify-center items-center py-16">
+        <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+      </GlassCard>
     );
   }
 
   return (
     <div className="space-y-6">
       {/* Plantillas disponibles */}
-      <Card className="border border-semantic-surface-border">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <h2 className="text-lg font-semibold text-newayzi-jet">
-            Plantillas de email
-          </h2>
-          {templateId && (
-            <Chip
-              color="secondary"
-              variant="flat"
-              startContent={<Icon icon="solar:document-text-bold" width={16} />}
-            >
-              {templates.find((t) => t.id === templateId)?.name ?? "Seleccionada"}
-            </Chip>
-          )}
-        </CardHeader>
-        <CardBody>
-          {templates.length === 0 ? (
-            <p className="text-sm text-semantic-text-muted">
-              No hay plantillas disponibles. Verifica el backend.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-3">
-                {templates.map((t) => (
-                  <Card
-                    key={t.id}
-                    className={`w-full max-w-md border ${
-                      templateId === t.id
-                        ? "border-newayzi-han-purple bg-newayzi-han-purple/5 ring-2 ring-newayzi-han-purple/20"
-                        : "border-semantic-surface-border"
-                    }`}
-                    isPressable
-                    onPress={() => setTemplateId(t.id)}
-                  >
-                    <CardBody className="py-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-medium text-newayzi-jet">{t.name}</p>
-                          <p className="text-sm text-semantic-text-muted">
-                            {t.description}
-                          </p>
-                        </div>
-                        {templateId === t.id && (
-                          <Icon
-                            icon="solar:check-circle-bold"
-                            className="text-newayzi-han-purple flex-shrink-0"
-                            width={24}
-                          />
-                        )}
-                      </div>
-                    </CardBody>
-                  </Card>
-                ))}
-              </div>
-              <Button
-                color="primary"
-                variant="solid"
-                size="md"
-                startContent={<Icon icon="solar:eye-bold" width={20} />}
-                onPress={handlePreview}
-                isDisabled={!templateId}
-                className="font-semibold shadow-sm"
-              >
-                Vista previa de la plantilla
-              </Button>
+      <GlassCard className="p-5">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
+              <Icon icon="solar:document-text-bold-duotone" className="text-[#9b74ff] text-base" />
             </div>
+            <div>
+              <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Plantillas</p>
+              <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
+                Plantillas de email
+              </p>
+            </div>
+          </div>
+          {templateId && (
+            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-[#5e2cec]/25 border border-[#5e2cec]/30 text-[#b89eff]">
+              <Icon icon="solar:document-text-bold" width={14} />
+              {templates.find((t) => t.id === templateId)?.name ?? "Seleccionada"}
+            </span>
           )}
-        </CardBody>
-      </Card>
+        </div>
+        {templates.length === 0 ? (
+          <p className="text-sm text-white/50">
+            No hay plantillas disponibles. Verifica el backend.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-3">
+              {templates.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTemplateId(t.id)}
+                  className={`w-full max-w-md text-left rounded-2xl border p-4 transition-all ${
+                    templateId === t.id
+                      ? "border-[#5e2cec]/50 bg-[#5e2cec]/15 ring-2 ring-[#5e2cec]/25"
+                      : "border-white/[0.1] bg-white/[0.03] hover:border-white/[0.14] hover:bg-white/[0.06]"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-sora font-semibold text-white">{t.name}</p>
+                      <p className="text-sm text-white/60 mt-1">
+                        {t.description}
+                      </p>
+                    </div>
+                    {templateId === t.id && (
+                      <Icon
+                        icon="solar:check-circle-bold"
+                        className="text-[#9b74ff] flex-shrink-0"
+                        width={24}
+                      />
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <Button
+              className="btn-newayzi-primary"
+              size="md"
+              startContent={<Icon icon="solar:eye-bold" width={20} />}
+              onPress={handlePreview}
+              isDisabled={!templateId}
+            >
+              Vista previa de la plantilla
+            </Button>
+          </div>
+        )}
+      </GlassCard>
 
       {/* Modal vista previa */}
       <Modal
@@ -248,17 +263,25 @@ export function CommunicationsClient() {
         onOpenChange={setPreviewOpen}
         size="2xl"
         scrollBehavior="inside"
+        classNames={{
+          base: "admin-modal-dark !bg-[#0f1220] rounded-[28px] border border-white/[0.12] backdrop-blur-xl shadow-2xl shadow-black/50 max-h-[90vh] overflow-hidden flex flex-col",
+          header: "border-b border-white/[0.08] !text-white font-sora font-bold text-lg shrink-0",
+          body: "!text-white/95 !bg-transparent overflow-y-auto",
+          closeButton: "!text-white/90 hover:!bg-white/10 hover:!text-white rounded-full",
+          backdrop: "!bg-black/70 backdrop-blur-md",
+          wrapper: "!bg-transparent",
+        }}
       >
         <ModalContent>
           <ModalHeader>Vista previa del email</ModalHeader>
           <ModalBody>
             {previewLoading ? (
               <div className="flex justify-center py-12">
-                <Spinner size="lg" color="primary" />
+                <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
               </div>
             ) : previewHtml ? (
               <div
-                className="rounded-lg border border-semantic-surface-border bg-white p-4 max-h-[70vh] overflow-auto"
+                className="rounded-xl border border-white/[0.1] bg-white p-4 max-h-[70vh] overflow-auto"
                 dangerouslySetInnerHTML={{ __html: previewHtml }}
               />
             ) : null}
@@ -267,27 +290,37 @@ export function CommunicationsClient() {
       </Modal>
 
       {/* Formulario de envío */}
-      <Card className="border border-semantic-surface-border">
-        <CardHeader>
-          <h2 className="text-lg font-semibold text-newayzi-jet">
-            Enviar comunicación
-          </h2>
-        </CardHeader>
-        <CardBody className="space-y-4">
+      <GlassCard className="p-5">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
+            <Icon icon="solar:letter-bold-duotone" className="text-[#9b74ff] text-base" />
+          </div>
+          <div>
+            <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Envío</p>
+            <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
+              Enviar comunicación
+            </p>
+          </div>
+        </div>
+        <div className="space-y-4">
           <Select
             label="Plantilla"
             selectedKeys={templateId ? [templateId] : []}
             onSelectionChange={(s) => setTemplateId(Array.from(s)[0] as string)}
             items={templates}
+            classNames={{
+              trigger: inputDark,
+              value: "!text-white/92",
+              label: "!text-white/70",
+              selectorIcon: "!text-white/50",
+              popoverContent: "bg-[#0f1220] border border-white/[0.1]",
+            }}
           >
-            {(t) => <SelectItem key={t.id}>{t.name}</SelectItem>}
+            {(t) => <SelectItem key={t.id} className="text-white">{t.name}</SelectItem>}
           </Select>
 
-          {/* Destinatarios: selector claro */}
           <div className="space-y-3">
-            <p className="text-sm font-medium text-newayzi-jet">
-              Destinatarios
-            </p>
+            <p className="text-sm font-medium text-white/80">Destinatarios</p>
             <Select
               label="¿A quién enviar?"
               placeholder="Selecciona un grupo o personas"
@@ -299,43 +332,48 @@ export function CommunicationsClient() {
               }}
               items={groups}
               description="El grupo seleccionado se muestra debajo"
+              classNames={{
+                trigger: inputDark,
+                value: "!text-white/92",
+                label: "!text-white/70",
+                selectorIcon: "!text-white/50",
+                description: "!text-white/50",
+                popoverContent: "bg-[#0f1220] border border-white/[0.1]",
+              }}
             >
               {(g) => (
-                <SelectItem key={g.id} textValue={g.name}>
+                <SelectItem key={g.id} textValue={g.name} className="text-white">
                   <div className="flex items-center justify-between gap-2 w-full">
                     <span>{g.name}</span>
                     {g.id !== "custom" && (
-                      <Chip size="sm" variant="flat">
-                        {g.recipients_count}
-                      </Chip>
+                      <span className="text-xs text-white/50">({g.recipients_count})</span>
                     )}
                   </div>
                 </SelectItem>
               )}
             </Select>
 
-            {/* Resumen visible del destino */}
             {groupId && (
               <div
-                className={`rounded-lg border p-3 ${
+                className={`rounded-xl border p-4 ${
                   groupId === "custom"
-                    ? "border-amber-300 bg-amber-50"
-                    : "border-newayzi-han-purple/30 bg-newayzi-han-purple/5"
+                    ? "border-amber-400/30 bg-amber-500/15"
+                    : "border-[#5e2cec]/30 bg-[#5e2cec]/10"
                 }`}
               >
                 <div className="flex items-center gap-2">
                   <Icon
                     icon="solar:users-group-rounded-outline"
                     width={20}
-                    className="text-newayzi-han-purple"
+                    className={groupId === "custom" ? "text-amber-400" : "text-[#9b74ff]"}
                   />
                   <div>
-                    <p className="font-medium text-newayzi-jet">
+                    <p className="font-medium text-white">
                       {groupId === "custom"
                         ? "Personas específicas"
                         : selectedGroup?.name}
                     </p>
-                    <p className="text-sm text-semantic-text-muted">
+                    <p className="text-sm text-white/60">
                       {groupId === "custom"
                         ? "Ingresa los emails en el campo de abajo"
                         : `${selectedGroup?.recipients_count ?? 0} destinatarios recibirán el email`}
@@ -345,7 +383,6 @@ export function CommunicationsClient() {
               </div>
             )}
 
-            {/* Campo para emails cuando es "Personas específicas" */}
             {groupId === "custom" && (
               <Textarea
                 label="Emails de destinatarios"
@@ -354,6 +391,12 @@ export function CommunicationsClient() {
                 onValueChange={setCustomEmails}
                 minRows={3}
                 description="Un solo email o varios. Separa con coma, punto y coma o salto de línea."
+                classNames={{
+                  inputWrapper: inputDark,
+                  input: "!text-white/95 placeholder:!text-white/38",
+                  label: "!text-white/70",
+                  description: "!text-white/50",
+                }}
               />
             )}
           </div>
@@ -364,6 +407,11 @@ export function CommunicationsClient() {
             value={subject}
             onValueChange={setSubject}
             isRequired
+            classNames={{
+              inputWrapper: inputDark,
+              input: "!text-white/95 placeholder:!text-white/38",
+              label: "!text-white/70",
+            }}
           />
 
           <Input
@@ -372,11 +420,17 @@ export function CommunicationsClient() {
             value={greeting}
             onValueChange={setGreeting}
             description="Saludo inicial del email (ej. Hola, / Estimados,)"
+            classNames={{
+              inputWrapper: inputDark,
+              input: "!text-white/95 placeholder:!text-white/38",
+              label: "!text-white/70",
+              description: "!text-white/50",
+            }}
           />
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-newayzi-jet">
-              Mensaje <span className="text-red-500">*</span>
+            <label className="text-sm font-medium text-white/80">
+              Mensaje <span className="text-red-400">*</span>
             </label>
             <EmailRichEditor
               value={bodyHtml || bodyText}
@@ -386,49 +440,60 @@ export function CommunicationsClient() {
               }}
               placeholder="Escribe el contenido del email. Usa negrita, listas numeradas y títulos para comunicaciones empresariales profesionales."
               minHeight="320px"
+              theme="dark"
             />
-            <p className="text-xs text-semantic-text-muted">
+            <p className="text-xs text-white/50">
               El contenido se enviará con el formato de la plantilla Newayzi (logo, políticas, etc.)
             </p>
           </div>
 
-          <Card className="border border-dashed border-gray-300 bg-gray-50/50">
-            <CardBody className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Icon icon="solar:link-circle-bold" width={20} className="text-newayzi-han-purple" />
-                <span className="text-sm font-medium text-newayzi-jet">
-                  Botón CTA (opcional)
-                </span>
-              </div>
-              <p className="text-xs text-semantic-text-muted">
-                Añade un botón de llamada a la acción debajo del mensaje. Si ambos campos están vacíos, no se mostrará.
+          <div className="rounded-2xl border border-white/[0.1] bg-white/[0.03] p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <Icon icon="solar:link-circle-bold" width={20} className="text-[#9b74ff]" />
+              <span className="text-sm font-medium text-white/80">
+                Botón CTA (opcional)
+              </span>
+            </div>
+            <p className="text-xs text-white/50">
+              Añade un botón de llamada a la acción debajo del mensaje. Si ambos campos están vacíos, no se mostrará.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label="Texto del botón"
+                placeholder="Ej: Visitar sitio"
+                value={ctaText}
+                onValueChange={setCtaText}
+                description="Ej: Ver más, Registrarse, Descargar"
+                classNames={{
+                  inputWrapper: inputDark,
+                  input: "!text-white/95 placeholder:!text-white/38",
+                  label: "!text-white/70",
+                  description: "!text-white/50",
+                }}
+              />
+              <Input
+                label="URL del botón"
+                placeholder="https://ejemplo.com"
+                value={ctaUrl}
+                onValueChange={setCtaUrl}
+                description="Enlace al que llevará el botón"
+                classNames={{
+                  inputWrapper: inputDark,
+                  input: "!text-white/95 placeholder:!text-white/38",
+                  label: "!text-white/70",
+                  description: "!text-white/50",
+                }}
+              />
+            </div>
+            {(ctaText.trim() || ctaUrl.trim()) && !(ctaText.trim() && ctaUrl.trim()) && (
+              <p className="text-xs text-amber-400">
+                Completa ambos campos para que el botón se muestre en el email.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Input
-                  label="Texto del botón"
-                  placeholder="Ej: Visitar sitio"
-                  value={ctaText}
-                  onValueChange={setCtaText}
-                  description="Ej: Ver más, Registrarse, Descargar"
-                />
-                <Input
-                  label="URL del botón"
-                  placeholder="https://ejemplo.com"
-                  value={ctaUrl}
-                  onValueChange={setCtaUrl}
-                  description="Enlace al que llevará el botón"
-                />
-              </div>
-              {(ctaText.trim() || ctaUrl.trim()) && !(ctaText.trim() && ctaUrl.trim()) && (
-                <p className="text-xs text-amber-600">
-                  Completa ambos campos para que el botón se muestre en el email.
-                </p>
-              )}
-            </CardBody>
-          </Card>
+            )}
+          </div>
 
           <Button
-            color="primary"
+            className="btn-newayzi-primary"
             onPress={handleSend}
             isLoading={sending}
             isDisabled={!canSubmit}
@@ -444,45 +509,41 @@ export function CommunicationsClient() {
           </Button>
 
           {result && (
-            <Card
-              className={`border ${
+            <div
+              className={`rounded-2xl border p-4 flex items-start gap-3 ${
                 result.failed > 0
-                  ? "border-amber-300 bg-amber-50"
-                  : "border-emerald-300 bg-emerald-50"
+                  ? "border-amber-400/30 bg-amber-500/15"
+                  : "border-emerald-400/30 bg-emerald-500/15"
               }`}
             >
-              <CardBody>
-                <div className="flex items-center gap-2">
-                  <Icon
-                    icon={
-                      result.failed > 0
-                        ? "solar:danger-triangle-bold"
-                        : "solar:check-circle-bold"
-                    }
-                    width={24}
-                    className={
-                      result.failed > 0 ? "text-amber-600" : "text-emerald-600"
-                    }
-                  />
-                  <div>
-                    <p className="font-medium">
-                      Enviados: {result.sent} de {result.total}
-                      {result.failed > 0 && ` (${result.failed} fallidos)`}
-                    </p>
-                    {result.errors.length > 0 && (
-                      <ul className="mt-1 text-sm text-amber-700">
-                        {result.errors.map((e, i) => (
-                          <li key={i}>{e}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              </CardBody>
-            </Card>
+              <Icon
+                icon={
+                  result.failed > 0
+                    ? "solar:danger-triangle-bold"
+                    : "solar:check-circle-bold"
+                }
+                width={24}
+                className={
+                  result.failed > 0 ? "text-amber-400 shrink-0" : "text-emerald-400 shrink-0"
+                }
+              />
+              <div>
+                <p className="font-medium text-white">
+                  Enviados: {result.sent} de {result.total}
+                  {result.failed > 0 && ` (${result.failed} fallidos)`}
+                </p>
+                {result.errors.length > 0 && (
+                  <ul className="mt-1 text-sm text-amber-300">
+                    {result.errors.map((e, i) => (
+                      <li key={i}>{e}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
           )}
-        </CardBody>
-      </Card>
+        </div>
+      </GlassCard>
     </div>
   );
 }

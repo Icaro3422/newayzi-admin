@@ -30,9 +30,8 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
   );
 }
 
-/* Fondo más claro para contraste y legibilidad del texto */
-const inputDark =
-  "bg-white/[0.14] border-white/[0.2] text-white data-[hover=true]:bg-white/[0.18] focus:border-[#5e2cec]/60 data-[focus=true]:border-[#5e2cec]/60";
+// Clases base complementadas por los estilos globales de globals.css (.admin-panel)
+const inputDark = "rounded-xl border";
 
 export function PropertiesList() {
   const { canEditProperty } = useAdmin();
@@ -135,12 +134,12 @@ export function PropertiesList() {
             className="w-40"
             size="sm"
             classNames={{
-              trigger: `rounded-xl ${inputDark}`,
-              label: "text-white/75",
-              value: "text-white font-medium",
-              innerWrapper: "text-white",
-              selectorIcon: "text-white/80",
-              popoverContent: "bg-[#0f1220] border-white/10",
+              trigger: inputDark,
+              label: "!text-white/65",
+              value: "!text-white/92 font-medium",
+              innerWrapper: "!text-white",
+              selectorIcon: "!text-white/50",
+              popoverContent: "bg-[#0f1220] border border-white/[0.1]",
             }}
           >
             <SelectItem key="all" className="text-white">Todos</SelectItem>
@@ -155,9 +154,9 @@ export function PropertiesList() {
             className="w-48"
             size="sm"
             classNames={{
-              inputWrapper: `rounded-xl ${inputDark}`,
-              input: "text-white placeholder:text-white/55",
-              label: "text-white/75",
+              inputWrapper: inputDark,
+              input: "!text-white/95 placeholder:!text-white/38",
+              label: "!text-white/65",
             }}
           />
           <Select
@@ -169,12 +168,12 @@ export function PropertiesList() {
             placeholder="Todas las conexiones"
             items={connectionItems}
             classNames={{
-              trigger: `rounded-xl ${inputDark}`,
-              label: "text-white/75",
-              value: "text-white font-medium",
-              innerWrapper: "text-white",
-              selectorIcon: "text-white/80",
-              popoverContent: "bg-[#0f1220] border-white/10",
+              trigger: inputDark,
+              label: "!text-white/65",
+              value: "!text-white/92 font-medium",
+              innerWrapper: "!text-white",
+              selectorIcon: "!text-white/50",
+              popoverContent: "bg-[#0f1220] border border-white/[0.1]",
             }}
           >
             {(item) => <SelectItem key={item.id} className="text-white">{item.name}</SelectItem>}

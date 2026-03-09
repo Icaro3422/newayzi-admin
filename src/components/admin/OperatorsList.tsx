@@ -2,20 +2,26 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  Table,
-  TableHeader,
-  TableColumn,
-  TableBody,
-  TableRow,
-  TableCell,
-  Button,
-  Chip,
-  Spinner,
-} from "@heroui/react";
+import { Button, Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { adminApi, type Operator } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
+
+function GlassCard({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6 transition-all duration-300 hover:border-white/[0.14] hover:bg-white/[0.065] ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
 
 export function OperatorsList({ refreshKey = 0 }: { refreshKey?: number }) {
   const { canAccess } = useAdmin();
@@ -34,62 +40,100 @@ export function OperatorsList({ refreshKey = 0 }: { refreshKey?: number }) {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-8">
-        <Spinner size="lg" color="primary" />
-      </div>
+      <GlassCard className="flex justify-center items-center py-16">
+        <Spinner
+          size="lg"
+          classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }}
+        />
+      </GlassCard>
+    );
+  }
+
+  if (list.length === 0) {
+    return (
+      <GlassCard className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 flex items-center justify-center mb-4">
+          <Icon icon="solar:users-group-rounded-bold-duotone" className="text-[#9b74ff] text-2xl" />
+        </div>
+        <p className="font-sora font-bold text-white text-base">No hay operadores</p>
+        <p className="mt-2 text-sm text-white/50">
+          Solo el super-admin puede crear operadores.
+        </p>
+      </GlassCard>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <Table aria-label="Operadores" classNames={{ wrapper: "border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm overflow-hidden" }}>
-        <TableHeader>
-          {[
-            <TableColumn key="nombre">Nombre</TableColumn>,
-            <TableColumn key="contacto">Contacto</TableColumn>,
-            <TableColumn key="conexiones">Conexiones</TableColumn>,
-            <TableColumn key="estado">Estado</TableColumn>,
-            ...(canEdit ? [<TableColumn key="acciones" align="end">Acciones</TableColumn>] : []),
-          ]}
-        </TableHeader>
-        <TableBody>
-          {list.map((op) => (
-            <TableRow key={op.id}>
-              {[
-                <TableCell key="nombre">
+    <GlassCard className="p-0 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-white/[0.08]">
+              <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
+                Nombre
+              </th>
+              <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
+                Contacto
+              </th>
+              <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
+                Conexiones
+              </th>
+              <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
+                Estado
+              </th>
+              {canEdit && (
+                <th className="text-right py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
+                  Acciones
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((op) => (
+              <tr
+                key={op.id}
+                className="border-b border-white/[0.06] last:border-0 hover:bg-white/[0.03] transition-colors"
+              >
+                <td className="py-4 px-5">
                   <Link
                     href={`/admin/operators/${op.id}`}
-                    className="font-medium text-newayzi-han-purple hover:underline"
+                    className="font-sora font-semibold text-[#9b74ff] hover:text-[#b89eff] transition-colors"
                   >
                     {op.name}
                   </Link>
-                </TableCell>,
-                <TableCell key="contacto">{op.contact_email || op.contact_phone || "—"}</TableCell>,
-                <TableCell key="conexiones">{op.connections_count ?? 0}</TableCell>,
-                <TableCell key="estado">
-                  <Chip size="sm" color={op.is_active ? "success" : "default"}>
+                </td>
+                <td className="py-4 px-5 text-white/70 text-sm">
+                  {op.contact_email || op.contact_phone || "—"}
+                </td>
+                <td className="py-4 px-5 text-white/70 text-sm">{op.connections_count ?? 0}</td>
+                <td className="py-4 px-5">
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.7rem] font-semibold ${
+                      op.is_active
+                        ? "bg-emerald-500/25 border border-emerald-400/30 text-emerald-300"
+                        : "bg-white/10 text-white/50"
+                    }`}
+                  >
                     {op.is_active ? "Activo" : "Inactivo"}
-                  </Chip>
-                </TableCell>,
-                ...(canEdit
-                  ? [
-                      <TableCell key="acciones" className="text-right">
-                        <Button as={Link} href={`/admin/operators/${op.id}`} size="sm" variant="flat">
-                          Editar
-                        </Button>
-                      </TableCell>,
-                    ]
-                  : []),
-              ]}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {list.length === 0 && (
-        <p className="text-center text-sm text-gray-500 py-8">
-          No hay operadores. Solo el super-admin puede crear operadores.
-        </p>
-      )}
-    </div>
+                  </span>
+                </td>
+                {canEdit && (
+                  <td className="py-4 px-5 text-right">
+                    <Button
+                      as={Link}
+                      href={`/admin/operators/${op.id}`}
+                      size="sm"
+                      className="rounded-xl bg-[#5e2cec]/25 border border-[#5e2cec]/40 text-[#b89eff] hover:bg-[#5e2cec]/35 font-semibold"
+                    >
+                      Editar
+                    </Button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </GlassCard>
   );
 }
