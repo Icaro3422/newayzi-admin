@@ -52,38 +52,38 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-semantic-surface-subdued">
-        <p className="text-semantic-text-muted">Cargando sesión...</p>
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-gray-50 via-blue-50/20 to-purple-50/20">
+        <p className="text-gray-500 font-medium">Cargando sesión...</p>
       </div>
     );
   }
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center bg-semantic-surface-subdued">
+      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-gray-50 via-blue-50/20 to-purple-50/20">
         <div className="text-center">
-          <p className="text-newayzi-red">{error}</p>
-          <p className="mt-2 text-sm text-semantic-text-muted">Comprueba NEXT_PUBLIC_API_URL y que el backend exponga GET /api/admin/me/</p>
+          <p className="text-newayzi-red font-medium">{error}</p>
+          <p className="mt-2 text-sm text-gray-500">Comprueba NEXT_PUBLIC_API_URL y que el backend exponga GET /api/admin/me/</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-semantic-surface-subdued">
-      <aside className="flex w-56 flex-col border-r border-semantic-surface-border bg-white">
-        <div className="flex h-14 items-center gap-2 border-b border-semantic-surface-border px-4">
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-purple-50/20 font-sora">
+      <aside className="flex w-60 flex-col border-r border-gray-200/80 bg-white/95 backdrop-blur-sm shadow-sm">
+        <div className="flex h-16 items-center gap-3 border-b border-gray-200/80 px-5">
           <img
             src="/brand/n-patron-black.svg"
             alt="Newayzi"
-            width={28}
-            height={28}
+            width={32}
+            height={32}
             className="flex-shrink-0"
           />
-          <span className="font-sora font-semibold text-newayzi-jet">
-            Newayzi <span className="text-semantic-text-muted font-normal">|</span> Admin
+          <span className="font-sora font-bold text-newayzi-jet text-lg">
+            Newayzi <span className="text-gray-400 font-normal">|</span> Admin
           </span>
         </div>
-        <nav className="flex-1 space-y-0.5 p-2">
+        <nav className="flex-1 space-y-0.5 p-3">
           {items.map((item) => {
             const isActive =
               pathname === item.href ||
@@ -92,24 +92,46 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                className={`relative flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? "bg-newayzi-han-purple/10 text-newayzi-han-purple"
-                    : "text-semantic-text-muted hover:bg-semantic-surface-subdued hover:text-newayzi-jet"
+                    ? "bg-newayzi-majorelle/10 text-newayzi-majorelle border-l-4 border-l-newayzi-majorelle rounded-l-none"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-newayzi-jet"
                 }`}
               >
-                <Icon icon={item.icon} width={20} />
+                <Icon
+                  icon={item.icon}
+                  width={22}
+                  className={isActive ? "text-newayzi-majorelle" : ""}
+                />
                 {item.label}
               </Link>
             );
           })}
         </nav>
+        <div className="border-t border-gray-200/80 p-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-newayzi-jet text-white font-sora font-bold text-sm">
+            N
+          </div>
+        </div>
       </aside>
-      <main className="flex-1 overflow-auto">
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-end gap-4 border-b border-semantic-surface-border bg-white px-6">
+      <main className="flex-1 overflow-auto relative">
+        <header className="sticky top-0 z-10 flex h-16 items-center justify-end gap-4 border-b border-gray-200/80 bg-white/90 backdrop-blur-sm px-6 shadow-sm">
           <UserButton afterSignOutUrl="/sign-in" />
         </header>
-        <div className="p-6">{children}</div>
+        <div className="relative p-6 lg:p-8">
+          {/* Patrón N una sola vez por página */}
+          <div
+            className="absolute inset-0 w-full h-full opacity-[0.04] select-none pointer-events-none"
+            aria-hidden
+          >
+            <img
+              src="/brand/n-patron-black.svg"
+              alt=""
+              className="absolute bottom-0 right-0 w-[55%] h-[70%] object-contain object-right-bottom"
+            />
+          </div>
+          <div className="relative z-10">{children}</div>
+        </div>
       </main>
     </div>
   );

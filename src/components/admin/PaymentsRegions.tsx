@@ -84,9 +84,9 @@ export function PaymentsRegions() {
 
   if (regions.length === 0 || methods.length === 0) {
     return (
-      <Card className="border border-semantic-surface-border">
+      <Card className="border border-gray-200/60 bg-white/90 backdrop-blur-sm rounded-[20px] shadow-sm">
         <CardBody>
-          <p className="text-semantic-text-muted">
+          <p className="text-gray-500">
             No hay regiones o métodos de pago configurados en el backend. Crea los modelos Region, PaymentMethod y RegionPaymentMethod.
           </p>
         </CardBody>
@@ -95,12 +95,12 @@ export function PaymentsRegions() {
   }
 
   return (
-    <Card className="border border-semantic-surface-border">
+    <Card className="border border-gray-200/60 bg-white/90 backdrop-blur-sm rounded-[20px] shadow-sm">
       <CardBody>
-        <p className="text-sm text-semantic-text-muted mb-4">
+        <p className="text-sm text-gray-500 mb-4">
           Activa o desactiva cada método de pago por región. Solo super-admin.
         </p>
-        <Table aria-label="Pagos por región" classNames={{ wrapper: "border border-semantic-surface-border rounded-lg" }}>
+        <Table aria-label="Pagos por región" classNames={{ wrapper: "border border-gray-200/60 rounded-lg overflow-hidden" }}>
           <TableHeader>
             {[
               <TableColumn key="region">Región</TableColumn>,

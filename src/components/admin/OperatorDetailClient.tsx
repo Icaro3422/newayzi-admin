@@ -63,9 +63,9 @@ export function OperatorDetailClient() {
   }
   if (!operator) {
     return (
-      <Card className="border border-semantic-surface-border">
+      <Card className="border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm">
         <CardBody>
-          <p className="text-semantic-text-muted">Operador no encontrado.</p>
+          <p className="text-gray-500">Operador no encontrado.</p>
           <Button as={Link} href="/admin/operators" className="mt-2">Volver</Button>
         </CardBody>
       </Card>
@@ -77,7 +77,7 @@ export function OperatorDetailClient() {
       <Button as={Link} href="/admin/operators" variant="flat" startContent={<Icon icon="solar:arrow-left-outline" width={18} />}>
         Volver
       </Button>
-      <Card className="border border-semantic-surface-border">
+      <Card className="border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm">
         <CardBody className="space-y-4">
           <Input label="Nombre" value={name} onValueChange={setName} isReadOnly={!canEdit} />
           <Input label="Email contacto" value={contact_email} onValueChange={setContactEmail} isReadOnly={!canEdit} />
@@ -94,9 +94,9 @@ export function OperatorDetailClient() {
           )}
         </CardBody>
       </Card>
-      <Card className="border border-semantic-surface-border">
+      <Card className="border border-gray-200/60 rounded-[20px] shadow-sm bg-white/90 backdrop-blur-sm">
         <CardBody>
-          <p className="text-sm text-semantic-text-muted">
+          <p className="text-sm text-gray-500">
             Conexiones asignadas: {operator.connections_count ?? 0}. Para asignar o cambiar la conexión, edita cada conexión en Conexiones PMS.
           </p>
         </CardBody>

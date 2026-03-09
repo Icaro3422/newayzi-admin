@@ -204,6 +204,8 @@ export interface AvailabilityItem {
   available: number;
   source: "internal" | "pms";
   block_reason?: string;
+  price_per_night?: string;
+  currency?: string;
 }
 
 export interface PaymentMethod {
@@ -464,6 +466,17 @@ export const adminApi = {
     data: { role?: AdminRole | null; operator_id?: number | null }
   ): Promise<AdminUserListItem> {
     return patchJson<AdminUserListItem>(`/api/admin/users/${id}/`, data);
+  },
+
+  async createUserAdmin(data: {
+    email: string;
+    first_name: string;
+    last_name?: string;
+    role: AdminRole;
+    operator_id?: number | null;
+    password: string;
+  }): Promise<AdminUserListItem> {
+    return postJson<AdminUserListItem>("/api/admin/users/create/", data);
   },
 
   async getAuditLogs(params?: { limit?: number }): Promise<{ results: unknown[] } | null> {

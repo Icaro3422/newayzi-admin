@@ -43,7 +43,7 @@ export function OperatorCreateButton({ onCreated }: { onCreated?: () => void }) 
 
   return (
     <>
-      <Button color="primary" onPress={() => setOpen(true)} startContent={<Icon icon="solar:add-circle-outline" width={20} />}>
+      <Button className="btn-newayzi-primary" onPress={() => setOpen(true)} startContent={<Icon icon="solar:add-circle-outline" width={20} />}>
         Nuevo operador
       </Button>
       <Modal isOpen={open} onOpenChange={setOpen}>
@@ -63,7 +63,7 @@ export function OperatorCreateButton({ onCreated }: { onCreated?: () => void }) 
           </ModalBody>
           <ModalFooter>
             <Button variant="flat" onPress={() => setOpen(false)}>Cancelar</Button>
-            <Button color="primary" onPress={handleCreate} isLoading={saving} isDisabled={!canSubmit}>
+            <Button className="btn-newayzi-primary" onPress={handleCreate} isLoading={saving} isDisabled={!canSubmit}>
               Crear
             </Button>
           </ModalFooter>
@@ -83,12 +83,12 @@ export function OperatorCreateButton({ onCreated }: { onCreated?: () => void }) 
               <h3 className="text-lg font-semibold text-newayzi-jet">
                 {successEmailSent ? "Operador agregado exitosamente" : "Operador creado"}
               </h3>
-              <p className="text-sm text-semantic-text-muted">
+              <p className="text-sm text-gray-500">
                 {successEmailSent
                   ? "El operador ha recibido un correo con sus credenciales temporales. Deberá cambiar la contraseña en su primer inicio de sesión."
-                  : "El operador se creó correctamente, pero no se pudo enviar el correo de invitación. Verifica que CLERK_SECRET_KEY y CHATIICO_API_KEY estén configurados en el backend, y que el email no esté ya registrado en Clerk."}
+                  : "El operador se creó correctamente, pero no se pudo enviar el correo de invitación. Verifica que RESEND_API_KEY esté configurado en el backend."}
               </p>
-              <Button color="primary" onPress={() => setShowSuccess(false)}>
+              <Button className="btn-newayzi-primary" onPress={() => setShowSuccess(false)}>
                 Entendido
               </Button>
             </div>
