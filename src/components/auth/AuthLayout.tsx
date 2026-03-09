@@ -36,10 +36,10 @@ function IconBubble({
   );
 }
 
-/* ── Util: card base ── */
+/* ── Util: card base — mayor contraste ── */
 function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl border border-white/[0.12] bg-white/[0.07] backdrop-blur-sm px-4 py-3.5 ${className}`}>
+    <div className={`rounded-2xl border border-white/20 bg-white/[0.12] backdrop-blur-sm px-4 py-3.5 ${className}`}>
       {children}
     </div>
   );
@@ -63,7 +63,7 @@ function SlideNombre() {
       </p>
 
       {/* Fórmula del nombre */}
-      <div className="rounded-2xl border border-white/[0.12] bg-white/[0.07] px-5 py-4 flex items-start gap-3 flex-wrap">
+      <div className="rounded-2xl border border-white/20 bg-white/[0.12] px-5 py-4 flex items-start gap-3 flex-wrap">
         {parts.map((item, i) =>
           item.meaning ? (
             <div key={i} className="flex flex-col items-center gap-1.5">
@@ -78,19 +78,19 @@ function SlideNombre() {
               >
                 {item.word}
               </span>
-              <span className="font-sora text-white/50 text-[0.6rem] leading-tight whitespace-pre-line text-center">
+              <span className="font-sora text-white/75 text-[0.6rem] leading-tight whitespace-pre-line text-center">
                 {item.meaning}
               </span>
             </div>
           ) : (
-            <span key={i} className="font-sora font-light text-white/30 self-start pt-0.5" style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.25rem)" }}>
+            <span key={i} className="font-sora font-light text-white/55 self-start pt-0.5" style={{ fontSize: "clamp(0.95rem, 1.6vw, 1.25rem)" }}>
               {item.word}
             </span>
           )
         )}
       </div>
 
-      <p className="font-sora text-white/60 text-[0.85rem] leading-relaxed">
+      <p className="font-sora text-white/85 text-[0.85rem] leading-relaxed">
         Una marca construida desde el lenguaje: nuevo + lugar + espacio.<br />Así nació Newayzi.
       </p>
     </div>
@@ -102,29 +102,29 @@ function SlideMision() {
   return (
     <div className="flex flex-col gap-6">
       <blockquote
-        className="font-sora font-light text-white leading-snug border-l-[3px] border-white/30 pl-5"
+        className="font-sora font-light text-white leading-snug border-l-[3px] border-white/50 pl-5"
         style={{ fontSize: "clamp(1.2rem, 2vw, 1.625rem)" }}
       >
         "Conectar personas con los{" "}
         <span className="font-bold">espacios que transforman</span>{" "}
         su forma de vivir, trabajar y crear."
       </blockquote>
-      <p className="font-sora text-white/60 text-sm leading-relaxed">
+      <p className="font-sora text-white/85 text-sm leading-relaxed">
         Desde Colombia, construimos puentes entre operadores, agentes y usuarios
         que buscan experiencias inmobiliarias distintas.
       </p>
       <div className="grid grid-cols-3 gap-2.5">
         {[
-          { value: "3+", label: "Ciudades",    icon: "solar:map-point-bold-duotone",  bg: "bg-blue-500/20",   ic: "text-blue-300"   },
-          { value: "∞",  label: "Propiedades", icon: "solar:buildings-2-bold-duotone", bg: "bg-violet-500/20", ic: "text-violet-300" },
-          { value: "1",  label: "Plataforma",  icon: "solar:global-bold-duotone",      bg: "bg-indigo-500/20", ic: "text-indigo-300" },
+          { value: "3+", label: "Ciudades",    icon: "solar:map-point-bold-duotone",  bg: "bg-blue-500/25",   ic: "text-blue-200"   },
+          { value: "∞",  label: "Propiedades", icon: "solar:buildings-2-bold-duotone", bg: "bg-violet-500/25", ic: "text-violet-200" },
+          { value: "1",  label: "Plataforma",  icon: "solar:global-bold-duotone",      bg: "bg-indigo-500/25", ic: "text-indigo-200" },
         ].map((stat) => (
-          <div key={stat.label} className="rounded-2xl border border-white/[0.12] bg-white/[0.07] px-3 py-3.5 flex flex-col items-center gap-2">
+          <div key={stat.label} className="rounded-2xl border border-white/20 bg-white/[0.12] px-3 py-3.5 flex flex-col items-center gap-2">
             <div className={`w-8 h-8 ${stat.bg} rounded-lg flex items-center justify-center`}>
               <Icon icon={stat.icon} className={`${stat.ic} text-lg`} />
             </div>
             <p className="font-sora font-black text-white text-xl leading-none">{stat.value}</p>
-            <p className="font-sora text-white/50 text-[0.65rem] uppercase tracking-wider">{stat.label}</p>
+            <p className="font-sora text-white/75 text-[0.65rem] uppercase tracking-wider">{stat.label}</p>
           </div>
         ))}
       </div>
@@ -172,13 +172,13 @@ function SlideRewards() {
         <p className="font-sora font-light text-white leading-snug" style={{ fontSize: "clamp(1.2rem, 2vw, 1.625rem)" }}>
           Cada reserva te{" "}<span className="font-bold">acerca a más beneficios.</span>
         </p>
-        <p className="font-sora text-white/60 text-[0.82rem] leading-relaxed mt-1.5">
+        <p className="font-sora text-white/85 text-[0.82rem] leading-relaxed mt-1.5">
           Newayzi Rewards premia tu actividad. Cuanto más reservas, más ganas.
         </p>
       </div>
       <div className="flex flex-col gap-2.5">
         {levels.map((lvl) => (
-          <div key={lvl.name} className="flex items-center gap-3.5 rounded-2xl border border-white/[0.12] bg-white/[0.07] px-4 py-3 overflow-hidden relative">
+          <div key={lvl.name} className="flex items-center gap-3.5 rounded-2xl border border-white/20 bg-white/[0.12] px-4 py-3 overflow-hidden relative">
             {/* Barra de acento lateral */}
             <div className={`absolute left-0 top-3 bottom-3 w-[3px] ${lvl.accentBar} rounded-r-full`} />
             <div className="pl-1">
@@ -187,16 +187,16 @@ function SlideRewards() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <p className={`font-sora font-bold text-sm leading-none ${lvl.nameColor}`}>{lvl.name}</p>
-                <span className="font-sora text-white/30 text-[0.6rem] uppercase tracking-wide">{lvl.badge}</span>
+                <span className="font-sora text-white/55 text-[0.6rem] uppercase tracking-wide">{lvl.badge}</span>
               </div>
-              <p className="font-sora text-white/60 text-[0.73rem] leading-relaxed mt-1">{lvl.desc}</p>
+              <p className="font-sora text-white/80 text-[0.73rem] leading-relaxed mt-1">{lvl.desc}</p>
             </div>
           </div>
         ))}
       </div>
-      <div className="flex items-center gap-3 rounded-2xl border border-yellow-400/20 bg-yellow-400/[0.07] px-4 py-2.5">
-        <IconBubble icon="solar:stars-bold-duotone" bgColor="bg-yellow-400/20" iconColor="text-yellow-300" size="sm" />
-        <p className="font-sora text-white/70 text-[0.78rem] leading-snug">
+      <div className="flex items-center gap-3 rounded-2xl border border-yellow-400/30 bg-yellow-400/[0.12] px-4 py-2.5">
+        <IconBubble icon="solar:stars-bold-duotone" bgColor="bg-yellow-400/25" iconColor="text-yellow-200" size="sm" />
+        <p className="font-sora text-white/90 text-[0.78rem] leading-snug">
           Tus puntos se pueden{" "}
           <span className="text-white font-semibold">canjear como descuento directo</span>{" "}
           en tu próxima reserva.
@@ -256,14 +256,14 @@ function SlideNiveles() {
             </div>
             <div className="pt-0.5 pb-2">
               <p className="font-sora font-semibold text-white text-[0.85rem] leading-snug">{step.title}</p>
-              <p className="font-sora text-white/55 text-[0.72rem] leading-relaxed mt-0.5">{step.desc}</p>
+              <p className="font-sora text-white/80 text-[0.72rem] leading-relaxed mt-0.5">{step.desc}</p>
             </div>
           </div>
         ))}
       </div>
-      <div className="flex items-center gap-3 rounded-2xl border border-white/[0.12] bg-white/[0.07] px-4 py-2.5">
-        <IconBubble icon="solar:info-circle-bold-duotone" bgColor="bg-violet-500/25" iconColor="text-violet-300" size="sm" />
-        <p className="font-sora text-white/60 text-[0.73rem] leading-snug">
+      <div className="flex items-center gap-3 rounded-2xl border border-white/20 bg-white/[0.12] px-4 py-2.5">
+        <IconBubble icon="solar:info-circle-bold-duotone" bgColor="bg-violet-500/25" iconColor="text-violet-200" size="sm" />
+        <p className="font-sora text-white/85 text-[0.73rem] leading-snug">
           Tu nivel y puntos se actualizan automáticamente al completar cada reserva.
         </p>
       </div>
@@ -281,7 +281,7 @@ function SlideEcosistema() {
       desc: "Publican, configuran y gestionan propiedades en la plataforma.",
     },
     {
-      icon: "solar:handshake-bold-duotone",
+      icon: "solar:user-id-bold-duotone",
       iconBg: "bg-blue-500/25", iconColor: "text-blue-200",
       name: "Agentes",
       desc: "Conectan propiedades con los clientes y gestionan relaciones.",
@@ -299,17 +299,17 @@ function SlideEcosistema() {
         <p className="font-sora font-light text-white leading-snug" style={{ fontSize: "clamp(1.2rem, 2vw, 1.625rem)" }}>
           Un ecosistema donde{" "}<span className="font-bold">todos ganan.</span>
         </p>
-        <p className="font-sora text-white/60 text-[0.82rem] leading-relaxed mt-1.5">
+        <p className="font-sora text-white/85 text-[0.82rem] leading-relaxed mt-1.5">
           Tres roles, una sola plataforma. Cada uno con herramientas diseñadas para sus necesidades.
         </p>
       </div>
       <div className="flex flex-col gap-2.5">
         {roles.map((role, i) => (
-          <div key={i} className="flex items-center gap-3.5 rounded-2xl border border-white/[0.12] bg-white/[0.07] px-4 py-3.5">
+          <div key={i} className="flex items-center gap-3.5 rounded-2xl border border-white/20 bg-white/[0.12] px-4 py-3.5">
             <IconBubble icon={role.icon} bgColor={role.iconBg} iconColor={role.iconColor} />
             <div>
               <p className="font-sora font-semibold text-white text-sm leading-snug">{role.name}</p>
-              <p className="font-sora text-white/55 text-[0.75rem] leading-relaxed mt-0.5">{role.desc}</p>
+              <p className="font-sora text-white/80 text-[0.75rem] leading-relaxed mt-0.5">{role.desc}</p>
             </div>
           </div>
         ))}
@@ -321,27 +321,60 @@ function SlideEcosistema() {
 /* ─── Slide: tecnología ─── */
 function SlideTecnologia() {
   const features = [
-    { icon: "solar:bolt-bold-duotone",            label: "Disponibilidad en tiempo real",      bg: "bg-yellow-500/20", ic: "text-yellow-200" },
-    { icon: "solar:card-bold-duotone",             label: "Pagos integrados y seguros",         bg: "bg-green-500/20",  ic: "text-green-200"  },
-    { icon: "solar:chat-round-dots-bold-duotone",  label: "Comunicación directa con Chatiico",  bg: "bg-blue-500/20",   ic: "text-blue-200"   },
-    { icon: "solar:gift-bold-duotone",             label: "Programa de lealtad y beneficios",   bg: "bg-pink-500/20",   ic: "text-pink-200"   },
-    { icon: "solar:chart-square-bold-duotone",     label: "Panel de métricas y reportes",       bg: "bg-purple-500/20", ic: "text-purple-200" },
+    {
+      icon: "solar:calendar-bold-duotone",
+      bg: "bg-yellow-500/20",
+      ic: "text-yellow-200",
+      label: "Calendario unificado",
+      desc: "Evita doble reserva. Sincroniza Airbnb, reservas directas y más en un solo lugar.",
+    },
+    {
+      icon: "solar:wallet-money-bold-duotone",
+      bg: "bg-green-500/20",
+      ic: "text-green-200",
+      label: "Cobros automáticos",
+      desc: "Pagos al confirmar, reconciliación simple. Sin cobros manuales ni seguimiento.",
+    },
+    {
+      icon: "solar:chat-round-dots-bold-duotone",
+      bg: "bg-blue-500/20",
+      ic: "text-blue-200",
+      label: "Atención al huésped",
+      desc: "Responde preguntas, reservas y soporte desde el panel. Sin cambiar de app.",
+    },
+    {
+      icon: "solar:gift-bold-duotone",
+      bg: "bg-pink-500/20",
+      ic: "text-pink-200",
+      label: "Clientes que vuelven",
+      desc: "Newayzi Rewards premia la recompra. Tus usuarios regresan y tú vendes más.",
+    },
+    {
+      icon: "solar:chart-square-bold-duotone",
+      bg: "bg-purple-500/20",
+      ic: "text-purple-200",
+      label: "Decisiones con datos",
+      desc: "Ocupación, ingresos y tendencias al instante. Optimiza tu operación.",
+    },
   ];
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <div>
         <p className="font-sora font-light text-white leading-snug" style={{ fontSize: "clamp(1.2rem, 2vw, 1.625rem)" }}>
-          Tecnología pensada{" "}<span className="font-bold">para el sector.</span>
+          Tecnología que{" "}<span className="font-bold">genera resultados.</span>
         </p>
-        <p className="font-sora text-white/60 text-[0.82rem] leading-relaxed mt-1.5">
-          Todo en una sola plataforma. Sin fricciones, sin silos.
+        <p className="font-sora text-white/85 text-[0.82rem] leading-relaxed mt-1.5">
+          Herramientas pensadas para operadores y agentes que quieren vender más con menos esfuerzo.
         </p>
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2.5">
         {features.map((f, i) => (
-          <div key={i} className="flex items-center gap-3.5 rounded-xl border border-white/[0.10] bg-white/[0.05] px-3.5 py-2.5">
+          <div key={i} className="flex items-start gap-3.5 rounded-xl border border-white/20 bg-white/[0.12] px-3.5 py-2.5">
             <IconBubble icon={f.icon} bgColor={f.bg} iconColor={f.ic} size="sm" />
-            <p className="font-sora text-white/80 text-[0.82rem] leading-snug font-medium">{f.label}</p>
+            <div>
+              <p className="font-sora font-semibold text-white text-[0.82rem] leading-snug">{f.label}</p>
+              <p className="font-sora text-white/75 text-[0.72rem] leading-relaxed mt-0.5">{f.desc}</p>
+            </div>
           </div>
         ))}
       </div>
@@ -415,30 +448,30 @@ function BrandPanel() {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* Fondos */}
+      {/* Fondos — gradiente más luminoso para mejor contraste */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 80% 90% at 60% 60%, #422DF6 0%, #2318B8 40%, #0e1260 75%, #080c3a 100%)",
+            "radial-gradient(ellipse 80% 90% at 60% 55%, #5a3cf8 0%, #3d28d4 35%, #1e1a6e 70%, #0d0f2e 100%)",
         }}
       />
       <div
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 60% 50% at 75% 15%, rgba(94,44,236,0.45) 0%, transparent 70%)",
+            "radial-gradient(ellipse 55% 45% at 80% 10%, rgba(139,92,246,0.5) 0%, transparent 65%)",
         }}
       />
       <div
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 50% 40% at 25% 88%, rgba(66,45,246,0.22) 0%, transparent 70%)",
+            "radial-gradient(ellipse 45% 35% at 20% 92%, rgba(99,102,241,0.25) 0%, transparent 70%)",
         }}
       />
 
-      {/* Patrón N */}
+      {/* Patrón N — más sutil para no restar legibilidad */}
       <div
         className="absolute bottom-[-5%] right-[-8%] w-[72%] h-[72%] pointer-events-none"
         aria-hidden
@@ -447,14 +480,14 @@ function BrandPanel() {
           src="/brand/n-patron-black.svg"
           alt=""
           className="w-full h-full object-contain object-right-bottom"
-          style={{ filter: "invert(1)", opacity: 0.055 }}
+          style={{ filter: "invert(1)", opacity: 0.04 }}
         />
       </div>
 
-      {/* Barra de progreso */}
-      <div className="absolute top-0 left-0 right-0 h-[2px] bg-white/10 z-20">
+      {/* Barra de progreso — más visible */}
+      <div className="absolute top-0 left-0 right-0 h-[3px] bg-white/15 z-20">
         <div
-          className="h-full bg-white/50 transition-none"
+          className="h-full bg-white transition-none"
           style={{ width: `${progress}%` }}
         />
       </div>
@@ -463,8 +496,8 @@ function BrandPanel() {
       <div className="relative z-10 flex flex-col justify-between p-12 xl:p-14 w-full h-full">
         {/* Tag del slide */}
         <div className="flex items-center gap-2">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-white/40" />
-          <p className="font-sora text-white/40 text-[0.7rem] uppercase tracking-[0.18em] font-medium">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-white/70" />
+          <p className="font-sora text-white/75 text-[0.7rem] uppercase tracking-[0.18em] font-semibold">
             {slide.tag}
           </p>
         </div>
@@ -481,7 +514,7 @@ function BrandPanel() {
           {slideComponents[slide.content]}
         </div>
 
-        {/* Dots de navegación + indicador pausa */}
+        {/* Dots de navegación + indicador pausa (espacio reservado para evitar layout shift) */}
         <div className="flex items-center justify-between">
           <div className="flex gap-2 items-center">
             {slides.map((s, i) => (
@@ -496,18 +529,22 @@ function BrandPanel() {
                   style={{
                     width: i === current ? "22px" : "6px",
                     height: "6px",
-                    background: i === current ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.25)",
+                    background: i === current ? "#ffffff" : "rgba(255,255,255,0.45)",
                   }}
                 />
               </button>
             ))}
           </div>
 
-          {paused && (
-            <span className="font-sora text-white/30 text-[0.65rem] uppercase tracking-wider">
+          <div className="min-w-[4.5rem] text-right">
+            <span
+              className={`font-sora text-white/80 text-[0.65rem] uppercase tracking-wider transition-opacity duration-150 ${
+                paused ? "opacity-100" : "opacity-0"
+              }`}
+            >
               En pausa
             </span>
-          )}
+          </div>
         </div>
       </div>
     </div>
