@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { UserButton } from "@clerk/nextjs";
+import { useClerk, useUser } from "@clerk/nextjs";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useAdmin } from "@/contexts/AdminContext";
 
@@ -41,6 +47,8 @@ const GLOW_2     = "radial-gradient(circle, rgba(66,45,246,0.10) 0%, transparent
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router   = useRouter();
+  const { signOut } = useClerk();
+  const { user } = useUser();
   const { canAccess, loading, error } = useAdmin();
   const items = navItems.filter((item) => canAccess(item.module));
 
@@ -136,14 +144,54 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* User button */}
+        {/* User dropdown */}
         <div className="border-t border-white/[0.07] p-3">
-          <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-white/50 hover:bg-white/[0.05] hover:text-white/70 transition-all duration-200">
-            <div className="shrink-0">
-              <UserButton afterSignOutUrl="/sign-in" />
-            </div>
-            <span className="text-[0.8125rem] font-medium truncate min-w-0">Mi cuenta</span>
-          </div>
+          <Dropdown
+            placement="top-start"
+            classNames={{
+              content: "bg-[#0f1220] border border-white/[0.12] rounded-xl shadow-xl shadow-black/30 p-1 min-w-[180px]",
+            }}
+          >
+            <DropdownTrigger>
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-white/50 hover:bg-white/[0.05] hover:text-white/70 transition-all duration-200 text-left cursor-pointer"
+              >
+                <div className="shrink-0 size-9 rounded-full overflow-hidden bg-white/10 flex items-center justify-center">
+                  {user?.imageUrl ? (
+                    <img
+                      src={user.imageUrl}
+                      alt=""
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-white/80 text-sm font-semibold">
+                      {user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0] ?? "?"}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[0.8125rem] font-medium truncate min-w-0">Mi cuenta</span>
+              </button>
+            </DropdownTrigger>
+            <DropdownMenu aria-label="Cuenta">
+              <DropdownItem
+                key="profile"
+                startContent={<Icon icon="solar:user-circle-outline" width={18} />}
+                className="text-white/90 data-[hover=true]:bg-white/10 rounded-lg"
+                onPress={() => router.push("/admin/profile")}
+              >
+                Mi perfil
+              </DropdownItem>
+              <DropdownItem
+                key="signout"
+                startContent={<Icon icon="solar:logout-2-outline" width={18} />}
+                className="text-red-400 data-[hover=true]:bg-red-500/20 rounded-lg"
+                onPress={() => signOut({ redirectUrl: "/sign-in" })}
+              >
+                Cerrar sesión
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
         </div>
       </aside>
 

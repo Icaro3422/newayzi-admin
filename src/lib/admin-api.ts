@@ -422,7 +422,7 @@ export const adminApi = {
     name: string;
     contact_email: string;
     contact_phone?: string;
-  }): Promise<Operator & { email_sent?: boolean }> {
+  }): Promise<Operator & { email_sent?: boolean; invite_status?: "sent" | "user_exists" | "no_resend" | "clerk_error" | "skipped" }> {
     return postJson<Operator>("/api/admin/operators/", data);
   },
 

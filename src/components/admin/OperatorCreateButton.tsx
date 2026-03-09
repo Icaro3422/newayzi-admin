@@ -20,7 +20,7 @@ export function OperatorCreateButton({ onCreated }: { onCreated?: () => void }) 
   const { canAccess } = useAdmin();
   const [open, setOpen] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [successEmailSent, setSuccessEmailSent] = useState(false);
+  const [inviteStatus, setInviteStatus] = useState<"sent" | "user_exists" | "no_resend" | "clerk_error" | "skipped" | null>(null);
   const [name, setName] = useState("");
   const [contact_email, setContactEmail] = useState("");
   const [contact_phone, setContactPhone] = useState("");
@@ -42,8 +42,8 @@ export function OperatorCreateButton({ onCreated }: { onCreated?: () => void }) 
       setContactEmail("");
       setContactPhone("");
       onCreated?.();
+      setInviteStatus(res.invite_status ?? (res.email_sent ? "sent" : "no_resend"));
       setShowSuccess(true);
-      setSuccessEmailSent(!!res.email_sent);
     } finally {
       setSaving(false);
     }
@@ -150,22 +150,46 @@ export function OperatorCreateButton({ onCreated }: { onCreated?: () => void }) 
             <div className="flex flex-col items-center gap-4 text-center">
               <div
                 className={`rounded-full p-4 ${
-                  successEmailSent ? "bg-emerald-500/25 border border-emerald-400/30" : "bg-amber-500/25 border border-amber-400/30"
+                  inviteStatus === "sent"
+                    ? "bg-emerald-500/25 border border-emerald-400/30"
+                    : inviteStatus === "user_exists"
+                    ? "bg-blue-500/25 border border-blue-400/30"
+                    : "bg-amber-500/25 border border-amber-400/30"
                 }`}
               >
                 <Icon
-                  icon={successEmailSent ? "solar:letter-bold" : "solar:user-check-bold"}
+                  icon={
+                    inviteStatus === "sent"
+                      ? "solar:letter-bold"
+                      : inviteStatus === "user_exists"
+                      ? "solar:user-check-bold"
+                      : "solar:user-bold"
+                  }
                   width={48}
-                  className={successEmailSent ? "text-emerald-300" : "text-amber-300"}
+                  className={
+                    inviteStatus === "sent"
+                      ? "text-emerald-300"
+                      : inviteStatus === "user_exists"
+                      ? "text-blue-300"
+                      : "text-amber-300"
+                  }
                 />
               </div>
               <h3 className="text-lg font-semibold text-white font-sora">
-                {successEmailSent ? "Operador agregado exitosamente" : "Operador creado"}
+                {inviteStatus === "sent"
+                  ? "Operador agregado exitosamente"
+                  : inviteStatus === "user_exists"
+                  ? "Operador creado — usuario ya existía"
+                  : "Operador creado"}
               </h3>
               <p className="text-sm text-white/60">
-                {successEmailSent
+                {inviteStatus === "sent"
                   ? "El operador ha recibido un correo con sus credenciales temporales. Deberá cambiar la contraseña en su primer inicio de sesión."
-                  : "El operador se creó correctamente, pero no se pudo enviar el correo de invitación. Verifica que RESEND_API_KEY esté configurado en el backend."}
+                  : inviteStatus === "user_exists"
+                  ? "Este email ya tenía una cuenta activa en la plataforma. El operador fue creado y vinculado a esa cuenta. No se envió correo de invitación."
+                  : inviteStatus === "no_resend"
+                  ? "El operador fue creado, pero no se pudo enviar el correo de invitación. Verifica que RESEND_API_KEY esté configurado en el backend."
+                  : "El operador fue creado, pero ocurrió un error al configurar su acceso en Clerk. Verifica los logs del backend."}
               </p>
               <Button className="btn-newayzi-primary" onPress={() => setShowSuccess(false)}>
                 Entendido
