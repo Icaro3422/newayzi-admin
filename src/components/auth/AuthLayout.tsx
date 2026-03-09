@@ -599,21 +599,21 @@ export function AuthLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen flex flex-col lg:flex-row font-sora">
       {/* Panel izquierdo / contenido principal */}
       <div className="w-full lg:w-[48%] flex flex-col justify-center px-5 sm:px-8 lg:px-16 xl:px-20 py-8 sm:py-10 lg:py-0 bg-white min-h-[100dvh] lg:min-h-0 overflow-y-auto">
-        <div className="mb-6 sm:mb-8 lg:mb-10">
-          <div className="flex items-center gap-2.5">
-            <Image
-              src="/brand/n-patron-black.svg"
-              width={32}
-              height={32}
-              alt="Newayzi"
-              className="object-contain shrink-0 sm:w-9 sm:h-9"
-            />
-            <span className="font-black font-sora tracking-[-0.03em] text-newayzi-jet text-lg sm:text-xl">
-              Newayzi
-            </span>
-          </div>
-        </div>
         <div className="w-full max-w-[420px] mx-auto">
+          <div className="mb-6 sm:mb-8 lg:mb-10">
+            <div className="flex items-center gap-2.5">
+              <Image
+                src="/brand/n-patron-black.svg"
+                width={32}
+                height={32}
+                alt="Newayzi"
+                className="object-contain shrink-0 sm:w-9 sm:h-9"
+              />
+              <span className="font-black font-sora tracking-[-0.03em] text-newayzi-jet text-lg sm:text-xl">
+                Newayzi
+              </span>
+            </div>
+          </div>
           {children}
         </div>
         <MobileBrandSummary />
