@@ -468,6 +468,17 @@ export const adminApi = {
     return patchJson<AdminUserListItem>(`/api/admin/users/${id}/`, data);
   },
 
+  async createUserAdmin(data: {
+    email: string;
+    first_name: string;
+    last_name?: string;
+    role: AdminRole;
+    operator_id?: number | null;
+    password: string;
+  }): Promise<AdminUserListItem> {
+    return postJson<AdminUserListItem>("/api/admin/users/create/", data);
+  },
+
   async getAuditLogs(params?: { limit?: number }): Promise<{ results: unknown[] } | null> {
     const q = params?.limit != null ? `?limit=${params.limit}` : "";
     return getJson<{ results: unknown[] }>(`/api/admin/audit-logs/${q}`);
