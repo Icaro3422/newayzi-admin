@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useClerk, useUser } from "@clerk/nextjs";
 import {
   Dropdown,
@@ -12,6 +12,7 @@ import {
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useAdmin } from "@/contexts/AdminContext";
+import { adminApi } from "@/lib/admin-api";
 
 function pathnameToModule(pathname: string): string | null {
   if (pathname === "/admin" || pathname === "/admin/") return "dashboard";
@@ -44,12 +45,126 @@ const BG_GRADIENT = "radial-gradient(ellipse 110% 80% at 20% 15%, #1e1060 0%, #0
 const GLOW_1     = "radial-gradient(circle, rgba(94,44,236,0.18) 0%, transparent 70%)";
 const GLOW_2     = "radial-gradient(circle, rgba(66,45,246,0.10) 0%, transparent 70%)";
 
+/* ── Pantalla de cambio de contraseña obligatorio ── */
+function ForcePasswordChange({ onDone }: { onDone: () => void }) {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword) { setError("Por favor ingresa una nueva contraseña."); return; }
+    if (newPassword.length < 8) { setError("La contraseña debe tener al menos 8 caracteres."); return; }
+    if (newPassword !== confirmPassword) { setError("Las contraseñas no coinciden."); return; }
+
+    setError("");
+    setLoading(true);
+    try {
+      await adminApi.setPassword(newPassword);
+      onDone();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "No se pudo cambiar la contraseña.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4 font-sora" style={{
+      background: "radial-gradient(ellipse 110% 80% at 20% 15%, #1e1060 0%, #0c0720 45%, #050310 100%)",
+    }}>
+      <div className="w-full max-w-md bg-white/[0.06] border border-white/[0.1] rounded-2xl p-8 backdrop-blur-sm">
+        {/* Ícono */}
+        <div className="w-14 h-14 rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 flex items-center justify-center mb-6 mx-auto">
+          <Icon icon="solar:lock-password-bold-duotone" className="text-[#a78bfa] text-3xl" />
+        </div>
+
+        <h1 className="font-sora font-extrabold text-2xl text-white text-center leading-tight mb-2">
+          Crea tu contraseña
+        </h1>
+        <p className="font-sora text-white/55 text-sm text-center leading-relaxed mb-8">
+          Por seguridad, debes establecer una contraseña propia antes de continuar.
+          Esta reemplazará la contraseña temporal de tu invitación.
+        </p>
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+          {/* Nueva contraseña */}
+          <div>
+            <label className="block font-sora font-medium text-[0.8rem] text-white/60 mb-1.5">
+              Nueva contraseña
+            </label>
+            <div className="relative">
+              <input
+                type={showNew ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Mínimo 8 caracteres"
+                autoFocus
+                className="w-full bg-white/[0.08] border border-white/[0.15] rounded-[10px] px-3.5 py-3 pr-10 text-white placeholder:text-white/30 font-sora text-[0.9375rem] outline-none focus:border-[#5e2cec] focus:ring-3 focus:ring-[#5e2cec]/20 transition-all"
+                style={{ minHeight: "46px" }}
+              />
+              <button type="button" onClick={() => setShowNew(v => !v)} tabIndex={-1}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors">
+                <Icon icon={showNew ? "solar:eye-closed-bold-duotone" : "solar:eye-bold-duotone"} className="text-xl" />
+              </button>
+            </div>
+          </div>
+
+          {/* Confirmar contraseña */}
+          <div>
+            <label className="block font-sora font-medium text-[0.8rem] text-white/60 mb-1.5">
+              Confirmar contraseña
+            </label>
+            <div className="relative">
+              <input
+                type={showConfirm ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repite tu contraseña"
+                className="w-full bg-white/[0.08] border border-white/[0.15] rounded-[10px] px-3.5 py-3 pr-10 text-white placeholder:text-white/30 font-sora text-[0.9375rem] outline-none focus:border-[#5e2cec] focus:ring-3 focus:ring-[#5e2cec]/20 transition-all"
+                style={{ minHeight: "46px" }}
+              />
+              <button type="button" onClick={() => setShowConfirm(v => !v)} tabIndex={-1}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors">
+                <Icon icon={showConfirm ? "solar:eye-closed-bold-duotone" : "solar:eye-bold-duotone"} className="text-xl" />
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2.5 rounded-[10px] bg-red-500/15 border border-red-500/30 px-3.5 py-3">
+              <Icon icon="solar:danger-circle-bold-duotone" className="text-red-400 text-lg shrink-0 mt-px" />
+              <p className="font-sora text-red-300 text-[0.8125rem] leading-snug">{error}</p>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full min-h-[48px] rounded-[10px] font-sora font-bold text-[0.9375rem] text-white bg-gradient-to-br from-[#3d21c4] to-[#5e2cec] shadow-[0_4px_16px_rgba(94,44,236,0.38)] hover:from-[#5e2cec] hover:to-[#422df6] hover:-translate-y-px active:translate-y-0 transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <><Icon icon="svg-spinners:ring-resize" className="text-lg" /><span>Guardando…</span></>
+            ) : (
+              <><Icon icon="solar:lock-password-bold-duotone" className="text-lg" /><span>Establecer contraseña y entrar</span></>
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router   = useRouter();
   const { signOut } = useClerk();
   const { user } = useUser();
-  const { canAccess, loading, error } = useAdmin();
+  const { canAccess, loading, error, mustChangePassword, clearMustChangePassword } = useAdmin();
   const items = navItems.filter((item) => canAccess(item.module));
 
   useEffect(() => {
@@ -94,6 +209,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <p className="mt-2 text-sm text-white/35">Comprueba NEXT_PUBLIC_API_URL y que el backend exponga GET /api/admin/me/</p>
         </div>
       </div>
+    );
+  }
+
+  // Primer login: forzar cambio de contraseña antes de mostrar el dashboard
+  if (mustChangePassword) {
+    return (
+      <ForcePasswordChange
+        onDone={async () => {
+          await clearMustChangePassword();
+        }}
+      />
     );
   }
 

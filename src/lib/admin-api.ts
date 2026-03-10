@@ -74,6 +74,7 @@ export interface AdminMe {
   operator_name?: string | null;
   permissions: string[];
   loyalty?: AdminLoyalty | null;
+  must_change_password?: boolean;
 }
 
 export interface PropertyPMSConnection {
@@ -325,6 +326,14 @@ async function postJson<T>(path: string, body?: unknown): Promise<T> {
 export const adminApi = {
   async getMe(): Promise<AdminMe | null> {
     return getJson<AdminMe>("/api/admin/me/");
+  },
+
+  async clearMustChangePassword(): Promise<void> {
+    await patchJson("/api/admin/me/password-changed/", { must_change_password: false });
+  },
+
+  async setPassword(newPassword: string): Promise<void> {
+    await postJson("/api/admin/me/set-password/", { new_password: newPassword });
   },
 
   async getProperties(params?: {
