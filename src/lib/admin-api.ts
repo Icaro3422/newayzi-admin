@@ -332,6 +332,10 @@ export const adminApi = {
     await patchJson("/api/admin/me/password-changed/", { must_change_password: false });
   },
 
+  async setPassword(newPassword: string): Promise<void> {
+    await postJson("/api/admin/me/set-password/", { new_password: newPassword });
+  },
+
   async getProperties(params?: {
     operator_id?: number;
     city?: string;

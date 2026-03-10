@@ -12,6 +12,7 @@ import {
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useAdmin } from "@/contexts/AdminContext";
+import { adminApi } from "@/lib/admin-api";
 
 function pathnameToModule(pathname: string): string | null {
   if (pathname === "/admin" || pathname === "/admin/") return "dashboard";
@@ -46,11 +47,8 @@ const GLOW_2     = "radial-gradient(circle, rgba(66,45,246,0.10) 0%, transparent
 
 /* ── Pantalla de cambio de contraseña obligatorio ── */
 function ForcePasswordChange({ onDone }: { onDone: () => void }) {
-  const { user } = useUser();
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -58,26 +56,18 @@ function ForcePasswordChange({ onDone }: { onDone: () => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentPassword) { setError("Por favor ingresa la contraseña temporal de tu invitación."); return; }
     if (!newPassword) { setError("Por favor ingresa una nueva contraseña."); return; }
     if (newPassword.length < 8) { setError("La contraseña debe tener al menos 8 caracteres."); return; }
     if (newPassword !== confirmPassword) { setError("Las contraseñas no coinciden."); return; }
-    if (currentPassword === newPassword) { setError("La nueva contraseña debe ser diferente a la temporal."); return; }
 
     setError("");
     setLoading(true);
     try {
-      await user?.updatePassword({ currentPassword, newPassword, signOutOfOtherSessions: false });
+      await adminApi.setPassword(newPassword);
       onDone();
     } catch (err: unknown) {
-      const clerkErr = err as { errors?: { longMessage?: string; message?: string; code?: string }[] };
-      const clerkCode = clerkErr.errors?.[0]?.code ?? "";
-      const clerkMsg = clerkErr.errors?.[0]?.longMessage || clerkErr.errors?.[0]?.message || "";
-      if (clerkCode === "form_password_incorrect" || clerkMsg.toLowerCase().includes("incorrect")) {
-        setError("La contraseña temporal es incorrecta. Revisa el email de invitación.");
-      } else {
-        setError(clerkMsg || "No se pudo cambiar la contraseña. Intenta de nuevo.");
-      }
+      const msg = err instanceof Error ? err.message : "No se pudo cambiar la contraseña.";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -98,32 +88,10 @@ function ForcePasswordChange({ onDone }: { onDone: () => void }) {
         </h1>
         <p className="font-sora text-white/55 text-sm text-center leading-relaxed mb-8">
           Por seguridad, debes establecer una contraseña propia antes de continuar.
-          Ingresa la contraseña temporal que recibiste en el correo de invitación.
+          Esta reemplazará la contraseña temporal de tu invitación.
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-          {/* Contraseña temporal */}
-          <div>
-            <label className="block font-sora font-medium text-[0.8rem] text-white/60 mb-1.5">
-              Contraseña temporal (del correo de invitación)
-            </label>
-            <div className="relative">
-              <input
-                type={showCurrent ? "text" : "password"}
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Contraseña del correo de invitación"
-                autoFocus
-                className="w-full bg-white/[0.08] border border-white/[0.15] rounded-[10px] px-3.5 py-3 pr-10 text-white placeholder:text-white/30 font-sora text-[0.9375rem] outline-none focus:border-[#5e2cec] focus:ring-3 focus:ring-[#5e2cec]/20 transition-all"
-                style={{ minHeight: "46px" }}
-              />
-              <button type="button" onClick={() => setShowCurrent(v => !v)} tabIndex={-1}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors">
-                <Icon icon={showCurrent ? "solar:eye-closed-bold-duotone" : "solar:eye-bold-duotone"} className="text-xl" />
-              </button>
-            </div>
-          </div>
-
           {/* Nueva contraseña */}
           <div>
             <label className="block font-sora font-medium text-[0.8rem] text-white/60 mb-1.5">
@@ -135,6 +103,7 @@ function ForcePasswordChange({ onDone }: { onDone: () => void }) {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Mínimo 8 caracteres"
+                autoFocus
                 className="w-full bg-white/[0.08] border border-white/[0.15] rounded-[10px] px-3.5 py-3 pr-10 text-white placeholder:text-white/30 font-sora text-[0.9375rem] outline-none focus:border-[#5e2cec] focus:ring-3 focus:ring-[#5e2cec]/20 transition-all"
                 style={{ minHeight: "46px" }}
               />
