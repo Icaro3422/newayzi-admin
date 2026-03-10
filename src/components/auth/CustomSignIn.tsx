@@ -5,8 +5,36 @@ import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { SignInResource } from "@clerk/types";
 
-type Step = "credentials" | "forgot" | "reset_code" | "new_password";
+type Step = "credentials" | "forgot" | "reset_code" | "needs_new_password";
+
+/* ── Mapeo de errores Clerk → mensajes en español ── */
+const CLERK_ERROR_MESSAGES: Record<string, string> = {
+  form_identifier_not_found: "No encontramos una cuenta con ese correo electrónico.",
+  form_password_incorrect: "La contraseña es incorrecta. Inténtalo de nuevo.",
+  form_password_pwned: "Esta contraseña es muy común. Elige una más segura.",
+  form_password_length_too_short: "La contraseña debe tener al menos 8 caracteres.",
+  form_identifier_exists: "Ya existe una cuenta con ese correo electrónico.",
+  form_param_missing: "Por favor completa todos los campos obligatorios.",
+  form_code_incorrect: "El código ingresado es incorrecto. Verifica e intenta de nuevo.",
+  too_many_requests: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
+  session_exists: "Ya tienes una sesión activa.",
+};
+
+function resolveClerkError(err: unknown): string {
+  const clerkErr = (err as { errors?: { code?: string; longMessage?: string; message?: string }[] })?.errors?.[0];
+  if (!clerkErr) {
+    return (err as { message?: string })?.message || "Ocurrió un error inesperado. Inténtalo de nuevo.";
+  }
+  const code = clerkErr.code ?? "";
+  return (
+    CLERK_ERROR_MESSAGES[code] ||
+    clerkErr.longMessage ||
+    clerkErr.message ||
+    "Ocurrió un error inesperado. Inténtalo de nuevo."
+  );
+}
 
 /* ── Componentes UI internos ── */
 function Label({ children }: { children: React.ReactNode }) {
@@ -24,6 +52,7 @@ function Input({
   onChange,
   autoFocus,
   right,
+  required,
 }: {
   type?: string;
   placeholder?: string;
@@ -31,6 +60,7 @@ function Input({
   onChange: (v: string) => void;
   autoFocus?: boolean;
   right?: React.ReactNode;
+  required?: boolean;
 }) {
   return (
     <div className="relative">
@@ -40,6 +70,7 @@ function Input({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         autoFocus={autoFocus}
+        required={required}
         className="
           w-full font-sora text-[0.9375rem] text-gray-900
           bg-gray-50 border border-gray-200 rounded-[10px]
@@ -131,6 +162,19 @@ function Divider() {
   );
 }
 
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-1.5 font-sora text-[0.8125rem] text-gray-400 hover:text-gray-600 mb-4 transition-colors"
+    >
+      <Icon icon="solar:arrow-left-bold-duotone" className="text-base" />
+      Volver
+    </button>
+  );
+}
+
 /* ── Componente principal ── */
 export function CustomSignIn() {
   const { isLoaded, signIn, setActive } = useSignIn();
@@ -140,8 +184,13 @@ export function CustomSignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [resetCode, setResetCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pendingSignIn, setPendingSignIn] = useState<SignInResource | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -150,25 +199,62 @@ export function CustomSignIn() {
 
   const clearMessages = () => { setError(""); setSuccess(""); };
 
+  const goTo = (s: Step) => { clearMessages(); setStep(s); };
+
   /* ── Submit: email + password ── */
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!signIn) return;
+
+    if (!email.trim()) { setError("Por favor ingresa tu correo electrónico."); return; }
+    if (!password) { setError("Por favor ingresa tu contraseña."); return; }
+
     clearMessages();
     setLoading(true);
     try {
-      const result = await signIn.create({ identifier: email, password });
+      const result = await signIn.create({ identifier: email.trim(), password });
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         router.push("/admin");
+      } else if (result.status === "needs_new_password") {
+        // Clerk marca la contraseña como comprometida (ej: invitación con contraseña temporal)
+        setPendingSignIn(result);
+        setNewPassword("");
+        setConfirmPassword("");
+        setStep("needs_new_password");
+      } else if (result.status === "needs_second_factor") {
+        setError("Tu cuenta requiere autenticación en dos pasos. Contacta al administrador.");
+      } else {
+        setError("No se pudo completar el inicio de sesión. Inténtalo de nuevo.");
       }
-    } catch (err: unknown) {
-      const clerkErr = err as { errors?: { longMessage?: string; message?: string }[] };
-      setError(
-        clerkErr.errors?.[0]?.longMessage ||
-        clerkErr.errors?.[0]?.message ||
-        "Credenciales incorrectas. Inténtalo de nuevo."
-      );
+    } catch (err) {
+      setError(resolveClerkError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ── Establecer nueva contraseña (flujo needs_new_password) ── */
+  const handleSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingSignIn) return;
+
+    if (!newPassword) { setError("Por favor ingresa una nueva contraseña."); return; }
+    if (newPassword.length < 8) { setError("La contraseña debe tener al menos 8 caracteres."); return; }
+    if (newPassword !== confirmPassword) { setError("Las contraseñas no coinciden."); return; }
+
+    clearMessages();
+    setLoading(true);
+    try {
+      const result = await pendingSignIn.resetPassword({ password: newPassword });
+      if (result.status === "complete") {
+        await setActive({ session: result.createdSessionId });
+        router.push("/admin");
+      } else {
+        setError("No se pudo establecer la contraseña. Inténtalo de nuevo.");
+      }
+    } catch (err) {
+      setError(resolveClerkError(err));
     } finally {
       setLoading(false);
     }
@@ -177,14 +263,18 @@ export function CustomSignIn() {
   /* ── Google OAuth ── */
   const handleGoogle = async () => {
     if (!signIn) return;
+    setGoogleLoading(true);
+    clearMessages();
     try {
       await signIn.authenticateWithRedirect({
         strategy: "oauth_google",
         redirectUrl: "/sso-callback",
         redirectUrlComplete: "/admin",
       });
-    } catch {
-      setError("No se pudo iniciar sesión con Google. Inténtalo de nuevo.");
+      // authenticateWithRedirect redirige inmediatamente; no se ejecuta código después
+    } catch (err) {
+      setError(resolveClerkError(err) || "No se pudo iniciar sesión con Google. Inténtalo de nuevo.");
+      setGoogleLoading(false);
     }
   };
 
@@ -192,15 +282,19 @@ export function CustomSignIn() {
   const handleForgotSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!signIn) return;
+
+    if (!email.trim()) { setError("Por favor ingresa tu correo electrónico."); return; }
+
     clearMessages();
     setLoading(true);
     try {
-      await signIn.create({ strategy: "reset_password_email_code", identifier: email });
+      await signIn.create({ strategy: "reset_password_email_code", identifier: email.trim() });
       setSuccess("Te enviamos un código de verificación. Revisa tu correo.");
+      setResetCode("");
+      setNewPassword("");
       setStep("reset_code");
-    } catch (err: unknown) {
-      const clerkErr = err as { errors?: { longMessage?: string }[] };
-      setError(clerkErr.errors?.[0]?.longMessage || "No encontramos una cuenta con ese correo.");
+    } catch (err) {
+      setError(resolveClerkError(err));
     } finally {
       setLoading(false);
     }
@@ -210,21 +304,27 @@ export function CustomSignIn() {
   const handleResetCode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!signIn) return;
+
+    if (!resetCode.trim()) { setError("Por favor ingresa el código de verificación."); return; }
+    if (!newPassword) { setError("Por favor ingresa tu nueva contraseña."); return; }
+    if (newPassword.length < 8) { setError("La contraseña debe tener al menos 8 caracteres."); return; }
+
     clearMessages();
     setLoading(true);
     try {
       const result = await signIn.attemptFirstFactor({
         strategy: "reset_password_email_code",
-        code: resetCode,
+        code: resetCode.trim(),
         password: newPassword,
       });
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         router.push("/admin");
+      } else {
+        setError("No se pudo restablecer la contraseña. Inténtalo de nuevo.");
       }
-    } catch (err: unknown) {
-      const clerkErr = err as { errors?: { longMessage?: string }[] };
-      setError(clerkErr.errors?.[0]?.longMessage || "Código incorrecto o contraseña inválida.");
+    } catch (err) {
+      setError(resolveClerkError(err));
     } finally {
       setLoading(false);
     }
@@ -247,21 +347,27 @@ export function CustomSignIn() {
         <button
           type="button"
           onClick={handleGoogle}
+          disabled={googleLoading}
           className="
             w-full min-h-[46px] flex items-center justify-center gap-3
             font-sora font-medium text-[0.9375rem] text-gray-700
             bg-white border-[1.5px] border-gray-200 rounded-[10px]
             hover:border-gray-300 hover:bg-gray-50
             hover:shadow-sm transition-all duration-150
+            disabled:opacity-60 disabled:cursor-not-allowed
           "
         >
-          <Icon icon="logos:google-icon" className="text-xl shrink-0" />
+          {googleLoading ? (
+            <Icon icon="svg-spinners:ring-resize" className="text-lg text-gray-500" />
+          ) : (
+            <Icon icon="logos:google-icon" className="text-xl shrink-0" />
+          )}
           Continuar con Google
         </button>
 
         <Divider />
 
-        <form onSubmit={handleSignIn} className="flex flex-col gap-4">
+        <form onSubmit={handleSignIn} className="flex flex-col gap-4" noValidate>
           {/* Email */}
           <div>
             <Label>Correo electrónico</Label>
@@ -280,7 +386,7 @@ export function CustomSignIn() {
               <Label>Contraseña</Label>
               <button
                 type="button"
-                onClick={() => { clearMessages(); setStep("forgot"); }}
+                onClick={() => goTo("forgot")}
                 className="font-sora text-[0.78rem] text-[#5e2cec] hover:text-[#422df6] font-medium transition-colors"
               >
                 ¿Olvidaste tu contraseña?
@@ -334,14 +440,7 @@ export function CustomSignIn() {
     return (
       <div className="flex flex-col gap-5">
         <div>
-          <button
-            type="button"
-            onClick={() => { clearMessages(); setStep("credentials"); }}
-            className="flex items-center gap-1.5 font-sora text-[0.8125rem] text-gray-400 hover:text-gray-600 mb-4 transition-colors"
-          >
-            <Icon icon="solar:arrow-left-bold-duotone" className="text-base" />
-            Volver
-          </button>
+          <BackButton onClick={() => goTo("credentials")} />
           <h1 className="font-sora font-extrabold text-[1.75rem] tracking-tight text-gray-900 leading-tight">
             Recuperar contraseña
           </h1>
@@ -350,7 +449,7 @@ export function CustomSignIn() {
           </p>
         </div>
 
-        <form onSubmit={handleForgotSend} className="flex flex-col gap-4">
+        <form onSubmit={handleForgotSend} className="flex flex-col gap-4" noValidate>
           <div>
             <Label>Correo electrónico</Label>
             <Input
@@ -374,20 +473,96 @@ export function CustomSignIn() {
     );
   }
 
+  /* ── PASO: nueva contraseña obligatoria (primer login con contraseña temporal) ── */
+  if (step === "needs_new_password") {
+    return (
+      <div className="flex flex-col gap-5">
+        <div>
+          <BackButton onClick={() => { setPendingSignIn(null); goTo("credentials"); }} />
+          <h1 className="font-sora font-extrabold text-[1.75rem] tracking-tight text-gray-900 leading-tight">
+            Crea tu contraseña
+          </h1>
+          <p className="font-sora text-gray-500 text-[0.9rem] mt-1.5 leading-relaxed">
+            Por seguridad, debes establecer una contraseña propia para continuar.
+          </p>
+        </div>
+
+        <form onSubmit={handleSetNewPassword} className="flex flex-col gap-4" noValidate>
+          <div>
+            <Label>Nueva contraseña</Label>
+            <Input
+              type={showNewPassword ? "text" : "password"}
+              placeholder="Mínimo 8 caracteres"
+              value={newPassword}
+              onChange={setNewPassword}
+              autoFocus
+              right={
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((v) => !v)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  tabIndex={-1}
+                >
+                  <Icon
+                    icon={showNewPassword ? "solar:eye-closed-bold-duotone" : "solar:eye-bold-duotone"}
+                    className="text-xl"
+                  />
+                </button>
+              }
+            />
+          </div>
+
+          <div>
+            <Label>Confirmar contraseña</Label>
+            <Input
+              type={showConfirmPassword ? "text" : "password"}
+              placeholder="Repite tu contraseña"
+              value={confirmPassword}
+              onChange={setConfirmPassword}
+              right={
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((v) => !v)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  tabIndex={-1}
+                >
+                  <Icon
+                    icon={showConfirmPassword ? "solar:eye-closed-bold-duotone" : "solar:eye-bold-duotone"}
+                    className="text-xl"
+                  />
+                </button>
+              }
+            />
+          </div>
+
+          {error && <ErrorBox message={error} />}
+
+          <PrimaryButton loading={loading}>
+            <Icon icon="solar:lock-password-bold-duotone" className="text-lg" />
+            Establecer contraseña y entrar
+          </PrimaryButton>
+        </form>
+      </div>
+    );
+  }
+
   /* ── PASO: código de restablecimiento ── */
   if (step === "reset_code") {
     return (
       <div className="flex flex-col gap-5">
         <div>
+          <BackButton onClick={() => goTo("forgot")} />
           <h1 className="font-sora font-extrabold text-[1.75rem] tracking-tight text-gray-900 leading-tight">
             Nueva contraseña
           </h1>
           <p className="font-sora text-gray-500 text-[0.9rem] mt-1.5 leading-relaxed">
-            Ingresa el código que recibiste en <span className="font-semibold text-gray-700">{email}</span> y elige una nueva contraseña.
+            Ingresa el código que recibiste en{" "}
+            <span className="font-semibold text-gray-700">{email}</span>{" "}
+            y elige una nueva contraseña.
           </p>
         </div>
 
-        <form onSubmit={handleResetCode} className="flex flex-col gap-4">
+        <form onSubmit={handleResetCode} className="flex flex-col gap-4" noValidate>
           <div>
             <Label>Código de verificación</Label>
             <Input
