@@ -5,8 +5,9 @@ import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { SignInResource } from "@clerk/types";
 
-type Step = "credentials" | "forgot" | "reset_code" | "new_password";
+type Step = "credentials" | "forgot" | "reset_code" | "needs_new_password";
 
 /* ── Componentes UI internos ── */
 function Label({ children }: { children: React.ReactNode }) {
@@ -140,8 +141,10 @@ export function CustomSignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [resetCode, setResetCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [pendingSignIn, setPendingSignIn] = useState<SignInResource | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -161,6 +164,14 @@ export function CustomSignIn() {
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         router.push("/admin");
+      } else if (result.status === "needs_new_password") {
+        // Clerk marca la contraseña como comprometida (ej: invitación con contraseña temporal)
+        // → mostrar formulario para establecer nueva contraseña
+        setPendingSignIn(result);
+        setNewPassword("");
+        setStep("needs_new_password");
+      } else {
+        setError("No se pudo completar el inicio de sesión. Inténtalo de nuevo.");
       }
     } catch (err: unknown) {
       const clerkErr = err as { errors?: { longMessage?: string; message?: string }[] };
@@ -168,6 +179,32 @@ export function CustomSignIn() {
         clerkErr.errors?.[0]?.longMessage ||
         clerkErr.errors?.[0]?.message ||
         "Credenciales incorrectas. Inténtalo de nuevo."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ── Establecer nueva contraseña (flujo needs_new_password) ── */
+  const handleSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingSignIn) return;
+    clearMessages();
+    setLoading(true);
+    try {
+      const result = await pendingSignIn.resetPassword({ password: newPassword });
+      if (result.status === "complete") {
+        await setActive({ session: result.createdSessionId });
+        router.push("/admin");
+      } else {
+        setError("No se pudo establecer la contraseña. Inténtalo de nuevo.");
+      }
+    } catch (err: unknown) {
+      const clerkErr = err as { errors?: { longMessage?: string; message?: string }[] };
+      setError(
+        clerkErr.errors?.[0]?.longMessage ||
+        clerkErr.errors?.[0]?.message ||
+        "La contraseña no es válida. Usa al menos 8 caracteres."
       );
     } finally {
       setLoading(false);
@@ -368,6 +405,55 @@ export function CustomSignIn() {
           <PrimaryButton loading={loading}>
             <Icon icon="solar:letter-bold-duotone" className="text-lg" />
             Enviar código
+          </PrimaryButton>
+        </form>
+      </div>
+    );
+  }
+
+  /* ── PASO: nueva contraseña obligatoria (primer login con contraseña temporal) ── */
+  if (step === "needs_new_password") {
+    return (
+      <div className="flex flex-col gap-5">
+        <div>
+          <h1 className="font-sora font-extrabold text-[1.75rem] tracking-tight text-gray-900 leading-tight">
+            Crea tu contraseña
+          </h1>
+          <p className="font-sora text-gray-500 text-[0.9rem] mt-1.5 leading-relaxed">
+            Por seguridad, debes establecer una contraseña propia para continuar.
+          </p>
+        </div>
+
+        <form onSubmit={handleSetNewPassword} className="flex flex-col gap-4">
+          <div>
+            <Label>Nueva contraseña</Label>
+            <Input
+              type={showNewPassword ? "text" : "password"}
+              placeholder="Mínimo 8 caracteres"
+              value={newPassword}
+              onChange={setNewPassword}
+              autoFocus
+              right={
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((v) => !v)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  tabIndex={-1}
+                >
+                  <Icon
+                    icon={showNewPassword ? "solar:eye-closed-bold-duotone" : "solar:eye-bold-duotone"}
+                    className="text-xl"
+                  />
+                </button>
+              }
+            />
+          </div>
+
+          {error && <ErrorBox message={error} />}
+
+          <PrimaryButton loading={loading}>
+            <Icon icon="solar:lock-password-bold-duotone" className="text-lg" />
+            Establecer contraseña y entrar
           </PrimaryButton>
         </form>
       </div>
