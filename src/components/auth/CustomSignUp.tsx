@@ -4,7 +4,7 @@ import { useSignUp } from "@clerk/nextjs";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 type Step = "form" | "verify";
 

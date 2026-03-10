@@ -31,6 +31,8 @@ interface AdminContextValue {
   canEditConnections: boolean;
   canSyncConnection: boolean;
   role: AdminRole | null;
+  mustChangePassword: boolean;
+  clearMustChangePassword: () => Promise<void>;
 }
 
 const AdminContext = createContext<AdminContextValue | null>(null);
@@ -73,6 +75,16 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     [me?.role]
   );
 
+  const clearMustChangePassword = useCallback(async () => {
+    try {
+      await adminApi.clearMustChangePassword();
+      // Refrescar el perfil para que must_change_password quede en false
+      await refetchMe();
+    } catch {
+      // ignorar — el usuario ya cambió la contraseña en Clerk
+    }
+  }, [refetchMe]);
+
   const value = useMemo<AdminContextValue>(
     () => ({
       me,
@@ -84,8 +96,10 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       canEditConnections: me ? canEditConnections(me.role) : false,
       canSyncConnection: me ? canSyncConnection(me.role) : false,
       role: me?.role ?? null,
+      mustChangePassword: me?.must_change_password === true,
+      clearMustChangePassword,
     }),
-    [me, loading, error, refetchMe, canAccess]
+    [me, loading, error, refetchMe, canAccess, clearMustChangePassword]
   );
 
   return (

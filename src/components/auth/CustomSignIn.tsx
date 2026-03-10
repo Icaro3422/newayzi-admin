@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { SignInResource } from "@clerk/types";
 
-type Step = "credentials" | "forgot" | "reset_code" | "needs_new_password";
+type Step = "credentials" | "forgot" | "reset_code" | "needs_new_password" | "second_factor";
 
 /* ── Mapeo de errores Clerk → mensajes en español ── */
 const CLERK_ERROR_MESSAGES: Record<string, string> = {
@@ -189,6 +189,8 @@ export function CustomSignIn() {
   const [resetCode, setResetCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [secondFactorCode, setSecondFactorCode] = useState("");
+  const [secondFactorStrategy, setSecondFactorStrategy] = useState<"totp" | "phone_code">("totp");
   const [pendingSignIn, setPendingSignIn] = useState<SignInResource | null>(null);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
@@ -223,7 +225,23 @@ export function CustomSignIn() {
         setConfirmPassword("");
         setStep("needs_new_password");
       } else if (result.status === "needs_second_factor") {
-        setError("Tu cuenta requiere autenticación en dos pasos. Contacta al administrador.");
+        // Determinar estrategia disponible: TOTP o código por SMS/email
+        const supported = result.supportedSecondFactors ?? [];
+        const hasTOTP = supported.some((f) => f.strategy === "totp");
+        const hasPhone = supported.some((f) => f.strategy === "phone_code");
+        setSecondFactorStrategy(hasTOTP ? "totp" : hasPhone ? "phone_code" : "totp");
+        setPendingSignIn(result);
+        setSecondFactorCode("");
+
+        // Si el factor es por SMS/email, prepararlo automáticamente
+        if (!hasTOTP && hasPhone) {
+          try {
+            await result.prepareSecondFactor({ strategy: "phone_code" });
+          } catch {
+            // ignorar — el usuario puede reintentar
+          }
+        }
+        setStep("second_factor");
       } else {
         setError("No se pudo completar el inicio de sesión. Inténtalo de nuevo.");
       }
@@ -252,6 +270,33 @@ export function CustomSignIn() {
         router.push("/admin");
       } else {
         setError("No se pudo establecer la contraseña. Inténtalo de nuevo.");
+      }
+    } catch (err) {
+      setError(resolveClerkError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ── Verificar segundo factor (TOTP o SMS) ── */
+  const handleSecondFactor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingSignIn) return;
+
+    if (!secondFactorCode.trim()) { setError("Por favor ingresa el código de verificación."); return; }
+
+    clearMessages();
+    setLoading(true);
+    try {
+      const result = await pendingSignIn.attemptSecondFactor({
+        strategy: secondFactorStrategy,
+        code: secondFactorCode.trim(),
+      });
+      if (result.status === "complete") {
+        await setActive({ session: result.createdSessionId });
+        router.push("/admin");
+      } else {
+        setError("No se pudo verificar el código. Inténtalo de nuevo.");
       }
     } catch (err) {
       setError(resolveClerkError(err));
@@ -431,6 +476,56 @@ export function CustomSignIn() {
             Regístrate
           </Link>
         </p>
+      </div>
+    );
+  }
+
+  /* ── PASO: segundo factor (TOTP / SMS) ── */
+  if (step === "second_factor") {
+    const isTOTP = secondFactorStrategy === "totp";
+    return (
+      <div className="flex flex-col gap-5">
+        <div>
+          <BackButton onClick={() => { setPendingSignIn(null); goTo("credentials"); }} />
+          <div className="w-12 h-12 rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center mb-4">
+            <Icon icon="solar:shield-keyhole-bold-duotone" className="text-[#5e2cec] text-2xl" />
+          </div>
+          <h1 className="font-sora font-extrabold text-[1.75rem] tracking-tight text-gray-900 leading-tight">
+            Verificación en dos pasos
+          </h1>
+          <p className="font-sora text-gray-500 text-[0.9rem] mt-1.5 leading-relaxed">
+            {isTOTP
+              ? "Abre tu aplicación de autenticación (Google Authenticator, Authy, etc.) e ingresa el código de 6 dígitos."
+              : "Ingresa el código que enviamos a tu teléfono registrado."}
+          </p>
+        </div>
+
+        <form onSubmit={handleSecondFactor} className="flex flex-col gap-4" noValidate>
+          <div>
+            <Label>{isTOTP ? "Código de autenticador" : "Código SMS"}</Label>
+            <Input
+              type="text"
+              placeholder="000000"
+              value={secondFactorCode}
+              onChange={setSecondFactorCode}
+              autoFocus
+            />
+          </div>
+
+          {error && <ErrorBox message={error} />}
+
+          <PrimaryButton loading={loading}>
+            <Icon icon="solar:shield-check-bold-duotone" className="text-lg" />
+            Verificar y acceder
+          </PrimaryButton>
+        </form>
+
+        <div className="rounded-[10px] bg-amber-50 border border-amber-200 px-3.5 py-3">
+          <p className="font-sora text-amber-700 text-[0.8125rem] leading-snug">
+            <span className="font-semibold">¿No configuraste la verificación en dos pasos?</span>{" "}
+            Pide a un administrador que desactive esta opción en tu cuenta o que contacte al equipo de Newayzi.
+          </p>
+        </div>
       </div>
     );
   }
