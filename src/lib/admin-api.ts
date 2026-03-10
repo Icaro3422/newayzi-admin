@@ -329,7 +329,7 @@ export const adminApi = {
   },
 
   async clearMustChangePassword(): Promise<void> {
-    await postJson("/api/admin/me/password-changed/", { must_change_password: false });
+    await patchJson("/api/admin/me/password-changed/", { must_change_password: false });
   },
 
   async getProperties(params?: {
