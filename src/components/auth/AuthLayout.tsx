@@ -97,8 +97,14 @@ function SlideNombre() {
   );
 }
 
-/* ─── Slide: misión ─── */
-function SlideMision() {
+/* ─── Slide: misión (stats reales del backend) ─── */
+function SlideMision({ stats }: { stats: { total_cities: number; total_room_types: number } | null }) {
+  const fmt = (v: number | undefined | null) => (v != null ? String(v) : "—");
+  const items = [
+    { value: fmt(stats?.total_cities), label: "Ciudades activas", icon: "solar:map-point-bold-duotone", bg: "bg-blue-500/25", ic: "text-blue-200" },
+    { value: fmt(stats?.total_room_types), label: "Alojamientos", icon: "solar:buildings-2-bold-duotone", bg: "bg-violet-500/25", ic: "text-violet-200" },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <blockquote
@@ -113,12 +119,8 @@ function SlideMision() {
         Desde Colombia, construimos puentes entre operadores, agentes y usuarios
         que buscan experiencias inmobiliarias distintas.
       </p>
-      <div className="grid grid-cols-3 gap-2.5">
-        {[
-          { value: "3+", label: "Ciudades",    icon: "solar:map-point-bold-duotone",  bg: "bg-blue-500/25",   ic: "text-blue-200"   },
-          { value: "∞",  label: "Propiedades", icon: "solar:buildings-2-bold-duotone", bg: "bg-violet-500/25", ic: "text-violet-200" },
-          { value: "1",  label: "Plataforma",  icon: "solar:global-bold-duotone",      bg: "bg-indigo-500/25", ic: "text-indigo-200" },
-        ].map((stat) => (
+      <div className="grid grid-cols-2 gap-2.5">
+        {items.map((stat) => (
           <div key={stat.label} className="rounded-2xl border border-white/20 bg-white/[0.12] px-3 py-3.5 flex flex-col items-center gap-2">
             <div className={`w-8 h-8 ${stat.bg} rounded-lg flex items-center justify-center`}>
               <Icon icon={stat.icon} className={`${stat.ic} text-lg`} />
@@ -382,17 +384,19 @@ function SlideTecnologia() {
   );
 }
 
-const slideComponents: Record<string, ReactNode> = {
-  nombre:     <SlideNombre />,
-  mision:     <SlideMision />,
-  rewards:    <SlideRewards />,
-  niveles:    <SlideNiveles />,
-  ecosistema: <SlideEcosistema />,
-  tecnologia: <SlideTecnologia />,
-};
+function getSlideComponents(platformStats: { total_cities: number; total_room_types: number } | null): Record<string, ReactNode> {
+  return {
+    nombre:     <SlideNombre />,
+    mision:     <SlideMision stats={platformStats} />,
+    rewards:    <SlideRewards />,
+    niveles:    <SlideNiveles />,
+    ecosistema: <SlideEcosistema />,
+    tecnologia: <SlideTecnologia />,
+  };
+}
 
 /* ─── Panel derecho con carousel ─── */
-function BrandPanel() {
+function BrandPanel({ platformStats }: { platformStats: { total_cities: number; total_room_types: number } | null }) {
   const [current, setCurrent] = useState(0);
   const [visible, setVisible] = useState(true);
   const [paused, setPaused] = useState(false);
@@ -511,7 +515,7 @@ function BrandPanel() {
             transition: "opacity 0.26s ease, transform 0.26s ease",
           }}
         >
-          {slideComponents[slide.content]}
+          {getSlideComponents(platformStats)[slide.content]}
         </div>
 
         {/* Dots de navegación + indicador pausa (espacio reservado para evitar layout shift) */}
@@ -595,32 +599,40 @@ function MobileBrandSummary() {
 
 /* ─── Layout principal ─── */
 export function AuthLayout({ children }: { children: ReactNode }) {
+  const [platformStats, setPlatformStats] = useState<{ total_cities: number; total_room_types: number } | null>(null);
+
+  useEffect(() => {
+    import("@/lib/admin-api").then(({ fetchPlatformStats }) =>
+      fetchPlatformStats().then((s) => s && setPlatformStats({ total_cities: s.total_cities, total_room_types: s.total_room_types }))
+    );
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col lg:flex-row font-sora">
       {/* Panel izquierdo / contenido principal */}
       <div className="w-full lg:w-[48%] flex flex-col justify-center px-5 sm:px-8 lg:px-16 xl:px-20 py-8 sm:py-10 lg:py-0 bg-white min-h-[100dvh] lg:min-h-0 overflow-y-auto">
-        <div className="mb-6 sm:mb-8 lg:mb-10">
-          <div className="flex items-center gap-2.5">
-            <Image
-              src="/brand/n-patron-black.svg"
-              width={32}
-              height={32}
-              alt="Newayzi"
-              className="object-contain shrink-0 sm:w-9 sm:h-9"
-            />
-            <span className="font-black font-sora tracking-[-0.03em] text-newayzi-jet text-lg sm:text-xl">
-              Newayzi
-            </span>
-          </div>
-        </div>
         <div className="w-full max-w-[420px] mx-auto">
+          <div className="mb-6 sm:mb-8 lg:mb-10">
+            <div className="flex items-center gap-2.5">
+              <Image
+                src="/brand/n-patron-black.svg"
+                width={32}
+                height={32}
+                alt="Newayzi"
+                className="object-contain shrink-0 sm:w-9 sm:h-9"
+              />
+              <span className="font-black font-sora tracking-[-0.03em] text-newayzi-jet text-lg sm:text-xl">
+                Newayzi
+              </span>
+            </div>
+          </div>
           {children}
         </div>
         <MobileBrandSummary />
       </div>
 
       {/* Panel derecho interactivo — solo desktop */}
-      <BrandPanel />
+      <BrandPanel platformStats={platformStats} />
     </div>
   );
 }
