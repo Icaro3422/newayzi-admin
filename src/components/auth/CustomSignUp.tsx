@@ -4,9 +4,42 @@ import { useSignUp } from "@clerk/nextjs";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 type Step = "form" | "verify";
+
+/* ── Mapeo de errores Clerk → mensajes en español ── */
+const CLERK_ERROR_MESSAGES: Record<string, string> = {
+  form_identifier_not_found: "No encontramos una cuenta con ese correo electrónico.",
+  form_identifier_exists: "Ya existe una cuenta con ese correo electrónico.",
+  form_password_incorrect: "La contraseña es incorrecta. Inténtalo de nuevo.",
+  form_password_pwned: "Esta contraseña es muy común. Elige una más segura.",
+  form_password_length_too_short: "La contraseña debe tener al menos 8 caracteres.",
+  form_param_format_invalid__email_address: "El formato del correo electrónico no es válido.",
+  form_param_missing: "Por favor completa todos los campos obligatorios.",
+  form_code_incorrect: "El código ingresado es incorrecto. Verifica e intenta de nuevo.",
+  too_many_requests: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
+  session_exists: "Ya tienes una sesión activa.",
+};
+
+function resolveClerkError(err: unknown): string {
+  const clerkErr = (err as { errors?: { code?: string; meta?: { paramName?: string }; longMessage?: string; message?: string }[] })?.errors?.[0];
+  if (!clerkErr) {
+    return (err as { message?: string })?.message || "Ocurrió un error inesperado. Inténtalo de nuevo.";
+  }
+  const code = clerkErr.code ?? "";
+  // Caso especial: email con formato inválido
+  const key =
+    code === "form_param_format_invalid" && clerkErr.meta?.paramName === "email_address"
+      ? "form_param_format_invalid__email_address"
+      : code;
+  return (
+    CLERK_ERROR_MESSAGES[key] ||
+    clerkErr.longMessage ||
+    clerkErr.message ||
+    "Ocurrió un error inesperado. Inténtalo de nuevo."
+  );
+}
 
 /* ── UI compartidos ── */
 function Label({ children }: { children: React.ReactNode }) {
@@ -110,6 +143,15 @@ function ErrorBox({ message }: { message: string }) {
   );
 }
 
+function SuccessBox({ message }: { message: string }) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-[10px] bg-green-50 border border-green-200 px-3.5 py-3">
+      <Icon icon="solar:check-circle-bold-duotone" className="text-green-600 text-lg shrink-0 mt-px" />
+      <p className="font-sora text-green-700 text-[0.8125rem] leading-snug">{message}</p>
+    </div>
+  );
+}
+
 function Divider() {
   return (
     <div className="flex items-center gap-3">
@@ -121,7 +163,15 @@ function Divider() {
 }
 
 /* ── OTP: 6 celdas separadas ── */
-function OTPInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function OTPInput({
+  value,
+  onChange,
+  onComplete,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onComplete: () => void;
+}) {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const digits = value.padEnd(6, "").split("").slice(0, 6);
 
@@ -131,12 +181,21 @@ function OTPInput({ value, onChange }: { value: string; onChange: (v: string) =>
     next[i] = cleaned;
     const joined = next.join("").replace(/\s/g, "");
     onChange(joined);
-    if (cleaned && i < 5) refs.current[i + 1]?.focus();
+    if (cleaned && i < 5) {
+      refs.current[i + 1]?.focus();
+    } else if (cleaned && i === 5 && joined.length === 6) {
+      // Auto-submit cuando se completan todos los dígitos
+      setTimeout(onComplete, 80);
+    }
   };
 
   const handleKeyDown = (i: number, e: React.KeyboardEvent) => {
     if (e.key === "Backspace" && !digits[i] && i > 0) {
       refs.current[i - 1]?.focus();
+    } else if (e.key === "ArrowLeft" && i > 0) {
+      refs.current[i - 1]?.focus();
+    } else if (e.key === "ArrowRight" && i < 5) {
+      refs.current[i + 1]?.focus();
     }
   };
 
@@ -145,6 +204,7 @@ function OTPInput({ value, onChange }: { value: string; onChange: (v: string) =>
     onChange(text);
     const focusIdx = Math.min(text.length, 5);
     refs.current[focusIdx]?.focus();
+    if (text.length === 6) setTimeout(onComplete, 80);
     e.preventDefault();
   };
 
@@ -161,15 +221,18 @@ function OTPInput({ value, onChange }: { value: string; onChange: (v: string) =>
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
           onPaste={i === 0 ? handlePaste : undefined}
+          onFocus={(e) => e.target.select()}
           autoFocus={i === 0}
-          className="
-            w-full aspect-square max-w-[52px] text-center
-            font-sora font-bold text-xl text-gray-900
-            bg-gray-50 border-[1.5px] border-gray-200 rounded-[10px]
-            outline-none transition-all duration-150
-            hover:border-gray-300 hover:bg-white
-            focus:border-[#5e2cec] focus:bg-white focus:ring-3 focus:ring-[#5e2cec]/10
-          "
+          className={[
+            "w-full aspect-square max-w-[52px] text-center",
+            "font-sora font-bold text-xl text-gray-900",
+            "border-[1.5px] rounded-[10px]",
+            "outline-none transition-all duration-150",
+            digits[i]
+              ? "border-[#5e2cec] bg-white shadow-[0_2px_8px_rgba(94,44,236,0.12)]"
+              : "border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-white",
+            "focus:border-[#5e2cec] focus:bg-white focus:ring-3 focus:ring-[#5e2cec]/10",
+          ].join(" ")}
         />
       ))}
     </div>
@@ -187,29 +250,50 @@ export function CustomSignUp() {
   const [showPassword, setShowPassword] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   if (!isLoaded) return null;
 
-  const clearError = () => setError("");
+  const clearMessages = () => { setError(""); setSuccess(""); };
 
   /* ── Crear cuenta ── */
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!signUp) return;
-    clearError();
+
+    if (!email.trim()) { setError("Por favor ingresa tu correo electrónico."); return; }
+    if (!password) { setError("Por favor ingresa una contraseña."); return; }
+    if (password.length < 8) { setError("La contraseña debe tener al menos 8 caracteres."); return; }
+
+    clearMessages();
     setLoading(true);
     try {
-      await signUp.create({ emailAddress: email, password });
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      setStep("verify");
+      const result = await signUp.create({ emailAddress: email.trim(), password });
+      if (result.status === "missing_requirements") {
+        await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+        setCode("");
+        setStep("verify");
+      } else if (result.status === "complete") {
+        await setActive({ session: result.createdSessionId });
+        router.push("/admin");
+      } else {
+        // Si Clerk requiere pasos adicionales no contemplados
+        setError("No se pudo completar el registro. Inténtalo de nuevo.");
+      }
     } catch (err: unknown) {
-      const clerkErr = err as { errors?: { longMessage?: string; message?: string }[] };
-      setError(
-        clerkErr.errors?.[0]?.longMessage ||
-        clerkErr.errors?.[0]?.message ||
-        "No se pudo crear la cuenta. Verifica los datos."
-      );
+      const clerkError = (err as { errors?: { code?: string; meta?: { paramName?: string } }[] })?.errors?.[0];
+      const errCode = clerkError?.code ?? "";
+
+      // Si la instancia de Clerk no tiene first_name/last_name, reintentar sin ellos (ya manejado arriba al no enviarlos)
+      // Si hay un error de campo desconocido, mostrar mensaje genérico
+      if (errCode === "form_param_unknown") {
+        setError("La configuración de registro no es compatible. Contacta al administrador.");
+      } else {
+        setError(resolveClerkError(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -218,32 +302,40 @@ export function CustomSignUp() {
   /* ── Google OAuth ── */
   const handleGoogle = async () => {
     if (!signUp) return;
+    setGoogleLoading(true);
+    clearMessages();
     try {
       await signUp.authenticateWithRedirect({
         strategy: "oauth_google",
         redirectUrl: "/sso-callback",
         redirectUrlComplete: "/admin",
       });
-    } catch {
-      setError("No se pudo continuar con Google. Inténtalo de nuevo.");
+      // authenticateWithRedirect redirige inmediatamente; no se ejecuta código después
+    } catch (err) {
+      setError(resolveClerkError(err) || "No se pudo continuar con Google. Inténtalo de nuevo.");
+      setGoogleLoading(false);
     }
   };
 
   /* ── Verificar código de email ── */
-  const handleVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleVerify = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!signUp) return;
-    clearError();
+
+    if (code.length < 6) { setError("Por favor ingresa el código completo de 6 dígitos."); return; }
+
+    clearMessages();
     setLoading(true);
     try {
       const result = await signUp.attemptEmailAddressVerification({ code });
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         router.push("/admin");
+      } else {
+        setError("No se pudo verificar el correo. Inténtalo de nuevo.");
       }
-    } catch (err: unknown) {
-      const clerkErr = err as { errors?: { longMessage?: string }[] };
-      setError(clerkErr.errors?.[0]?.longMessage || "Código incorrecto. Verifica e inténtalo de nuevo.");
+    } catch (err) {
+      setError(resolveClerkError(err));
     } finally {
       setLoading(false);
     }
@@ -252,11 +344,16 @@ export function CustomSignUp() {
   /* ── Reenviar código ── */
   const handleResend = async () => {
     if (!signUp) return;
-    clearError();
+    clearMessages();
+    setResendLoading(true);
     try {
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-    } catch {
-      setError("No se pudo reenviar el código. Inténtalo de nuevo.");
+      setCode("");
+      setSuccess("Código reenviado. Revisa tu bandeja de entrada.");
+    } catch (err) {
+      setError(resolveClerkError(err) || "No se pudo reenviar el código. Inténtalo de nuevo.");
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -277,21 +374,27 @@ export function CustomSignUp() {
         <button
           type="button"
           onClick={handleGoogle}
+          disabled={googleLoading}
           className="
             w-full min-h-[46px] flex items-center justify-center gap-3
             font-sora font-medium text-[0.9375rem] text-gray-700
             bg-white border-[1.5px] border-gray-200 rounded-[10px]
             hover:border-gray-300 hover:bg-gray-50 hover:shadow-sm
             transition-all duration-150
+            disabled:opacity-60 disabled:cursor-not-allowed
           "
         >
-          <Icon icon="logos:google-icon" className="text-xl shrink-0" />
+          {googleLoading ? (
+            <Icon icon="svg-spinners:ring-resize" className="text-lg text-gray-500" />
+          ) : (
+            <Icon icon="logos:google-icon" className="text-xl shrink-0" />
+          )}
           Continuar con Google
         </button>
 
         <Divider />
 
-        <form onSubmit={handleSignUp} className="flex flex-col gap-4">
+        <form onSubmit={handleSignUp} className="flex flex-col gap-4" noValidate>
           <div>
             <Label>Correo electrónico</Label>
             <Input
@@ -369,21 +472,63 @@ export function CustomSignUp() {
           </p>
         </div>
 
-        <form onSubmit={handleVerify} className="flex flex-col gap-5">
-          <OTPInput value={code} onChange={setCode} />
+        <form
+          id="verify-form"
+          onSubmit={handleVerify}
+          className="flex flex-col gap-5"
+        >
+          <OTPInput
+            value={code}
+            onChange={setCode}
+            onComplete={() => {
+              // Disparar submit del formulario cuando se completan los 6 dígitos
+              document.getElementById("verify-submit")?.click();
+            }}
+          />
+
+          <p className="font-sora text-gray-400 text-[0.72rem] -mt-2">
+            Revisa también tu carpeta de spam.
+          </p>
 
           {error && <ErrorBox message={error} />}
+          {success && <SuccessBox message={success} />}
 
-          <PrimaryButton loading={loading} disabled={code.length < 6}>
-            <Icon icon="solar:shield-check-bold-duotone" className="text-lg" />
-            Verificar y acceder
-          </PrimaryButton>
+          <button
+            id="verify-submit"
+            type="submit"
+            form="verify-form"
+            disabled={loading || code.length < 6}
+            className="
+              w-full min-h-[48px] rounded-[10px] font-sora font-bold text-[0.9375rem] text-white
+              bg-gradient-to-br from-[#3d21c4] to-[#5e2cec]
+              shadow-[0_4px_16px_rgba(94,44,236,0.38)]
+              hover:from-[#5e2cec] hover:to-[#422df6]
+              hover:shadow-[0_6px_22px_rgba(94,44,236,0.46)]
+              hover:-translate-y-px
+              active:translate-y-0 active:shadow-[0_2px_8px_rgba(94,44,236,0.35)]
+              transition-all duration-150
+              disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0
+              flex items-center justify-center gap-2
+            "
+          >
+            {loading ? (
+              <>
+                <Icon icon="svg-spinners:ring-resize" className="text-lg" />
+                <span>Un momento…</span>
+              </>
+            ) : (
+              <>
+                <Icon icon="solar:shield-check-bold-duotone" className="text-lg" />
+                Verificar y acceder
+              </>
+            )}
+          </button>
         </form>
 
         <div className="flex items-center justify-between pt-1">
           <button
             type="button"
-            onClick={() => { clearError(); setStep("form"); }}
+            onClick={() => { clearMessages(); setCode(""); setStep("form"); }}
             className="flex items-center gap-1.5 font-sora text-[0.8rem] text-gray-400 hover:text-gray-600 transition-colors"
           >
             <Icon icon="solar:arrow-left-bold-duotone" className="text-sm" />
@@ -392,8 +537,10 @@ export function CustomSignUp() {
           <button
             type="button"
             onClick={handleResend}
-            className="font-sora text-[0.8rem] text-[#5e2cec] hover:text-[#422df6] font-medium transition-colors"
+            disabled={resendLoading}
+            className="flex items-center gap-1.5 font-sora text-[0.8rem] text-[#5e2cec] hover:text-[#422df6] font-medium transition-colors disabled:opacity-50"
           >
+            {resendLoading && <Icon icon="svg-spinners:ring-resize" className="text-sm" />}
             Reenviar código
           </button>
         </div>
