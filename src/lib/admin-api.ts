@@ -619,3 +619,29 @@ export function canEditConnections(role: AdminRole): boolean {
 export function canSyncConnection(role: AdminRole): boolean {
   return ["super_admin", "operador"].includes(role);
 }
+
+/** Stats públicas de la plataforma (catalog API). Usado en sign-in. */
+export interface PlatformStats {
+  total_cities: number;
+  total_properties: number;
+  total_room_types: number;
+  total_countries: number;
+}
+
+export async function fetchPlatformStats(): Promise<PlatformStats | null> {
+  const base = getApiBase();
+  if (!base) return null;
+  try {
+    const res = await fetch(`${base}/api/catalog/stats/`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      total_cities: Number(data.total_cities) || 0,
+      total_properties: Number(data.total_properties) || 0,
+      total_room_types: Number(data.total_room_types) || 0,
+      total_countries: Number(data.total_countries) || 0,
+    };
+  } catch {
+    return null;
+  }
+}
