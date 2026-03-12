@@ -228,6 +228,9 @@ export function PropertiesList() {
                   <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
                     Mascotas
                   </th>
+                  <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
+                    Rewards
+                  </th>
                   {canEditProperty && (
                     <th className="text-right py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
                       Acciones
@@ -295,6 +298,42 @@ export function PropertiesList() {
                       </span>
                     </td>
                     <td className="py-4 px-5 text-white/70 text-sm">{p.pets_allowed ? "Sí" : "No"}</td>
+                    <td className="py-4 px-5">
+                      {p.rewards_info?.participates ? (
+                        <div className="flex flex-col gap-1">
+                          {(() => {
+                            const ri = p.rewards_info!;
+                            const isElite = ri.label === "elite";
+                            const isPreferred = ri.label === "preferred";
+                            const badgeClass = isElite
+                              ? "bg-amber-500/20 border-amber-400/30 text-amber-300"
+                              : isPreferred
+                              ? "bg-violet-500/20 border-violet-400/30 text-[#c4a8ff]"
+                              : "bg-[#5e2cec]/20 border-[#5e2cec]/35 text-[#b89eff]";
+                            return (
+                              <>
+                                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-bold border ${badgeClass}`}>
+                                  <Icon icon="solar:gift-bold-duotone" width={10} />
+                                  {ri.label_display ?? "Rewards"}
+                                </span>
+                                {ri.cashback_pct !== undefined && ri.cashback_pct > 0 && (
+                                  <span className="text-[0.6rem] text-emerald-400 font-semibold">
+                                    {ri.cashback_pct}% cashback
+                                  </span>
+                                )}
+                                {ri.visibility_boost !== undefined && ri.visibility_boost > 0 && (
+                                  <span className="text-[0.6rem] text-blue-400/80">
+                                    {ri.visibility_label}
+                                  </span>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      ) : (
+                        <span className="text-white/30 text-sm">—</span>
+                      )}
+                    </td>
                     {canEditProperty && (
                       <td className="py-4 px-5 text-right">
                         <div className="flex justify-end gap-2">

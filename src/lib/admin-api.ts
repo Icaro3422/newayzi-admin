@@ -83,6 +83,19 @@ export interface PropertyPMSConnection {
   pms_type: string;
 }
 
+export interface PropertyRewardsInfo {
+  participates: boolean;
+  status?: "active" | "legacy";
+  label?: string;
+  label_display?: string;
+  cashback_rate?: number;
+  cashback_pct?: number;
+  visibility_boost?: number;
+  visibility_label?: string;
+  min_monthly_bookings?: number | null;
+  auto_renew?: boolean;
+}
+
 export interface PropertyListItem {
   id: number;
   name: string;
@@ -94,6 +107,7 @@ export interface PropertyListItem {
   room_types_count?: number;
   operator_name?: string | null;
   pms_connections?: PropertyPMSConnection[];
+  rewards_info?: PropertyRewardsInfo | null;
 }
 
 export interface PropertyDetail extends PropertyListItem {
