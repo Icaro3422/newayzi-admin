@@ -7,6 +7,7 @@ import { Icon } from "@iconify/react";
 import { useParams } from "next/navigation";
 import { adminApi, type Operator } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
+import { OperatorRewardsPanel } from "./OperatorRewardsPanel";
 
 function GlassCard({
   children,
@@ -165,6 +166,26 @@ export function OperatorDetailClient() {
           Conexiones asignadas: {operator.connections_count ?? 0}. Para asignar o cambiar la conexión, edita cada conexión en Conexiones PMS.
         </p>
       </GlassCard>
+
+      {/* ── Acuerdos Newayzi Rewards ─────────────────────────────────── */}
+      {canEdit && (
+        <div className="rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-400/20 flex items-center justify-center">
+              <i className="icon-[mdi--gift] text-purple-400 text-lg" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white/90">Newayzi Rewards — Acuerdo comercial</h2>
+              <p className="text-xs text-white/50">
+                Gestiona los términos negociados con este operador para su participación en el programa de cashback.
+              </p>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl p-5">
+            <OperatorRewardsPanel operatorId={id} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

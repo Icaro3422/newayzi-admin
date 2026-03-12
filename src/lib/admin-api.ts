@@ -323,9 +323,34 @@ async function postJson<T>(path: string, body?: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export interface RewardPoolMovement {
+  id: number;
+  kind: "contribution" | "cashback_issued" | "redemption" | "breakage" | "adjustment";
+  amount: number;
+  notes: string;
+  createdAt: string;
+  bookingId: number | null;
+}
+
+export interface RewardPoolSummary {
+  totalContributed: number;
+  totalIssued: number;
+  totalRedeemed: number;
+  totalBreakage: number;
+  currentBalance: number;
+  liability: number;
+  totalUsersWithPoints: number;
+  totalPointsInCirculation: number;
+  recentMovements: RewardPoolMovement[];
+}
+
 export const adminApi = {
   async getMe(): Promise<AdminMe | null> {
     return getJson<AdminMe>("/api/admin/me/");
+  },
+
+  async getPoolSummary(): Promise<RewardPoolSummary | null> {
+    return getJson<RewardPoolSummary>("/api/admin/loyalty/pool/");
   },
 
   async clearMustChangePassword(): Promise<void> {
@@ -589,6 +614,83 @@ export interface CommunicationGroup {
   description: string;
   recipients_count: number;
 }
+
+// ─────────────────────────────────────────────────────────────────────────── //
+//  Rewards Agreements
+// ─────────────────────────────────────────────────────────────────────────── //
+
+export type AgreementStatus = "draft" | "pending" | "active" | "paused" | "expired" | "cancelled";
+export type VisibilityBoost = 0 | 1 | 2 | 3;
+export type RewardsLabel = "none" | "partner" | "preferred" | "elite";
+
+export interface RewardsAgreement {
+  id: number;
+  operatorId: number;
+  operatorName: string;
+  status: AgreementStatus;
+  statusDisplay: string;
+  cashbackContributionRate: number;
+  cashbackContributionPct: string;
+  visibilityBoost: VisibilityBoost;
+  visibilityBoostDisplay: string;
+  rewardsLabel: RewardsLabel;
+  rewardsLabelDisplay: string;
+  commissionOffsetPct: number;
+  minMonthlyBookings: number;
+  effectiveFrom: string;
+  effectiveUntil: string | null;
+  autoRenew: boolean;
+  renewalNoticeDays: number;
+  termsNotes: string;
+  signedByNewayzi: string;
+  signedByOperator: string;
+  signedAt: string | null;
+  createdBy: string;
+  internalNotes: string;
+  isActiveToday: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OperatorRewardsData {
+  operator: { id: number; name: string; email: string };
+  activeAgreement: RewardsAgreement | null;
+  agreements: RewardsAgreement[];
+  stats: {
+    poolContributions: number;
+    cashbackEmitted: number;
+    bookingsRewarded: number;
+  };
+}
+
+export const rewardsAgreementsApi = {
+  async getForOperator(operatorId: number): Promise<OperatorRewardsData> {
+    return getJson<OperatorRewardsData>(
+      `/api/admin/operators/${operatorId}/rewards-agreements/`
+    ) as Promise<OperatorRewardsData>;
+  },
+
+  async create(
+    operatorId: number,
+    data: Partial<RewardsAgreement>
+  ): Promise<RewardsAgreement> {
+    return postJson<RewardsAgreement>(
+      `/api/admin/operators/${operatorId}/rewards-agreements/`,
+      data
+    );
+  },
+
+  async update(
+    operatorId: number,
+    agreementId: number,
+    data: Partial<RewardsAgreement> & { status?: AgreementStatus }
+  ): Promise<RewardsAgreement> {
+    return patchJson<RewardsAgreement>(
+      `/api/admin/operators/${operatorId}/rewards-agreements/${agreementId}/`,
+      data
+    );
+  },
+};
 
 /** Permisos derivados del rol (plan: super_admin todo, operador solo suyo, agente solo dashboard/availability) */
 export function canAccessModule(role: AdminRole | null, module: string): boolean {

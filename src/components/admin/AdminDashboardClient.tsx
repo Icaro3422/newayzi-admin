@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAdmin } from "@/contexts/AdminContext";
 import { adminApi } from "@/lib/admin-api";
 import type { PMSConnectionListItem, PropertyListItem, Agency } from "@/lib/admin-api";
+import { RewardPoolStatus } from "./RewardPoolStatus";
 
 /* ─── Primitivos de UI (estilo imagen) ───────────────── */
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -217,6 +218,9 @@ export function AdminDashboardClient() {
           ))}
         </div>
       </GlassCard>
+
+      {/* ── Reward Pool (solo super_admin) ── */}
+      {role === "super_admin" && <RewardPoolStatus />}
 
       {/* ── Fila 2: Infraestructura + Rewards ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
