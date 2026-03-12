@@ -3,7 +3,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { esES } from "@clerk/localizations";
 import type { LocalizationResource } from "@clerk/types";
-import { HeroUIProvider } from "@heroui/react";
+import { HeroUIProvider, ToastProvider } from "@heroui/react";
 import { ReactNode } from "react";
 
 /** Localización en español con overrides para el admin */
@@ -81,6 +81,16 @@ const clerkAppearance = {
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <HeroUIProvider>
+      <ToastProvider
+        placement="bottom-right"
+        toastProps={{
+          classNames: {
+            base: "bg-[#0f1220]/95 backdrop-blur-xl border border-white/[0.12] shadow-xl",
+            title: "text-white font-sora font-semibold",
+            description: "text-white/70 text-sm",
+          },
+        }}
+      />
       <ClerkProvider
         localization={localization}
         appearance={clerkAppearance}

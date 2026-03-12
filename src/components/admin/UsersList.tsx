@@ -5,6 +5,7 @@ import {
   Select,
   SelectItem,
   Spinner,
+  addToast,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { adminApi, ROLE_META, type AdminUserListItem, type AdminRole } from "@/lib/admin-api";
@@ -66,6 +67,21 @@ export function UsersList() {
     try {
       const updated = await adminApi.patchUser(userId, { role: role ?? undefined });
       setList((prev) => prev.map((u) => (u.id === userId ? updated : u)));
+      const userName = list.find((u) => u.id === userId);
+      const name = userName ? `${userName.first_name} ${userName.last_name}`.trim() || userName.email : "Usuario";
+      addToast({
+        title: "Rol actualizado",
+        description: `${name} ahora tiene rol: ${role ? roleLabel(role) : "Sin rol"}`,
+        color: "success",
+        timeout: 4000,
+      });
+    } catch (e) {
+      addToast({
+        title: "Error al actualizar rol",
+        description: e instanceof Error ? e.message : "No se pudo guardar el cambio. Inténtalo de nuevo.",
+        color: "danger",
+        timeout: 5000,
+      });
     } finally {
       setPatching(null);
     }
@@ -77,6 +93,22 @@ export function UsersList() {
     try {
       const updated = await adminApi.patchUser(userId, { operator_id: operator_id ?? undefined });
       setList((prev) => prev.map((u) => (u.id === userId ? updated : u)));
+      const userName = list.find((u) => u.id === userId);
+      const name = userName ? `${userName.first_name} ${userName.last_name}`.trim() || userName.email : "Usuario";
+      const opName = operator_id ? operators.find((o) => o.id === operator_id)?.name ?? "operador" : "Ninguno";
+      addToast({
+        title: "Operador asignado",
+        description: `${name} → ${opName}`,
+        color: "success",
+        timeout: 4000,
+      });
+    } catch (e) {
+      addToast({
+        title: "Error al asignar operador",
+        description: e instanceof Error ? e.message : "No se pudo guardar el cambio. Inténtalo de nuevo.",
+        color: "danger",
+        timeout: 5000,
+      });
     } finally {
       setPatching(null);
     }
