@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { adminApi, type PMSConnectionListItem } from "@/lib/admin-api";
+import { useAdmin } from "@/contexts/AdminContext";
 
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
@@ -17,6 +18,11 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
 }
 
 export function ConnectionsList({ refreshKey = 0 }: { refreshKey?: number }) {
+  const { role, me } = useAdmin();
+  const isOperador = role === "operador";
+  const isSuperAdmin = role === "super_admin";
+  const operatorId = me?.operator_id ?? null;
+
   const [list, setList] = useState<PMSConnectionListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,10 +30,18 @@ export function ConnectionsList({ refreshKey = 0 }: { refreshKey?: number }) {
     setLoading(true);
     adminApi
       .getConnections()
-      .then((res) => setList(res?.results ?? []))
+      .then((res) => {
+        const all = res?.results ?? [];
+        // El backend ya filtra por operador en la mayoría de los casos,
+        // pero aplicamos filtro adicional en el cliente como capa extra de seguridad.
+        const filtered = isOperador && operatorId
+          ? all.filter((c) => !c.operator_name || c.operator_name === me?.operator_name)
+          : all;
+        setList(filtered);
+      })
       .catch(() => setList([]))
       .finally(() => setLoading(false));
-  }, [refreshKey]);
+  }, [refreshKey, isOperador, operatorId, me?.operator_name]);
 
   if (loading) {
     return (
@@ -45,7 +59,9 @@ export function ConnectionsList({ refreshKey = 0 }: { refreshKey?: number }) {
         </div>
         <p className="font-sora font-bold text-white text-base">Sin conexiones</p>
         <p className="mt-2 text-sm text-white/50">
-          Crea una nueva conexión PMS para comenzar.
+          {isSuperAdmin
+            ? "Crea una nueva conexión PMS para comenzar."
+            : "No tienes conexiones PMS asignadas aún. Contacta a un administrador."}
         </p>
       </GlassCard>
     );
@@ -63,11 +79,14 @@ export function ConnectionsList({ refreshKey = 0 }: { refreshKey?: number }) {
               <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
                 Tipo PMS
               </th>
+              {/* La columna Operador solo es relevante para super_admin y comercial */}
+              {!isOperador && (
+                <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
+                  Operador
+                </th>
+              )}
               <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
-                Operador
-              </th>
-              <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
-                Sincronizadas / Pendientes / No disp.
+                Unidades sinc. / pend.
               </th>
               <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
                 Estado
@@ -76,7 +95,7 @@ export function ConnectionsList({ refreshKey = 0 }: { refreshKey?: number }) {
                 Última sync
               </th>
               <th className="text-right py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
-                Acciones
+                {isSuperAdmin ? "Acciones" : "Detalle"}
               </th>
             </tr>
           </thead>
@@ -92,15 +111,15 @@ export function ConnectionsList({ refreshKey = 0 }: { refreshKey?: number }) {
                 <td className="py-4 px-5 text-white/70 text-sm">
                   {c.pms_type_display || c.pms_type}
                 </td>
-                <td className="py-4 px-5 text-white/70 text-sm">
-                  {c.operator_name ?? "—"}
-                </td>
+                {!isOperador && (
+                  <td className="py-4 px-5 text-white/70 text-sm">
+                    {c.operator_name ?? "—"}
+                  </td>
+                )}
                 <td className="py-4 px-5 text-sm text-white/60">
                   {c.counts ? (
                     <span>
-                      Prop: {c.counts.properties_synced} sinc. / {c.counts.properties_pending} pend. / {c.counts.properties_disabled} no disp.
-                      <br />
-                      Rooms: {c.counts.room_types_synced} sinc. / {c.counts.room_types_pending} pend. / {c.counts.room_types_disabled} no disp.
+                      {c.counts.room_types_synced} sinc. / {c.counts.room_types_pending} pend.
                     </span>
                   ) : (
                     "—"
@@ -127,7 +146,7 @@ export function ConnectionsList({ refreshKey = 0 }: { refreshKey?: number }) {
                     href={`/admin/connections/${c.id}`}
                     className="font-sora font-semibold text-[#9b74ff] hover:text-[#b89eff] transition-colors"
                   >
-                    Ver detalle
+                    {isSuperAdmin ? "Editar" : "Ver detalle"}
                   </Link>
                 </td>
               </tr>

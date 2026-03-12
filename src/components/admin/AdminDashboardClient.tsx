@@ -4,15 +4,16 @@ import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { useAdmin } from "@/contexts/AdminContext";
-import { adminApi } from "@/lib/admin-api";
+import { adminApi, ROLE_META } from "@/lib/admin-api";
 import type { PMSConnectionListItem, PropertyListItem, Agency } from "@/lib/admin-api";
 import { RewardPoolStatus } from "./RewardPoolStatus";
 
 /* ─── Primitivos de UI (estilo imagen) ───────────────── */
-function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+function GlassCard({ children, className = "", style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
   return (
     <div
       className={`rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6 transition-all duration-300 hover:border-white/[0.14] hover:bg-white/[0.065] ${className}`}
+      style={style}
     >
       {children}
     </div>
@@ -109,9 +110,9 @@ export function AdminDashboardClient() {
     async function load() {
       try {
         const [propsRes, connRes, opRes, agenciesRes] = await Promise.all([
-          adminApi.getProperties(),
-          adminApi.getConnections(),
-          adminApi.getOperators(),
+          canAccess("properties") ? adminApi.getProperties() : Promise.resolve(null),
+          canAccess("connections") ? adminApi.getConnections() : Promise.resolve(null),
+          canAccess("operators") ? adminApi.getOperators() : Promise.resolve(null),
           canAccess("agents") ? adminApi.getAgencies() : Promise.resolve(null),
         ]);
         if (cancelled) return;
@@ -127,7 +128,7 @@ export function AdminDashboardClient() {
     }
     load();
     return () => { cancelled = true; };
-  }, [canAccess]);
+  }, [canAccess, role]);
 
   const totalSynced = connections.reduce(
     (s, c) => s + (c.counts?.room_types_synced ?? c.counts?.properties_synced ?? 0),
@@ -144,78 +145,180 @@ export function AdminDashboardClient() {
 
   const loyalty = me?.loyalty;
   const displayName = me?.profile?.full_name || me?.profile?.email || "Admin";
+  const roleMeta = role ? ROLE_META[role] : null;
+
+  // ── Vista simplificada para AGENTE ──────────────────────────────────────
+  if (role === "agente") {
+    return (
+      <div className="space-y-4 lg:space-y-5">
+        <GlassCard className="flex flex-row items-center gap-4 py-4 px-5" style={{ borderLeft: `4px solid ${roleMeta?.color}50` }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${roleMeta?.color}20` }}>
+            <Icon icon={roleMeta?.icon ?? "solar:bag-4-bold-duotone"} className="text-xl" style={{ color: roleMeta?.color }} />
+          </div>
+          <div className="min-w-0">
+            <p className="font-sora font-bold text-white text-[0.9375rem] leading-tight">
+              Hola, {displayName}
+            </p>
+            <p className="mt-1 text-[0.8125rem] text-white/60">
+              {roleMeta?.description} — Accedé a la disponibilidad desde el menú lateral.
+            </p>
+          </div>
+        </GlassCard>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <QuickLink href="/admin/availability" icon="solar:calendar-bold-duotone" label="Disponibilidad" />
+          <QuickLink href="/admin/profile" icon="solar:user-circle-bold-duotone" label="Mi perfil" />
+        </div>
+
+        {/* Loyalty personal */}
+        {loyalty && (
+          <AccentCard className="flex flex-col">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Newayzi Rewards</p>
+                <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">Nivel {loyalty.level}</p>
+              </div>
+              <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                <Icon icon="solar:crown-bold-duotone" className="text-yellow-300 text-base" />
+              </div>
+            </div>
+            <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-4 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-white/55 text-[0.65rem] uppercase tracking-wide">Puntos</p>
+                <p className="font-sora font-black text-white text-3xl leading-none mt-0.5">{loyalty.points.toLocaleString()}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-white/55 text-[0.65rem] uppercase tracking-wide">Reservas</p>
+                <p className="font-sora font-black text-white text-3xl leading-none mt-0.5">{loyalty.completedBookings}</p>
+              </div>
+            </div>
+          </AccentCard>
+        )}
+      </div>
+    );
+  }
+
+  // ── Vista para VISUALIZADOR ─────────────────────────────────────────────
+  if (role === "visualizador") {
+    return (
+      <div className="space-y-4 lg:space-y-5">
+        <GlassCard className="flex flex-row items-center gap-4 py-4 px-5" style={{ borderLeft: `4px solid ${roleMeta?.color}50` }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${roleMeta?.color}20` }}>
+            <Icon icon={roleMeta?.icon ?? "solar:eye-bold-duotone"} className="text-xl" style={{ color: roleMeta?.color }} />
+          </div>
+          <div className="min-w-0">
+            <p className="font-sora font-bold text-white text-[0.9375rem] leading-tight">Hola, {displayName}</p>
+            <p className="mt-1 text-[0.8125rem] text-white/60">{roleMeta?.description}</p>
+          </div>
+        </GlassCard>
+
+        {/* Stats read-only */}
+        <GlassCard>
+          <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold mb-4">Vista general de la plataforma</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { label: "Propiedades", value: properties.length, icon: "solar:buildings-2-bold-duotone" },
+              { label: "Activas", value: activeProps, icon: "solar:check-circle-bold-duotone" },
+              { label: "Publicadas", value: publishedProps, icon: "solar:eye-bold-duotone" },
+              { label: "Disponibilidad", value: null, icon: "solar:calendar-bold-duotone" },
+            ].map((s) => (
+              <div key={s.label} className="rounded-2xl bg-white/[0.04] border border-white/[0.06] px-4 py-3">
+                <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.1em] font-semibold truncate">{s.label}</p>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <Icon icon={s.icon} className="text-[#7c4cff] text-base shrink-0" />
+                  <p className="font-sora font-black text-white text-2xl leading-none">
+                    {loading ? <span className="inline-block w-8 h-5 rounded bg-white/10 animate-pulse" /> : (s.value ?? "—")}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <QuickLink href="/admin/properties" icon="solar:buildings-2-bold-duotone" label="Ver propiedades" count={properties.length} />
+          <QuickLink href="/admin/availability" icon="solar:calendar-bold-duotone" label="Disponibilidad" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 lg:space-y-5">
       {/* ── Bienvenida (arriba del todo) ── */}
-      <GlassCard className="flex flex-row items-center gap-4 py-4 px-5 border-l-4 border-l-[#5e2cec]/50">
-        <div className="w-10 h-10 rounded-xl bg-[#5e2cec]/20 flex items-center justify-center shrink-0">
-          <Icon icon="solar:home-2-bold-duotone" className="text-[#9b74ff] text-xl" />
+      <GlassCard
+        className="flex flex-row items-center gap-4 py-4 px-5"
+        style={{ borderLeft: `4px solid ${roleMeta?.color ?? "#5e2cec"}50` }}
+      >
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: `${roleMeta?.color ?? "#5e2cec"}20` }}
+        >
+          <Icon icon={roleMeta?.icon ?? "solar:home-2-bold-duotone"} className="text-xl" style={{ color: roleMeta?.color ?? "#9b74ff" }} />
         </div>
         <div className="min-w-0">
           <p className="font-sora font-bold text-white text-[0.9375rem] leading-tight">
-            Bienvenido al panel de administración de Newayzi
+            {role === "operador" ? `Hola, ${displayName} — tu panel de gestión` : `Bienvenido al panel de administración de Newayzi`}
           </p>
           <p className="mt-1 text-[0.8125rem] text-white/60 leading-relaxed">
-            Usa el menú lateral para navegar. Los ítems visibles dependen de tu rol.
+            {roleMeta?.description ?? "Usa el menú lateral para navegar. Los ítems visibles dependen de tu rol."}
           </p>
         </div>
       </GlassCard>
 
-      {/* ── Header island (estilo imagen) ── */}
+      {/* ── Header island ── */}
       <GlassCard className="flex flex-col gap-6 py-6 px-6 sm:px-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="min-w-0">
             <p className="text-white/40 text-[0.65rem] uppercase tracking-[0.18em] font-semibold mb-1.5">
-              Panel de administración
+              {role === "operador" ? "Panel del operador" : "Panel de administración"}
             </p>
             <h1 className="font-sora font-black text-white text-2xl sm:text-3xl leading-tight tracking-tight">
               {displayName}
             </h1>
-            {role && (
-              <span className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full bg-[#5e2cec]/20 border border-[#5e2cec]/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#9b74ff]" />
-                <span className="text-[#b89eff] text-[0.7rem] font-semibold uppercase tracking-wider">
-                  {role.replace("_", " ")}
+            {roleMeta && (
+              <span
+                className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full"
+                style={{ background: `${roleMeta.color}18`, border: `1px solid ${roleMeta.color}35` }}
+              >
+                <Icon icon={roleMeta.icon} width={12} style={{ color: roleMeta.color }} />
+                <span className="text-[0.7rem] font-semibold uppercase tracking-wider" style={{ color: roleMeta.color }}>
+                  {roleMeta.label}
                 </span>
               </span>
             )}
           </div>
         </div>
 
-        {/* Stats en grid ordenado */}
+        {/* Stats en grid — filtradas por rol */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5 pt-4 border-t border-white/[0.08]">
           {[
-            { label: "Propiedades", value: properties.length, icon: "solar:buildings-2-bold-duotone" },
-            { label: "Conexiones", value: connections.length, icon: "solar:link-circle-bold-duotone" },
-            { label: "Sincronizadas", value: totalSynced, icon: "solar:check-circle-bold-duotone" },
-            { label: "Pendientes", value: totalPending, icon: "solar:clock-circle-bold-duotone" },
-            ...(role === "super_admin"
-              ? [{ label: "Operadores", value: operatorsCount, icon: "solar:users-group-rounded-bold-duotone" }]
-              : []),
-            ...(canAccess("agents")
-              ? [{ label: "Agencias", value: agencies.length, icon: "solar:bag-4-bold-duotone" }]
-              : []),
-          ].map((s) => (
-            <div
-              key={s.label}
-              className="flex flex-col gap-1.5 rounded-2xl bg-white/[0.04] border border-white/[0.06] px-4 py-3 min-w-0"
-            >
-              <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.1em] font-semibold truncate">
-                {s.label}
-              </p>
-              <div className="flex items-center gap-2">
-                <Icon icon={s.icon} className="text-[#7c4cff] text-base shrink-0" />
-                <p className="font-sora font-black text-white text-xl sm:text-2xl leading-none">
-                  {loading || s.value == null ? (
-                    <span className="inline-block w-10 h-6 rounded-md bg-white/10 animate-pulse" />
-                  ) : (
-                    s.value.toLocaleString()
-                  )}
-                </p>
+            canAccess("properties") && { label: role === "operador" ? "Mis propiedades" : "Propiedades", value: properties.length, icon: "solar:buildings-2-bold-duotone" },
+            canAccess("connections") && { label: role === "operador" ? "Mis conexiones" : "Conexiones", value: connections.length, icon: "solar:link-circle-bold-duotone" },
+            canAccess("connections") && { label: "Sincronizadas", value: totalSynced, icon: "solar:check-circle-bold-duotone" },
+            canAccess("connections") && totalPending > 0 && { label: "Pendientes", value: totalPending, icon: "solar:clock-circle-bold-duotone" },
+            canAccess("operators") && { label: "Operadores", value: operatorsCount, icon: "solar:users-group-rounded-bold-duotone" },
+            canAccess("agents") && { label: "Agencias", value: agencies.length, icon: "solar:bag-4-bold-duotone" },
+          ]
+            .filter(Boolean)
+            .map((s: any) => (
+              <div
+                key={s.label}
+                className="flex flex-col gap-1.5 rounded-2xl bg-white/[0.04] border border-white/[0.06] px-4 py-3 min-w-0"
+              >
+                <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.1em] font-semibold truncate">{s.label}</p>
+                <div className="flex items-center gap-2">
+                  <Icon icon={s.icon} className="text-[#7c4cff] text-base shrink-0" />
+                  <p className="font-sora font-black text-white text-xl sm:text-2xl leading-none">
+                    {loading || s.value == null ? (
+                      <span className="inline-block w-10 h-6 rounded-md bg-white/10 animate-pulse" />
+                    ) : (
+                      s.value.toLocaleString()
+                    )}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       </GlassCard>
 
@@ -405,12 +508,14 @@ export function AdminDashboardClient() {
           )}
         </AccentCard>
 
-        {/* Card Accesos rápidos (estilo imagen) */}
+        {/* Card Accesos rápidos — filtrados por rol */}
         <GlassCard className="flex flex-col">
           <div className="flex items-start justify-between gap-4 mb-5 min-w-0">
             <div className="min-w-0 flex-1">
               <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Accesos rápidos</p>
-              <p className="font-sora font-bold text-white text-base leading-snug mt-1">Módulos del panel</p>
+              <p className="font-sora font-bold text-white text-base leading-snug mt-1">
+                {role === "operador" ? "Tu gestión" : "Módulos del panel"}
+              </p>
             </div>
             <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
               <Icon icon="solar:widget-5-bold-duotone" className="text-[#9b74ff] text-base" />
@@ -418,13 +523,13 @@ export function AdminDashboardClient() {
           </div>
           <div className="flex flex-col gap-2">
             {[
-              { href: "/admin/properties", icon: "solar:buildings-2-bold-duotone", label: "Propiedades", count: properties.length, show: canAccess("properties") },
-              { href: "/admin/connections", icon: "solar:link-circle-bold-duotone", label: "Conexiones PMS", count: connections.length, show: canAccess("connections") },
-              { href: "/admin/availability", icon: "solar:calendar-bold-duotone", label: "Disponibilidad", count: undefined, show: canAccess("availability") },
-              { href: "/admin/agents", icon: "solar:bag-4-bold-duotone", label: "Agencias", count: agencies.length, show: canAccess("agents") },
+              { href: "/admin/properties", icon: "solar:buildings-2-bold-duotone", label: role === "operador" ? "Mis propiedades" : "Propiedades", count: properties.length, show: canAccess("properties") },
+              { href: "/admin/connections", icon: "solar:link-circle-bold-duotone", label: role === "operador" ? "Mis conexiones" : "Conexiones PMS", count: connections.length, show: canAccess("connections") },
+              { href: "/admin/availability", icon: "solar:calendar-bold-duotone", label: role === "operador" ? "Mi disponibilidad" : "Disponibilidad", count: undefined, show: canAccess("availability") },
               { href: "/admin/operators", icon: "solar:users-group-rounded-bold-duotone", label: "Operadores", count: operatorsCount, show: canAccess("operators") },
-              { href: "/admin/users", icon: "solar:user-id-bold-duotone", label: "Usuarios", count: undefined, show: canAccess("users") },
+              { href: "/admin/agents", icon: "solar:bag-4-bold-duotone", label: "Agencias", count: agencies.length, show: canAccess("agents") },
               { href: "/admin/communications", icon: "solar:letter-bold-duotone", label: "Comunicaciones", count: undefined, show: canAccess("communications") },
+              { href: "/admin/users", icon: "solar:user-id-bold-duotone", label: "Usuarios y roles", count: undefined, show: canAccess("users") },
               { href: "/admin/payments", icon: "solar:wallet-money-bold-duotone", label: "Pagos", count: undefined, show: canAccess("payments") },
             ]
               .filter((l) => l.show)

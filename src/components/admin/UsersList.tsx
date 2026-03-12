@@ -7,7 +7,7 @@ import {
   Spinner,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { adminApi, type AdminUserListItem, type AdminRole } from "@/lib/admin-api";
+import { adminApi, ROLE_META, type AdminUserListItem, type AdminRole } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 
 const ROLES: { value: AdminRole; label: string }[] = [
@@ -15,6 +15,7 @@ const ROLES: { value: AdminRole; label: string }[] = [
   { value: "visualizador", label: "Visualizador" },
   { value: "comercial", label: "Comercial" },
   { value: "operador", label: "Operador" },
+  { value: "agente", label: "Agente" },
 ];
 
 const inputDark = "rounded-xl border";
@@ -37,7 +38,7 @@ function GlassCard({
 
 function roleLabel(role: AdminRole | null): string {
   if (!role) return "Sin rol";
-  return ROLES.find((r) => r.value === role)?.label ?? role;
+  return ROLE_META[role]?.label ?? ROLES.find((r) => r.value === role)?.label ?? role;
 }
 
 export function UsersList() {

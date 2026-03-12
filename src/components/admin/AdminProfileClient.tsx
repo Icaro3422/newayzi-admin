@@ -376,7 +376,7 @@ export function AdminProfileClient() {
                   <div className="space-y-2">
                     {operatorRewards.programBenefits.map((b, i) => (
                       <div key={i} className="flex items-start gap-3 rounded-xl bg-white/[0.04] border border-white/[0.06] px-4 py-3">
-                        <i className={`icon-[${b.icon}] text-purple-400 text-lg shrink-0 mt-0.5`} />
+                        <Icon icon={b.icon ?? "solar:gift-bold-duotone"} className="text-purple-400 text-lg shrink-0 mt-0.5" />
                         <div>
                           <p className="text-sm font-semibold text-white/80">{b.title}</p>
                           <p className="text-xs text-white/40 mt-0.5">{b.description}</p>

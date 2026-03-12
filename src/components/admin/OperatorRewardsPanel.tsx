@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Icon } from "@iconify/react";
 import {
   rewardsAgreementsApi,
   type RewardsAgreement,
@@ -8,15 +9,15 @@ import {
   type OperatorRewardsData,
 } from "@/lib/admin-api";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Design tokens (dark glass system) ─────────────────────────────────────
 
-const STATUS_META: Record<AgreementStatus, { label: string; color: string; dot: string }> = {
-  draft:     { label: "Borrador",            color: "text-gray-500",  dot: "bg-gray-400" },
-  pending:   { label: "Pendiente de firma",  color: "text-amber-600", dot: "bg-amber-400" },
-  active:    { label: "Activo",              color: "text-emerald-600", dot: "bg-emerald-400" },
-  paused:    { label: "Pausado",             color: "text-orange-500", dot: "bg-orange-400" },
-  expired:   { label: "Expirado",            color: "text-red-500",   dot: "bg-red-400" },
-  cancelled: { label: "Cancelado",           color: "text-red-400",   dot: "bg-red-300" },
+const STATUS_META: Record<AgreementStatus, { label: string; color: string; bg: string; dot: string }> = {
+  draft:     { label: "Borrador",           color: "text-white/50",    bg: "bg-white/[0.08] border-white/[0.12]",       dot: "bg-white/40" },
+  pending:   { label: "Pendiente de firma", color: "text-amber-300",   bg: "bg-amber-500/15 border-amber-400/25",       dot: "bg-amber-400" },
+  active:    { label: "Activo",             color: "text-emerald-300", bg: "bg-emerald-500/15 border-emerald-400/25",   dot: "bg-emerald-400" },
+  paused:    { label: "Pausado",            color: "text-orange-300",  bg: "bg-orange-500/15 border-orange-400/25",     dot: "bg-orange-400" },
+  expired:   { label: "Expirado",           color: "text-red-300",     bg: "bg-red-500/15 border-red-400/25",           dot: "bg-red-400" },
+  cancelled: { label: "Cancelado",          color: "text-red-400/70",  bg: "bg-red-500/10 border-red-400/15",           dot: "bg-red-400/60" },
 };
 
 const VISIBILITY_LABELS: Record<number, string> = {
@@ -27,10 +28,10 @@ const VISIBILITY_LABELS: Record<number, string> = {
 };
 
 const LABEL_META: Record<string, { label: string; color: string }> = {
-  none:      { label: "Sin etiqueta",       color: "text-gray-400" },
-  partner:   { label: "Rewards Partner",    color: "text-blue-600" },
-  preferred: { label: "Preferred Rewards",  color: "text-purple-600" },
-  elite:     { label: "Elite Rewards",      color: "text-amber-600" },
+  none:      { label: "Sin etiqueta",      color: "text-white/40" },
+  partner:   { label: "Rewards Partner",   color: "text-blue-300" },
+  preferred: { label: "Preferred Rewards", color: "text-[#9b74ff]" },
+  elite:     { label: "Elite Rewards",     color: "text-amber-300" },
 };
 
 function fmt(val: number) {
@@ -51,21 +52,21 @@ interface AgreementFormProps {
   saving: boolean;
 }
 
-function AgreementForm({ operatorId, initial, onSave, onCancel, saving }: AgreementFormProps) {
+function AgreementForm({ operatorId: _operatorId, initial, onSave, onCancel, saving }: AgreementFormProps) {
   const [form, setForm] = useState({
     cashbackContributionRate: String((initial?.cashbackContributionRate ?? 0) * 100),
-    visibilityBoost: String(initial?.visibilityBoost ?? 0),
-    rewardsLabel: initial?.rewardsLabel ?? "none",
-    commissionOffsetPct: String((initial?.commissionOffsetPct ?? 0) * 100),
-    minMonthlyBookings: String(initial?.minMonthlyBookings ?? 0),
-    effectiveFrom: initial?.effectiveFrom ?? new Date().toISOString().split("T")[0],
-    effectiveUntil: initial?.effectiveUntil ?? "",
-    autoRenew: initial?.autoRenew ?? false,
-    renewalNoticeDays: String(initial?.renewalNoticeDays ?? 30),
-    termsNotes: initial?.termsNotes ?? "",
-    signedByNewayzi: initial?.signedByNewayzi ?? "",
-    signedByOperator: initial?.signedByOperator ?? "",
-    internalNotes: initial?.internalNotes ?? "",
+    visibilityBoost:          String(initial?.visibilityBoost ?? 0),
+    rewardsLabel:             initial?.rewardsLabel ?? "none",
+    commissionOffsetPct:      String((initial?.commissionOffsetPct ?? 0) * 100),
+    minMonthlyBookings:       String(initial?.minMonthlyBookings ?? 0),
+    effectiveFrom:            initial?.effectiveFrom ?? new Date().toISOString().split("T")[0],
+    effectiveUntil:           initial?.effectiveUntil ?? "",
+    autoRenew:                initial?.autoRenew ?? false,
+    renewalNoticeDays:        String(initial?.renewalNoticeDays ?? 30),
+    termsNotes:               initial?.termsNotes ?? "",
+    signedByNewayzi:          initial?.signedByNewayzi ?? "",
+    signedByOperator:         initial?.signedByOperator ?? "",
+    internalNotes:            initial?.internalNotes ?? "",
   });
 
   const handle = (k: string, v: string | boolean) =>
@@ -73,35 +74,43 @@ function AgreementForm({ operatorId, initial, onSave, onCancel, saving }: Agreem
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const rate = parseFloat(form.cashbackContributionRate) / 100;
+    const rate   = parseFloat(form.cashbackContributionRate) / 100;
     const offset = parseFloat(form.commissionOffsetPct) / 100;
     await onSave({
       cashbackContributionRate: isNaN(rate) ? 0 : rate,
-      visibilityBoost: parseInt(form.visibilityBoost) as any,
-      rewardsLabel: form.rewardsLabel as any,
+      visibilityBoost:     parseInt(form.visibilityBoost) as any,
+      rewardsLabel:        form.rewardsLabel as any,
       commissionOffsetPct: isNaN(offset) ? 0 : offset,
-      minMonthlyBookings: parseInt(form.minMonthlyBookings) || 0,
-      effectiveFrom: form.effectiveFrom,
-      effectiveUntil: form.effectiveUntil || null,
-      autoRenew: form.autoRenew,
-      renewalNoticeDays: parseInt(form.renewalNoticeDays) || 30,
-      termsNotes: form.termsNotes,
-      signedByNewayzi: form.signedByNewayzi,
-      signedByOperator: form.signedByOperator,
-      internalNotes: form.internalNotes,
+      minMonthlyBookings:  parseInt(form.minMonthlyBookings) || 0,
+      effectiveFrom:       form.effectiveFrom,
+      effectiveUntil:      form.effectiveUntil || null,
+      autoRenew:           form.autoRenew,
+      renewalNoticeDays:   parseInt(form.renewalNoticeDays) || 30,
+      termsNotes:          form.termsNotes,
+      signedByNewayzi:     form.signedByNewayzi,
+      signedByOperator:    form.signedByOperator,
+      internalNotes:       form.internalNotes,
     });
   };
 
-  const inputCls = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300";
-  const labelCls = "block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide";
+  const inputCls =
+    "w-full border border-white/[0.12] bg-white/[0.06] rounded-lg px-3 py-2 text-[0.8375rem] text-white placeholder:text-white/25 " +
+    "focus:outline-none focus:border-[#5e2cec] focus:ring-2 focus:ring-[#5e2cec]/20 transition-all font-sora " +
+    "[color-scheme:dark]"; // for date inputs
+  const labelCls =
+    "block text-[0.62rem] font-semibold text-white/40 mb-1.5 uppercase tracking-[0.12em]";
+  const hintCls = "text-[0.6rem] text-white/25 mt-1 leading-snug";
+  const sectionCls =
+    "rounded-xl border border-white/[0.09] bg-white/[0.03] p-4 space-y-4";
+  const sectionTitleCls =
+    "text-[0.6rem] font-bold uppercase tracking-[0.15em] text-white/35 mb-1";
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-4 font-sora">
+
       {/* Condiciones comerciales */}
-      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-4">
-        <p className="text-xs font-bold uppercase tracking-widest text-gray-400">
-          Condiciones comerciales negociadas
-        </p>
+      <div className={sectionCls}>
+        <p className={sectionTitleCls}>Condiciones comerciales negociadas</p>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={labelCls}>Aporte al cashback (%)</label>
@@ -113,9 +122,7 @@ function AgreementForm({ operatorId, initial, onSave, onCancel, saving }: Agreem
               placeholder="ej. 2.5"
               required
             />
-            <p className="text-[10px] text-gray-400 mt-0.5">
-              % del valor de la reserva que el operador aporta al cashback del huésped
-            </p>
+            <p className={hintCls}>% del valor de reserva que el operador aporta al cashback</p>
           </div>
           <div>
             <label className={labelCls}>Offset de comisión (%)</label>
@@ -126,9 +133,7 @@ function AgreementForm({ operatorId, initial, onSave, onCancel, saving }: Agreem
               onChange={(e) => handle("commissionOffsetPct", e.target.value)}
               placeholder="ej. 1.5"
             />
-            <p className="text-[10px] text-gray-400 mt-0.5">
-              Reducción de comisión Newayzi como compensación por el aporte
-            </p>
+            <p className={hintCls}>Reducción de comisión Newayzi como compensación</p>
           </div>
           <div>
             <label className={labelCls}>Boost de visibilidad</label>
@@ -138,7 +143,7 @@ function AgreementForm({ operatorId, initial, onSave, onCancel, saving }: Agreem
               onChange={(e) => handle("visibilityBoost", e.target.value)}
             >
               {Object.entries(VISIBILITY_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
+                <option key={k} value={k} className="bg-[#0f1220] text-white">{v}</option>
               ))}
             </select>
           </div>
@@ -150,7 +155,7 @@ function AgreementForm({ operatorId, initial, onSave, onCancel, saving }: Agreem
               onChange={(e) => handle("rewardsLabel", e.target.value)}
             >
               {Object.entries(LABEL_META).map(([k, v]) => (
-                <option key={k} value={k}>{v.label}</option>
+                <option key={k} value={k} className="bg-[#0f1220] text-white">{v.label}</option>
               ))}
             </select>
           </div>
@@ -168,8 +173,8 @@ function AgreementForm({ operatorId, initial, onSave, onCancel, saving }: Agreem
       </div>
 
       {/* Vigencia */}
-      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-4">
-        <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Vigencia</p>
+      <div className={sectionCls}>
+        <p className={sectionTitleCls}>Vigencia del acuerdo</p>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={labelCls}>Vigente desde *</label>
@@ -199,15 +204,15 @@ function AgreementForm({ operatorId, initial, onSave, onCancel, saving }: Agreem
               onChange={(e) => handle("renewalNoticeDays", e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-3 pt-4">
+          <div className="flex items-center gap-3 pt-5">
             <input
               type="checkbox"
               id="autoRenew"
               checked={form.autoRenew}
               onChange={(e) => handle("autoRenew", e.target.checked)}
-              className="w-4 h-4 accent-purple-600"
+              className="w-4 h-4 accent-[#5e2cec] rounded"
             />
-            <label htmlFor="autoRenew" className="text-sm text-gray-700 font-medium">
+            <label htmlFor="autoRenew" className="text-[0.8125rem] text-white/80 font-medium cursor-pointer">
               Renovación automática
             </label>
           </div>
@@ -215,8 +220,8 @@ function AgreementForm({ operatorId, initial, onSave, onCancel, saving }: Agreem
       </div>
 
       {/* Firma y notas */}
-      <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-4">
-        <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Firma y condiciones</p>
+      <div className={sectionCls}>
+        <p className={sectionTitleCls}>Firma y condiciones pactadas</p>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={labelCls}>Firmado por (Newayzi)</label>
@@ -249,31 +254,46 @@ function AgreementForm({ operatorId, initial, onSave, onCancel, saving }: Agreem
           />
         </div>
         <div>
-          <label className={labelCls}>Notas internas del equipo comercial (NO visible para el operador)</label>
+          <label className={labelCls}>
+            <span className="inline-flex items-center gap-1">
+              <Icon icon="solar:lock-keyhole-minimalistic-bold-duotone" width={10} className="text-amber-400" />
+              Notas internas — no visibles para el operador
+            </span>
+          </label>
           <textarea
-            className={`${inputCls} h-16 resize-none`}
+            className={`${inputCls} h-16 resize-none border-amber-400/20 focus:border-amber-400/50`}
             value={form.internalNotes}
             onChange={(e) => handle("internalNotes", e.target.value)}
-            placeholder="Contexto de la negociación, prioridad, próximos pasos..."
+            placeholder="Contexto de negociación, prioridad, próximos pasos..."
           />
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center justify-end gap-3">
+      {/* Acciones */}
+      <div className="flex items-center justify-end gap-3 pt-1">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          className="px-4 py-2 text-[0.8125rem] font-semibold text-white/50 border border-white/[0.12] rounded-xl hover:bg-white/[0.05] hover:text-white/80 transition-all"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={saving}
-          className="px-5 py-2 text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-purple-500 rounded-lg hover:shadow-md transition-all disabled:opacity-50"
+          className="px-5 py-2 text-[0.8125rem] font-bold text-white rounded-xl
+            bg-gradient-to-br from-[#3d21c4] to-[#5e2cec]
+            shadow-[0_4px_14px_rgba(94,44,236,0.35)]
+            hover:from-[#5e2cec] hover:to-[#422df6]
+            hover:-translate-y-px active:translate-y-0
+            transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed
+            flex items-center gap-2"
         >
-          {saving ? "Guardando..." : "Guardar acuerdo"}
+          {saving ? (
+            <><Icon icon="svg-spinners:ring-resize" width={14} /> Guardando…</>
+          ) : (
+            <><Icon icon="solar:diskette-bold-duotone" width={14} /> Guardar acuerdo</>
+          )}
         </button>
       </div>
     </form>
@@ -288,11 +308,11 @@ function AgreementCard({
   onEdit,
 }: {
   agreement: RewardsAgreement;
-  onStatusChange: (id: number, status: AgreementStatus) => Promise<void>;
-  onEdit: (agreement: RewardsAgreement) => void;
+  onStatusChange?: (id: number, status: AgreementStatus) => Promise<void>;
+  onEdit?: (agreement: RewardsAgreement) => void;
 }) {
   const meta = STATUS_META[agreement.status];
-  const labelMeta = LABEL_META[agreement.rewardsLabel];
+  const labelMeta = LABEL_META[agreement.rewardsLabel] ?? LABEL_META.none;
 
   const allowedTransitions: Partial<Record<AgreementStatus, AgreementStatus[]>> = {
     draft:   ["pending", "cancelled"],
@@ -310,41 +330,50 @@ function AgreementCard({
     draft:     "Volver a borrador",
   };
 
+  const TRANSITION_STYLES: Partial<Record<AgreementStatus, string>> = {
+    active:    "border-emerald-400/30 text-emerald-300 hover:bg-emerald-500/15",
+    paused:    "border-amber-400/25 text-amber-300 hover:bg-amber-500/10",
+    cancelled: "border-red-400/25 text-red-400 hover:bg-red-500/10",
+    pending:   "border-white/[0.15] text-white/60 hover:bg-white/[0.06]",
+    draft:     "border-white/[0.15] text-white/60 hover:bg-white/[0.06]",
+  };
+
   return (
-    <div className={`rounded-xl border p-4 transition-all ${agreement.isActiveToday ? "border-emerald-200 bg-emerald-50/30" : "border-gray-100 bg-white"}`}>
+    <div
+      className={`rounded-2xl border p-4 transition-all font-sora ${
+        agreement.isActiveToday
+          ? "border-emerald-400/25 bg-emerald-500/[0.07]"
+          : "border-white/[0.09] bg-white/[0.04]"
+      }`}
+    >
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${meta.color} border-current/20 bg-current/5`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+          <span className={`inline-flex items-center gap-1.5 text-[0.7rem] font-bold px-2.5 py-1 rounded-full border ${meta.bg} ${meta.color}`}>
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
             {meta.label}
           </span>
           {agreement.isActiveToday && (
-            <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full uppercase tracking-wider">
-              Acuerdo vigente hoy
+            <span className="text-[0.65rem] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
+              Vigente hoy
             </span>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {!["expired", "cancelled"].includes(agreement.status) && (
+          {onEdit && !["expired", "cancelled"].includes(agreement.status) && (
             <button
               onClick={() => onEdit(agreement)}
-              className="text-xs font-semibold text-gray-400 hover:text-purple-600 transition-colors"
+              className="text-[0.75rem] font-semibold text-white/35 hover:text-[#9b74ff] transition-colors flex items-center gap-1"
             >
+              <Icon icon="solar:pen-bold-duotone" width={12} />
               Editar
             </button>
           )}
-          {nextStatuses.map((s) => (
+          {onStatusChange && nextStatuses.map((s) => (
             <button
               key={s}
               onClick={() => onStatusChange(agreement.id, s)}
-              className={`text-xs font-bold px-3 py-1 rounded-lg border transition-all ${
-                s === "active"
-                  ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                  : s === "cancelled"
-                  ? "border-red-200 text-red-500 hover:bg-red-50"
-                  : "border-gray-200 text-gray-600 hover:bg-gray-50"
-              }`}
+              className={`text-[0.72rem] font-bold px-2.5 py-1 rounded-lg border transition-all ${TRANSITION_STYLES[s] ?? "border-white/[0.12] text-white/50 hover:bg-white/[0.05]"}`}
             >
               {TRANSITION_LABELS[s] ?? s}
             </button>
@@ -352,70 +381,77 @@ function AgreementCard({
         </div>
       </div>
 
-      {/* Condiciones */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-        <div className="bg-white rounded-lg border border-gray-100 p-3 text-center">
-          <p className="text-xl font-black text-purple-600">{agreement.cashbackContributionPct}</p>
-          <p className="text-[10px] text-gray-400 font-medium mt-0.5">Aporte cashback</p>
+      {/* Condiciones — 4 stat chips */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+        <div className="rounded-xl bg-white/[0.05] border border-white/[0.08] p-3 text-center">
+          <p className="text-xl font-black text-[#9b74ff]">{agreement.cashbackContributionPct}</p>
+          <p className="text-[0.6rem] text-white/35 font-medium mt-0.5 uppercase tracking-wide">Aporte cashback</p>
         </div>
-        <div className="bg-white rounded-lg border border-gray-100 p-3 text-center">
-          <p className="text-base font-black text-gray-700">{VISIBILITY_LABELS[agreement.visibilityBoost]}</p>
-          <p className="text-[10px] text-gray-400 font-medium mt-0.5">Visibilidad</p>
+        <div className="rounded-xl bg-white/[0.05] border border-white/[0.08] p-3 text-center">
+          <p className="text-[0.8rem] font-bold text-white/80 leading-snug">{VISIBILITY_LABELS[agreement.visibilityBoost]}</p>
+          <p className="text-[0.6rem] text-white/35 font-medium mt-0.5 uppercase tracking-wide">Visibilidad</p>
         </div>
-        <div className="bg-white rounded-lg border border-gray-100 p-3 text-center">
-          <p className={`text-base font-black ${labelMeta.color}`}>{labelMeta.label}</p>
-          <p className="text-[10px] text-gray-400 font-medium mt-0.5">Etiqueta</p>
+        <div className="rounded-xl bg-white/[0.05] border border-white/[0.08] p-3 text-center">
+          <p className={`text-[0.8rem] font-bold leading-snug ${labelMeta.color}`}>{labelMeta.label}</p>
+          <p className="text-[0.6rem] text-white/35 font-medium mt-0.5 uppercase tracking-wide">Etiqueta</p>
         </div>
-        <div className="bg-white rounded-lg border border-gray-100 p-3 text-center">
-          <p className="text-base font-black text-gray-700">
+        <div className="rounded-xl bg-white/[0.05] border border-white/[0.08] p-3 text-center">
+          <p className="text-[0.8rem] font-bold text-white/80 leading-snug">
             {agreement.commissionOffsetPct > 0
               ? `−${(agreement.commissionOffsetPct * 100).toFixed(1)}%`
               : "Sin offset"}
           </p>
-          <p className="text-[10px] text-gray-400 font-medium mt-0.5">Offset comisión</p>
+          <p className="text-[0.6rem] text-white/35 font-medium mt-0.5 uppercase tracking-wide">Offset comisión</p>
         </div>
       </div>
 
       {/* Vigencia y firma */}
-      <div className="flex flex-wrap gap-4 text-xs text-gray-500 border-t border-gray-100 pt-3">
+      <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[0.72rem] text-white/40 border-t border-white/[0.08] pt-3">
         <span>
-          <span className="font-semibold">Desde:</span>{" "}
+          <span className="text-white/55 font-semibold">Desde:</span>{" "}
           {new Date(agreement.effectiveFrom).toLocaleDateString("es-CO")}
         </span>
         {agreement.effectiveUntil && (
           <span>
-            <span className="font-semibold">Hasta:</span>{" "}
+            <span className="text-white/55 font-semibold">Hasta:</span>{" "}
             {new Date(agreement.effectiveUntil).toLocaleDateString("es-CO")}
           </span>
         )}
         {!agreement.effectiveUntil && (
-          <span className="text-emerald-600 font-semibold">Sin fecha de vencimiento</span>
+          <span className="text-emerald-400/80 font-semibold">Sin fecha de vencimiento</span>
         )}
         {agreement.autoRenew && (
-          <span className="text-blue-500 font-semibold">Auto-renovación activa</span>
+          <span className="text-blue-400/80 font-semibold flex items-center gap-1">
+            <Icon icon="solar:refresh-circle-bold-duotone" width={11} />
+            Auto-renovación
+          </span>
         )}
         {agreement.signedByNewayzi && (
           <span>
-            <span className="font-semibold">Firmado por Newayzi:</span> {agreement.signedByNewayzi}
+            <span className="text-white/55 font-semibold">Firmado Newayzi:</span> {agreement.signedByNewayzi}
           </span>
         )}
         {agreement.signedByOperator && (
           <span>
-            <span className="font-semibold">Firmado por operador:</span> {agreement.signedByOperator}
+            <span className="text-white/55 font-semibold">Firmado Operador:</span> {agreement.signedByOperator}
           </span>
         )}
       </div>
 
       {/* Notas */}
       {agreement.termsNotes && (
-        <div className="mt-3 text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">
-          <span className="font-semibold text-gray-600">Condiciones pactadas:</span>{" "}
+        <div className="mt-3 text-[0.75rem] text-white/50 bg-white/[0.04] rounded-xl px-3.5 py-2.5 border border-white/[0.08]">
+          <span className="font-semibold text-white/65">Condiciones pactadas:</span>{" "}
           {agreement.termsNotes}
         </div>
       )}
       {agreement.internalNotes && (
-        <div className="mt-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
-          <span className="font-semibold">Nota interna:</span> {agreement.internalNotes}
+        <div className="mt-2 text-[0.75rem] bg-amber-500/10 rounded-xl px-3.5 py-2.5 border border-amber-400/20 flex items-start gap-2">
+          <Icon icon="solar:lock-keyhole-minimalistic-bold-duotone" width={13} className="text-amber-400 shrink-0 mt-px" />
+          <span>
+            <span className="font-semibold text-amber-300">Nota interna:</span>{" "}
+            <span className="text-amber-200/70">{agreement.internalNotes}</span>
+          </span>
         </div>
       )}
     </div>
@@ -426,15 +462,16 @@ function AgreementCard({
 
 interface OperatorRewardsPanelProps {
   operatorId: number;
+  readOnly?: boolean;
 }
 
-export function OperatorRewardsPanel({ operatorId }: OperatorRewardsPanelProps) {
-  const [data, setData] = useState<OperatorRewardsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [editingAgreement, setEditingAgreement] = useState<RewardsAgreement | null>(null);
+export function OperatorRewardsPanel({ operatorId, readOnly = false }: OperatorRewardsPanelProps) {
+  const [data, setData]                 = useState<OperatorRewardsData | null>(null);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState<string | null>(null);
+  const [saving, setSaving]             = useState(false);
+  const [showForm, setShowForm]         = useState(false);
+  const [editingAgreement, setEditing]  = useState<RewardsAgreement | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -469,7 +506,7 @@ export function OperatorRewardsPanel({ operatorId }: OperatorRewardsPanelProps) 
     setSaving(true);
     try {
       await rewardsAgreementsApi.update(operatorId, editingAgreement.id, formData);
-      setEditingAgreement(null);
+      setEditing(null);
       await load();
     } catch (e: any) {
       alert(e.message ?? "Error al actualizar acuerdo");
@@ -487,98 +524,136 @@ export function OperatorRewardsPanel({ operatorId }: OperatorRewardsPanelProps) 
     }
   };
 
+  /* ── Loading ── */
   if (loading) {
     return (
-      <div className="flex justify-center py-10">
-        <i className="icon-[mdi--loading] animate-spin text-2xl text-purple-500" />
+      <div className="flex justify-center items-center py-12">
+        <Icon icon="svg-spinners:ring-resize" className="text-[#7c4cff] text-2xl" />
       </div>
     );
   }
 
+  /* ── Error ── */
   if (error) {
+    const is403 = error.includes("403");
     return (
-      <div className="rounded-xl bg-red-50 border border-red-100 p-4 text-sm text-red-600">
-        {error}
-        <button onClick={load} className="ml-3 underline font-semibold">Reintentar</button>
+      <div className={`rounded-2xl border p-4 font-sora ${
+        is403
+          ? "bg-amber-500/10 border-amber-400/25"
+          : "bg-red-500/10 border-red-400/25"
+      }`}>
+        <div className="flex items-start gap-3">
+          <Icon
+            icon={is403 ? "solar:lock-keyhole-bold-duotone" : "solar:danger-circle-bold-duotone"}
+            className={`text-xl shrink-0 mt-0.5 ${is403 ? "text-amber-400" : "text-red-400"}`}
+          />
+          <div className="min-w-0">
+            {is403 ? (
+              <>
+                <p className="font-semibold text-amber-300 text-[0.8375rem]">Sin permisos para ver este acuerdo</p>
+                <p className="text-[0.78rem] text-amber-200/60 mt-1 leading-relaxed">
+                  Tu perfil no tiene el rol de plataforma configurado en el servidor.
+                  Ve a <strong className="text-amber-200/80">Usuarios y roles</strong>, selecciona tu usuario
+                  y vuelve a guardar el rol <strong className="text-amber-200/80">Super admin</strong>.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold text-red-300 text-[0.8375rem]">{error}</p>
+                <button onClick={load} className="mt-2 text-[0.78rem] font-semibold text-red-400 hover:text-red-300 underline transition-colors">
+                  Reintentar
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
 
-  const stats = data?.stats;
+  const stats      = data?.stats;
   const agreements = data?.agreements ?? [];
 
   return (
-    <div className="space-y-6">
-      {/* Estadísticas del operador en el programa */}
+    <div className="space-y-5 font-sora">
+
+      {/* ── Stats del programa ── */}
       {stats && (
         <div className="grid grid-cols-3 gap-3">
           {[
-            { icon: "mdi--bank-transfer-in", label: "Aportado al pool", value: fmt(stats.poolContributions) },
-            { icon: "mdi--gift", label: "Cashback emitido", value: fmt(stats.cashbackEmitted) },
-            { icon: "mdi--bookmark-multiple", label: "Reservas con Rewards", value: String(stats.bookingsRewarded) },
+            { icon: "solar:money-bag-bold-duotone",   label: "Aportado al pool",      value: fmt(stats.poolContributions),    color: "text-[#9b74ff]" },
+            { icon: "solar:gift-bold-duotone",         label: "Cashback emitido",       value: fmt(stats.cashbackEmitted),      color: "text-emerald-400" },
+            { icon: "solar:bookmark-bold-duotone",     label: "Reservas con Rewards",   value: String(stats.bookingsRewarded),  color: "text-amber-400" },
           ].map((s) => (
-            <div key={s.label} className="rounded-xl border border-gray-100 bg-white p-4 text-center">
-              <i className={`icon-[${s.icon}] text-2xl text-purple-500 mb-1`} />
-              <p className="text-lg font-black text-gray-800">{s.value}</p>
-              <p className="text-[11px] text-gray-400">{s.label}</p>
+            <div key={s.label} className="rounded-2xl border border-white/[0.08] bg-white/[0.04] p-3.5 text-center">
+              <Icon icon={s.icon} className={`text-2xl mb-1.5 ${s.color}`} />
+              <p className={`text-lg font-black ${s.color}`}>{s.value}</p>
+              <p className="text-[0.6rem] text-white/35 font-medium mt-0.5 uppercase tracking-wide">{s.label}</p>
             </div>
           ))}
         </div>
       )}
 
-      {/* Acuerdo activo */}
+      {/* ── Acuerdo activo ── */}
       {data?.activeAgreement && (
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
+          <p className="text-[0.6rem] font-bold uppercase tracking-[0.15em] text-white/35 mb-2">
             Acuerdo vigente hoy
           </p>
           <AgreementCard
             agreement={data.activeAgreement}
-            onStatusChange={handleStatusChange}
-            onEdit={(a) => { setEditingAgreement(a); setShowForm(false); }}
+            onStatusChange={readOnly ? undefined : handleStatusChange}
+            onEdit={readOnly ? undefined : (a) => { setEditing(a); setShowForm(false); }}
           />
         </div>
       )}
 
-      {/* Formulario: nuevo o edición */}
-      {(showForm || editingAgreement) && (
-        <div className="rounded-2xl border border-purple-200 bg-purple-50/30 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-sm text-gray-800">
-              {editingAgreement ? "Editar acuerdo" : "Nuevo acuerdo de participación"}
-            </h3>
+      {/* ── Formulario nuevo / edición ── */}
+      {!readOnly && (showForm || editingAgreement) && (
+        <div className="rounded-2xl border border-[#5e2cec]/30 bg-[#5e2cec]/[0.07] p-5">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-[#5e2cec]/25 border border-[#5e2cec]/30 flex items-center justify-center">
+                <Icon icon={editingAgreement ? "solar:pen-bold-duotone" : "solar:add-circle-bold-duotone"} className="text-[#9b74ff] text-sm" />
+              </div>
+              <h3 className="font-bold text-[0.875rem] text-white">
+                {editingAgreement ? "Editar acuerdo" : "Nuevo acuerdo de participación"}
+              </h3>
+            </div>
             <button
-              onClick={() => { setShowForm(false); setEditingAgreement(null); }}
-              className="text-gray-400 hover:text-gray-600"
+              onClick={() => { setShowForm(false); setEditing(null); }}
+              className="text-white/30 hover:text-white/70 transition-colors"
             >
-              <i className="icon-[mdi--close] text-lg" />
+              <Icon icon="solar:close-circle-bold-duotone" width={20} />
             </button>
           </div>
           <AgreementForm
             operatorId={operatorId}
             initial={editingAgreement ?? undefined}
             onSave={editingAgreement ? handleUpdate : handleCreate}
-            onCancel={() => { setShowForm(false); setEditingAgreement(null); }}
+            onCancel={() => { setShowForm(false); setEditing(null); }}
             saving={saving}
           />
         </div>
       )}
 
-      {/* Botón crear */}
-      {!showForm && !editingAgreement && (
+      {/* ── Botón crear ── */}
+      {!readOnly && !showForm && !editingAgreement && (
         <button
           onClick={() => setShowForm(true)}
-          className="w-full py-3 rounded-xl border-2 border-dashed border-purple-200 text-sm font-bold text-purple-500 hover:bg-purple-50 hover:border-purple-300 transition-all flex items-center justify-center gap-2"
+          className="w-full py-3 rounded-2xl border-2 border-dashed border-[#5e2cec]/35 text-[0.8125rem] font-bold text-[#9b74ff]
+            hover:bg-[#5e2cec]/10 hover:border-[#5e2cec]/55
+            transition-all duration-200 flex items-center justify-center gap-2"
         >
-          <i className="icon-[mdi--plus-circle] text-lg" />
+          <Icon icon="solar:add-circle-bold-duotone" width={18} />
           Crear nuevo acuerdo Rewards
         </button>
       )}
 
-      {/* Historial de acuerdos */}
+      {/* ── Historial ── */}
       {agreements.length > 0 && (
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">
+          <p className="text-[0.6rem] font-bold uppercase tracking-[0.15em] text-white/35 mb-2.5">
             Historial de acuerdos ({agreements.length})
           </p>
           <div className="space-y-3">
@@ -586,19 +661,22 @@ export function OperatorRewardsPanel({ operatorId }: OperatorRewardsPanelProps) 
               <AgreementCard
                 key={a.id}
                 agreement={a}
-                onStatusChange={handleStatusChange}
-                onEdit={(ag) => { setEditingAgreement(ag); setShowForm(false); }}
+                onStatusChange={readOnly ? undefined : handleStatusChange}
+                onEdit={readOnly ? undefined : (ag) => { setEditing(ag); setShowForm(false); }}
               />
             ))}
           </div>
         </div>
       )}
 
+      {/* ── Estado vacío ── */}
       {agreements.length === 0 && !showForm && (
-        <div className="text-center py-10 text-gray-400">
-          <i className="icon-[mdi--handshake-outline] text-4xl mb-2 block" />
-          <p className="text-sm font-medium">Este operador aún no tiene acuerdos Rewards.</p>
-          <p className="text-xs mt-0.5">Crea el primer acuerdo para integrarlo al programa.</p>
+        <div className="text-center py-12 text-white/30">
+          <Icon icon="solar:handshake-bold-duotone" className="text-5xl mb-3 mx-auto text-[#5e2cec]/40" />
+          <p className="text-[0.875rem] font-semibold text-white/45">Este operador aún no tiene acuerdos Rewards.</p>
+          {!readOnly && (
+            <p className="text-[0.78rem] mt-1 text-white/25">Crea el primer acuerdo para integrarlo al programa de cashback.</p>
+          )}
         </div>
       )}
     </div>

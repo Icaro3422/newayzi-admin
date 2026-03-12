@@ -34,7 +34,10 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
 const inputDark = "rounded-xl border";
 
 export function PropertiesList() {
-  const { canEditProperty } = useAdmin();
+  const { canEditProperty, role, me } = useAdmin();
+  const isOperador = role === "operador";
+  const operatorId = me?.operator_id ?? null;
+
   const [list, setList] = useState<PropertyListItem[]>([]);
   const [connections, setConnections] = useState<PMSConnectionListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,11 +58,13 @@ export function PropertiesList() {
     async function load() {
       setLoading(true);
       try {
-        const params: { is_active?: boolean; city?: string; pms_connection_id?: number } = {};
+        const params: { is_active?: boolean; city?: string; pms_connection_id?: number; operator?: number } = {};
         if (filterActive === "true") params.is_active = true;
         if (filterActive === "false") params.is_active = false;
         if (filterCity.trim()) params.city = filterCity.trim();
         if (filterPms !== "all") params.pms_connection_id = parseInt(filterPms, 10);
+        // Los operadores solo ven sus propias propiedades
+        if (isOperador && operatorId) params.operator = operatorId;
         const res = await adminApi.getProperties(params);
         if (cancelled) return;
         setList(res?.results ?? []);
@@ -73,7 +78,7 @@ export function PropertiesList() {
     return () => {
       cancelled = true;
     };
-  }, [filterActive, filterCity, filterPms]);
+  }, [filterActive, filterCity, filterPms, isOperador, operatorId]);
 
   async function togglePublished(p: PropertyListItem) {
     if (!canEditProperty) return;

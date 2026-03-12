@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { adminApi, type Operator } from "@/lib/admin-api";
+import { adminApi, isModuleReadOnly, type Operator } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 
 function GlassCard({
@@ -24,8 +24,9 @@ function GlassCard({
 }
 
 export function OperatorsList({ refreshKey = 0 }: { refreshKey?: number }) {
-  const { canAccess } = useAdmin();
-  const canEdit = canAccess("operators");
+  const { canAccess, role } = useAdmin();
+  // comercial puede ver operadores pero no editar
+  const canEdit = canAccess("operators") && !isModuleReadOnly(role, "operators");
   const [list, setList] = useState<Operator[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -57,7 +58,7 @@ export function OperatorsList({ refreshKey = 0 }: { refreshKey?: number }) {
         </div>
         <p className="font-sora font-bold text-white text-base">No hay operadores</p>
         <p className="mt-2 text-sm text-white/50">
-          Solo el super-admin puede crear operadores.
+          {canEdit ? "Crea el primer operador desde el botón superior." : "No hay operadores registrados aún."}
         </p>
       </GlassCard>
     );
@@ -81,9 +82,9 @@ export function OperatorsList({ refreshKey = 0 }: { refreshKey?: number }) {
               <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
                 Estado
               </th>
-              {canEdit && (
+              {canAccess("operators") && (
                 <th className="text-right py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
-                  Acciones
+                  {canEdit ? "Acciones" : "Detalle"}
                 </th>
               )}
             </tr>
@@ -117,7 +118,7 @@ export function OperatorsList({ refreshKey = 0 }: { refreshKey?: number }) {
                     {op.is_active ? "Activo" : "Inactivo"}
                   </span>
                 </td>
-                {canEdit && (
+                {canAccess("operators") && (
                   <td className="py-4 px-5 text-right">
                     <Button
                       as={Link}
@@ -125,7 +126,7 @@ export function OperatorsList({ refreshKey = 0 }: { refreshKey?: number }) {
                       size="sm"
                       className="rounded-xl bg-[#5e2cec]/25 border border-[#5e2cec]/40 text-[#b89eff] hover:bg-[#5e2cec]/35 font-semibold"
                     >
-                      Editar
+                      {canEdit ? "Editar" : "Ver"}
                     </Button>
                   </td>
                 )}

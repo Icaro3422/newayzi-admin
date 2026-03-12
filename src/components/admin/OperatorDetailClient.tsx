@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button, Input, Switch, Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useParams } from "next/navigation";
-import { adminApi, type Operator } from "@/lib/admin-api";
+import { adminApi, isModuleReadOnly, type Operator } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 import { OperatorRewardsPanel } from "./OperatorRewardsPanel";
 
@@ -30,8 +30,11 @@ const inputDark = "rounded-xl border";
 export function OperatorDetailClient() {
   const params = useParams();
   const id = parseInt(String(params?.id ?? "0"), 10);
-  const { canAccess } = useAdmin();
-  const canEdit = canAccess("operators");
+  const { canAccess, role } = useAdmin();
+  // canAccess: super_admin + comercial pueden ver el detalle del operador
+  // canEdit: solo super_admin puede editar (comercial está en modo solo lectura)
+  const canEdit = canAccess("operators") && !isModuleReadOnly(role, "operators");
+  const canViewRewards = canAccess("operators"); // super_admin + comercial ven el acuerdo
   const [operator, setOperator] = useState<Operator | null>(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState("");
@@ -167,23 +170,31 @@ export function OperatorDetailClient() {
         </p>
       </GlassCard>
 
-      {/* ── Acuerdos Newayzi Rewards ─────────────────────────────────── */}
-      {canEdit && (
+      {/* ── Acuerdos Newayzi Rewards — visible para super_admin y comercial ── */}
+      {canViewRewards && (
         <div className="rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-400/20 flex items-center justify-center">
-              <i className="icon-[mdi--gift] text-purple-400 text-lg" />
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-400/20 flex items-center justify-center">
+                <Icon icon="solar:gift-bold-duotone" className="text-purple-400 text-lg" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white/90">Newayzi Rewards — Acuerdo comercial</h2>
+                <p className="text-xs text-white/50">
+                  {canEdit
+                    ? "Gestiona los términos negociados con este operador para su participación en el programa de cashback."
+                    : "Vista del acuerdo de cashback vigente con este operador."}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base font-bold text-white/90">Newayzi Rewards — Acuerdo comercial</h2>
-              <p className="text-xs text-white/50">
-                Gestiona los términos negociados con este operador para su participación en el programa de cashback.
-              </p>
-            </div>
+            {!canEdit && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/15 border border-blue-400/25 text-blue-300 text-[0.68rem] font-semibold uppercase tracking-wide shrink-0">
+                <Icon icon="solar:eye-bold-duotone" width={11} />
+                Solo lectura
+              </span>
+            )}
           </div>
-          <div className="bg-white rounded-2xl p-5">
-            <OperatorRewardsPanel operatorId={id} />
-          </div>
+          <OperatorRewardsPanel operatorId={id} readOnly={!canEdit} />
         </div>
       )}
     </div>

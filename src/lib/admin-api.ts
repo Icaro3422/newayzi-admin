@@ -692,26 +692,36 @@ export const rewardsAgreementsApi = {
   },
 };
 
-/** Permisos derivados del rol (plan: super_admin todo, operador solo suyo, agente solo dashboard/availability) */
+/** Metadatos visuales por rol — icono, color, label y descripción */
+export const ROLE_META: Record<AdminRole, { label: string; icon: string; color: string; description: string }> = {
+  super_admin:  { label: "Super Admin",  icon: "solar:shield-star-bold-duotone",     color: "#fbbf24", description: "Acceso completo a todas las funciones" },
+  comercial:    { label: "Comercial",    icon: "solar:hand-money-bold-duotone",      color: "#34d399", description: "Gestión comercial y operadores" },
+  visualizador: { label: "Visualizador", icon: "solar:eye-bold-duotone",             color: "#60a5fa", description: "Vista general — solo lectura" },
+  operador:     { label: "Operador",     icon: "solar:buildings-2-bold-duotone",     color: "#a78bfa", description: "Gestión de tus propiedades" },
+  agente:       { label: "Agente",       icon: "solar:bag-4-bold-duotone",           color: "#fb923c", description: "Disponibilidad y reservas" },
+};
+
+/** Permisos de acceso a módulos */
 export function canAccessModule(role: AdminRole | null, module: string): boolean {
   if (!role) return false;
   if (role === "super_admin") return true;
   switch (module) {
     case "profile":
-      return true; // Todos los roles pueden ver su propio perfil
     case "dashboard":
       return true;
     case "properties":
-      return ["super_admin", "visualizador", "comercial", "operador"].includes(role);
+      return ["visualizador", "comercial", "operador"].includes(role);
     case "availability":
-      return ["super_admin", "visualizador", "comercial", "operador", "agente"].includes(role);
+      return ["visualizador", "comercial", "operador", "agente"].includes(role);
     case "connections":
-      return ["super_admin", "operador"].includes(role);
+      return role === "operador";
     case "operators":
+      return role === "comercial"; // comercial ve operadores (solo lectura)
+    case "communications":
+      return role === "comercial"; // comercial usa comunicaciones
     case "agents":
     case "payments":
     case "users":
-    case "communications":
     case "audit":
       return false; // solo super_admin (ya retornó arriba)
     default:
@@ -719,8 +729,28 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
   }
 }
 
+/** Si el módulo es de solo lectura para este rol */
+export function isModuleReadOnly(role: AdminRole | null, module: string): boolean {
+  if (!role) return true;
+  if (role === "super_admin") return false;
+  switch (module) {
+    case "properties":   return role === "visualizador"; // comercial y operador pueden editar
+    case "availability": return role !== "operador" && role !== "comercial";
+    case "operators":    return true; // comercial solo ve, no edita
+    case "communications": return role !== "comercial";
+    default:             return true;
+  }
+}
+
+/** Si el rol puede crear entidades en el módulo */
+export function canCreate(role: AdminRole | null, module: string): boolean {
+  if (!role) return false;
+  if (role === "super_admin") return true;
+  return false; // solo super_admin puede crear por ahora
+}
+
 export function canEditProperty(role: AdminRole): boolean {
-  return ["super_admin", "comercial", "visualizador", "operador"].includes(role);
+  return ["super_admin", "comercial", "operador"].includes(role);
 }
 
 export function canEditConnections(role: AdminRole): boolean {

@@ -16,6 +16,7 @@ import {
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { adminApi, type AvailabilityItem, type PropertyListItem, type Operator } from "@/lib/admin-api";
+import { useAdmin } from "@/contexts/AdminContext";
 
 type ViewMode = "calendar" | "table";
 
@@ -79,6 +80,10 @@ function formatPriceRangeCompact(min: number, max: number, currency = "COP"): st
 }
 
 export function AvailabilityList() {
+  const { role, me } = useAdmin();
+  const isOperador = role === "operador";
+  const myOperatorId = me?.operator_id ?? null;
+
   const [list, setList] = useState<AvailabilityItem[]>([]);
   const [properties, setProperties] = useState<PropertyListItem[]>([]);
   const [operators, setOperators] = useState<Operator[]>([]);
@@ -95,7 +100,10 @@ export function AvailabilityList() {
     return d.toISOString().slice(0, 10);
   });
   const [propertyId, setPropertyId] = useState<string>("");
-  const [operatorId, setOperatorId] = useState<string>("");
+  // Para operadores, el filtro de operador se fija al suyo propio
+  const [operatorId, setOperatorId] = useState<string>(() =>
+    isOperador && myOperatorId ? String(myOperatorId) : ""
+  );
   const [viewMode, setViewMode] = useState<ViewMode>("calendar");
 
   function load() {
@@ -105,8 +113,13 @@ export function AvailabilityList() {
     if (dateTo) params.date_to = dateTo;
     const pid = parseInt(propertyId, 10);
     if (!Number.isNaN(pid)) params.property_id = pid;
-    const oid = parseInt(operatorId, 10);
-    if (!Number.isNaN(oid)) params.operator_id = oid;
+    // Para operadores, siempre filtrar por su operator_id, sin excepción
+    const effectiveOperatorId = isOperador && myOperatorId
+      ? myOperatorId
+      : parseInt(operatorId, 10);
+    if (!Number.isNaN(effectiveOperatorId) && effectiveOperatorId > 0) {
+      params.operator_id = effectiveOperatorId;
+    }
     adminApi.getAvailability(params).then((res) => {
       setList(res?.results ?? []);
       setLoading(false);
@@ -117,16 +130,21 @@ export function AvailabilityList() {
     let cancelled = false;
     Promise.all([
       adminApi.getProperties({ is_active: true }),
-      adminApi.getOperators(),
+      // Los operadores no necesitan el selector de operador — solo el super_admin/comercial
+      isOperador ? Promise.resolve(null) : adminApi.getOperators(),
     ]).then(([propsRes, opsRes]) => {
       if (cancelled) return;
       const props = propsRes?.results ?? [];
       const ops = opsRes?.results ?? [];
-      setProperties([...new Map(props.map((p) => [p.id, p])).values()]);
+      // Para operadores, filtramos las propiedades a las suyas (si hay operator_name disponible)
+      const filteredProps = isOperador && me?.operator_name
+        ? props.filter((p) => !p.operator_name || p.operator_name === me.operator_name)
+        : props;
+      setProperties([...new Map(filteredProps.map((p) => [p.id, p])).values()]);
       setOperators([...new Map(ops.map((o) => [o.id, o])).values()]);
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [isOperador, myOperatorId, me?.operator_name]);
 
   useEffect(() => {
     load();
@@ -232,33 +250,36 @@ export function AvailabilityList() {
           <div>
             <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Filtros</p>
             <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
-              Operador, propiedad y fechas
+              {isOperador ? "Propiedad y fechas" : "Operador, propiedad y fechas"}
             </p>
           </div>
         </div>
         <div className="flex flex-wrap items-end gap-4">
-          <Select
-            label="Operador"
-            placeholder="Todos"
-            selectedKeys={operatorId ? [operatorId] : ["__all__"]}
-            onSelectionChange={(s) => {
-              const v = Array.from(s)[0] as string;
-              setOperatorId(v === "__all__" ? "" : v);
-            }}
-            size="sm"
-            className="w-48"
-            items={[{ id: "__all__", name: "Todos los operadores" }, ...operators]}
-            classNames={{
-              trigger: inputDark,
-              label: "!text-white/65",
-              value: "!text-white/92 font-medium",
-              innerWrapper: "!text-white",
-              selectorIcon: "!text-white/50",
-              popoverContent: "bg-[#0f1220] border border-white/[0.1]",
-            }}
-          >
-            {(item) => <SelectItem key={String(item.id)} className="text-white">{item.name}</SelectItem>}
-          </Select>
+          {/* El selector de operador solo aparece para roles con acceso a múltiples operadores */}
+          {!isOperador && (
+            <Select
+              label="Operador"
+              placeholder="Todos"
+              selectedKeys={operatorId ? [operatorId] : ["__all__"]}
+              onSelectionChange={(s) => {
+                const v = Array.from(s)[0] as string;
+                setOperatorId(v === "__all__" ? "" : v);
+              }}
+              size="sm"
+              className="w-48"
+              items={[{ id: "__all__", name: "Todos los operadores" }, ...operators]}
+              classNames={{
+                trigger: inputDark,
+                label: "!text-white/65",
+                value: "!text-white/92 font-medium",
+                innerWrapper: "!text-white",
+                selectorIcon: "!text-white/50",
+                popoverContent: "bg-[#0f1220] border border-white/[0.1]",
+              }}
+            >
+              {(item) => <SelectItem key={String(item.id)} className="text-white">{item.name}</SelectItem>}
+            </Select>
+          )}
           <Select
             label="Propiedad"
             placeholder="Todas"
