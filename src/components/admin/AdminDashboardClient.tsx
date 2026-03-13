@@ -420,93 +420,213 @@ export function AdminDashboardClient() {
           </div>
         </GlassCard>
 
-        {/* Card: Acuerdo comercial (operador) o Newayzi Rewards (otros roles) */}
-        {role === "operador" ? (
-          <AccentCard className="flex flex-col">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Acuerdo Comercial</p>
-                <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
-                  {operatorRewards?.activeAgreement
-                    ? operatorRewards.activeAgreement.rewardsLabelDisplay
-                    : "Socio Newayzi"}
-                </p>
-              </div>
-              <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-                <Icon icon="solar:handshake-bold-duotone" className="text-yellow-300 text-base" />
-              </div>
-            </div>
+        {/* Card: Programa de Socios (operador) o Newayzi Rewards (otros roles) */}
+        {role === "operador" ? (() => {
+          const ag = operatorRewards?.activeAgreement ?? null;
+          const stats = operatorRewards?.stats;
 
-            {operatorRewards?.activeAgreement ? (
-              <>
-                <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-4 mb-4 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-white/55 text-[0.65rem] uppercase tracking-wide">Cashback a huéspedes</p>
-                    <p className="font-sora font-black text-white text-3xl leading-none mt-0.5">
-                      {operatorRewards.activeAgreement.cashbackContributionPct}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-white/55 text-[0.65rem] uppercase tracking-wide">Reservas recompensadas</p>
-                    <p className="font-sora font-black text-white text-3xl leading-none mt-0.5">
-                      {operatorRewards.stats.bookingsRewarded}
-                    </p>
-                  </div>
-                </div>
+          // Tiers del programa de socios
+          const TIERS = [
+            {
+              key: "partner",
+              name: "Partner",
+              badge: "Socio base",
+              icon: "solar:medal-ribbons-star-bold-duotone",
+              accent: "rgba(180,180,200,0.9)",
+              accentBg: "rgba(160,160,180,0.12)",
+              benefits: ["Cashback básico a huéspedes", "Visibilidad estándar en búsquedas"],
+            },
+            {
+              key: "premium_partner",
+              name: "Premium Partner",
+              badge: "Socio preferente",
+              icon: "solar:crown-bold-duotone",
+              accent: "#9b74ff",
+              accentBg: "rgba(155,116,255,0.15)",
+              benefits: ["Mayor % cashback a huéspedes", "Visibilidad destacada", "Posicionamiento preferente"],
+            },
+            {
+              key: "elite_partner",
+              name: "Elite Partner",
+              badge: "Socio estratégico",
+              icon: "solar:star-bold-duotone",
+              accent: "#fbbf24",
+              accentBg: "rgba(251,191,36,0.12)",
+              benefits: ["Máximo cashback a huéspedes", "Visibilidad premium", "Soporte dedicado Newayzi"],
+            },
+          ];
 
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="rounded-2xl bg-white/[0.08] border border-white/[0.12] px-3.5 py-3">
-                    <p className="text-white/50 text-[0.62rem] uppercase tracking-wide">Visibilidad</p>
-                    <p className="font-sora font-bold text-white text-sm mt-0.5 leading-tight">
-                      {operatorRewards.activeAgreement.visibilityBoostDisplay}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-white/[0.08] border border-white/[0.12] px-3.5 py-3">
-                    <p className="text-white/50 text-[0.62rem] uppercase tracking-wide">Cashback emitido</p>
-                    <p className="font-sora font-bold text-white text-sm mt-0.5">
-                      ${operatorRewards.stats.cashbackEmitted.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
+          // Detectar el tier activo por nombre
+          const activeTierKey = ag
+            ? TIERS.find(t =>
+                ag.rewardsLabelDisplay?.toLowerCase().includes(t.name.toLowerCase().split(" ")[0])
+              )?.key ?? null
+            : null;
+          const activeTier = TIERS.find(t => t.key === activeTierKey) ?? null;
 
-                <div className="mt-3 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                  <p className="text-white/50 text-[0.68rem]">
-                    Vigente desde {new Date(operatorRewards.activeAgreement.effectiveFrom).toLocaleDateString("es-CO")}
-                    {operatorRewards.activeAgreement.effectiveUntil
-                      ? ` · Hasta ${new Date(operatorRewards.activeAgreement.effectiveUntil).toLocaleDateString("es-CO")}`
-                      : " · Sin fecha de vencimiento"}
+          return (
+            <AccentCard className="flex flex-col">
+              {/* Header */}
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Programa de Socios</p>
+                  <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
+                    {ag ? ag.rewardsLabelDisplay : "Sin nivel activo"}
                   </p>
                 </div>
-              </>
-            ) : (
-              <>
-                <p className="text-white/70 text-[0.82rem] leading-relaxed mb-4">
-                  Aún no tienes un acuerdo comercial activo con Newayzi. Contacta al equipo para configurarlo.
-                </p>
-                {[
-                  { name: "Partner", badge: "Socio base", color: "30%", accent: "rgba(160,160,180,0.9)" },
-                  { name: "Premium Partner", badge: "Socio preferente", color: "65%", accent: "#9b74ff" },
-                  { name: "Elite Partner", badge: "Socio estratégico", color: "95%", accent: "#fbbf24" },
-                ].map((lvl) => (
-                  <div
-                    key={lvl.name}
-                    className="flex items-center gap-3 rounded-2xl px-4 py-2.5 bg-white/[0.08] border border-white/[0.1] mb-2"
-                  >
-                    <div className="w-2 h-2 rounded-full shrink-0" style={{ background: lvl.accent }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-sora font-bold text-white text-sm leading-none">{lvl.name}</p>
-                      <p className="text-white/55 text-[0.7rem] mt-0.5">{lvl.badge}</p>
+                <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                  <Icon
+                    icon={activeTier?.icon ?? "solar:handshake-bold-duotone"}
+                    className="text-base"
+                    style={{ color: activeTier?.accent ?? "#fbbf24" }}
+                  />
+                </div>
+              </div>
+
+              {/* Barra de progresión de tiers */}
+              <div className="flex items-center gap-1 mb-4">
+                {TIERS.map((tier, idx) => {
+                  const isActive = tier.key === activeTierKey;
+                  const isPast = activeTierKey
+                    ? TIERS.findIndex(t => t.key === activeTierKey) > idx
+                    : false;
+                  return (
+                    <div key={tier.key} className="flex items-center flex-1 gap-1">
+                      <div
+                        className="flex-1 rounded-full transition-all duration-500"
+                        style={{
+                          height: isActive ? "6px" : "3px",
+                          background: isActive
+                            ? tier.accent
+                            : isPast
+                              ? "rgba(155,116,255,0.5)"
+                              : "rgba(255,255,255,0.12)",
+                        }}
+                      />
+                      <div
+                        className="flex flex-col items-center shrink-0"
+                        style={{ minWidth: 0 }}
+                      >
+                        <div
+                          className="w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300"
+                          style={{
+                            background: isActive ? tier.accent : isPast ? "rgba(155,116,255,0.4)" : "rgba(255,255,255,0.1)",
+                            boxShadow: isActive ? `0 0 10px ${tier.accent}80` : "none",
+                          }}
+                        >
+                          <Icon
+                            icon={tier.icon}
+                            className="text-[0.55rem]"
+                            style={{ color: isActive ? "#fff" : isPast ? "#fff" : "rgba(255,255,255,0.3)" }}
+                          />
+                        </div>
+                        <p
+                          className="text-[0.52rem] font-semibold mt-0.5 whitespace-nowrap"
+                          style={{ color: isActive ? tier.accent : "rgba(255,255,255,0.3)" }}
+                        >
+                          {tier.name.split(" ")[0]}
+                        </p>
+                      </div>
                     </div>
-                    <div className="w-20 h-1.5 rounded-full overflow-hidden bg-white/10">
-                      <div className="h-full rounded-full" style={{ width: lvl.color, background: lvl.accent }} />
+                  );
+                })}
+              </div>
+
+              {ag ? (
+                /* ── CON ACUERDO ACTIVO ── */
+                <>
+                  {/* Métricas principales */}
+                  <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-3.5 mb-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-white/50 text-[0.6rem] uppercase tracking-wide">Cashback a huéspedes</p>
+                        <p className="font-sora font-black text-white text-2xl leading-none mt-0.5">
+                          {ag.cashbackContributionPct}
+                        </p>
+                        <p className="text-white/35 text-[0.6rem] mt-0.5">por reserva confirmada</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-white/50 text-[0.6rem] uppercase tracking-wide">Reservas recompensadas</p>
+                        <p className="font-sora font-black text-white text-2xl leading-none mt-0.5">
+                          {stats?.bookingsRewarded ?? 0}
+                        </p>
+                        <p className="text-white/35 text-[0.6rem] mt-0.5">con cashback emitido</p>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </>
-            )}
-          </AccentCard>
-        ) : (
+
+                  {/* Detalles del nivel */}
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div className="rounded-xl bg-white/[0.07] border border-white/[0.1] px-3 py-2.5">
+                      <p className="text-white/45 text-[0.58rem] uppercase tracking-wide">Visibilidad</p>
+                      <p className="font-semibold text-white text-[0.78rem] mt-0.5 leading-tight">
+                        {ag.visibilityBoostDisplay}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-white/[0.07] border border-white/[0.1] px-3 py-2.5">
+                      <p className="text-white/45 text-[0.58rem] uppercase tracking-wide">Cashback emitido</p>
+                      <p className="font-semibold text-white text-[0.78rem] mt-0.5">
+                        ${(stats?.cashbackEmitted ?? 0).toLocaleString("es-CO")}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Estado y vigencia */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                      <p className="text-white/45 text-[0.62rem]">
+                        Vigente desde {new Date(ag.effectiveFrom).toLocaleDateString("es-CO")}
+                        {ag.effectiveUntil
+                          ? ` · hasta ${new Date(ag.effectiveUntil).toLocaleDateString("es-CO")}`
+                          : " · sin vencimiento"}
+                      </p>
+                    </div>
+                    {ag.autoRenew && (
+                      <span className="text-[0.58rem] text-violet-300 bg-violet-500/15 rounded-full px-2 py-0.5 border border-violet-400/20">
+                        Auto-renueva
+                      </span>
+                    )}
+                  </div>
+                </>
+              ) : (
+                /* ── SIN ACUERDO ACTIVO ── */
+                <>
+                  <div className="rounded-xl bg-white/[0.07] border border-white/[0.1] px-3.5 py-3 mb-3 flex items-start gap-2.5">
+                    <Icon icon="solar:info-circle-bold-duotone" className="text-amber-400 text-base shrink-0 mt-0.5" />
+                    <p className="text-white/65 text-[0.75rem] leading-relaxed">
+                      Aún no tienes un acuerdo de socio activo. Contacta al equipo Newayzi para activar tu nivel y ofrecer cashback a tus huéspedes.
+                    </p>
+                  </div>
+
+                  {/* Beneficios por tier */}
+                  <div className="space-y-2">
+                    {TIERS.map((tier) => (
+                      <div
+                        key={tier.key}
+                        className="rounded-xl px-3.5 py-2.5 border flex items-center gap-3"
+                        style={{ background: tier.accentBg, borderColor: `${tier.accent}25` }}
+                      >
+                        <Icon icon={tier.icon} className="text-lg shrink-0" style={{ color: tier.accent }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-sora font-bold text-white text-[0.78rem] leading-none">{tier.name}</p>
+                            <span className="text-[0.55rem] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: `${tier.accent}25`, color: tier.accent }}>
+                              {tier.badge}
+                            </span>
+                          </div>
+                          <p className="text-white/45 text-[0.65rem] mt-0.5 truncate">
+                            {tier.benefits[0]}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </AccentCard>
+          );
+        })() : (
           <AccentCard className="flex flex-col">
             <div className="flex items-start justify-between mb-4">
               <div>
