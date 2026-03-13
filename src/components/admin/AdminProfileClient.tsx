@@ -1,10 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Icon } from "@iconify/react";
+import { useUser } from "@clerk/nextjs";
+import Link from "next/link";
+import { Input, Button, addToast } from "@heroui/react";
 import { useAdmin } from "@/contexts/AdminContext";
 import { rewardsAgreementsApi } from "@/lib/admin-api";
+import { resolveClerkError } from "@/lib/clerk-errors";
 import type { AdminRole, AdminLoyalty, OperatorRewardsData } from "@/lib/admin-api";
+
+const inputDark = "rounded-xl border border-white/[0.12] bg-white/[0.04]";
+const MAX_IMAGE_SIZE_MB = 10;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 const ROLE_LABELS: Record<AdminRole, string> = {
   super_admin: "Super admin",
@@ -95,26 +103,231 @@ function useOperatorRewards(operatorId: number | null) {
 }
 
 export function AdminProfileClient() {
-  const { me, role } = useAdmin();
+  const { me, role, refetchMe } = useAdmin();
+  const { user } = useUser();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   if (!me) return null;
 
   const { profile, operator_name, loyalty, operator_id } = me;
-  const displayName = profile.full_name || `${profile.first_name} ${profile.last_name}`.trim() || profile.email;
+  // Preferir datos de Clerk (actualizados al editar) sobre me del backend
+  const displayName =
+    (user ? [user.firstName, user.lastName].filter(Boolean).join(" ").trim() : null) ||
+    profile.full_name ||
+    `${profile.first_name} ${profile.last_name}`.trim() ||
+    profile.email;
   const operatorRewards = useOperatorRewards(role === "operador" ? (operator_id ?? null) : null);
+
+  // Sincronizar nombre desde Clerk o me
+  useEffect(() => {
+    const fn = user?.firstName ?? profile.first_name ?? "";
+    const ln = user?.lastName ?? profile.last_name ?? "";
+    setFirstName(fn);
+    setLastName(ln);
+  }, [user?.firstName, user?.lastName, profile.first_name, profile.last_name]);
+
+  const handleSaveProfile = useCallback(async () => {
+    if (!user) return;
+    const fn = firstName.trim();
+    const ln = lastName.trim();
+    if (!fn) {
+      addToast({
+        title: "Campo requerido",
+        description: "El nombre es obligatorio.",
+        color: "warning",
+      });
+      return;
+    }
+    setSaving(true);
+    setSuccess(false);
+    try {
+      await user.update({
+        firstName: fn.slice(0, 255),
+        lastName: ln.slice(0, 255),
+      });
+      await refetchMe();
+      setSuccess(true);
+      addToast({
+        title: "Perfil actualizado",
+        description: "Tus datos se guardaron correctamente.",
+        color: "success",
+      });
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (e) {
+      addToast({
+        title: "Error al guardar",
+        description: resolveClerkError(e),
+        color: "danger",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }, [user, firstName, lastName, refetchMe]);
+
+  const handleImageChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !user) return;
+
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+        addToast({
+          title: "Formato no permitido",
+          description: "Usa una imagen JPG, PNG, WebP o GIF.",
+          color: "warning",
+        });
+        e.target.value = "";
+        return;
+      }
+      if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
+        addToast({
+          title: "Imagen demasiado grande",
+          description: `La imagen debe pesar menos de ${MAX_IMAGE_SIZE_MB} MB.`,
+          color: "warning",
+        });
+        e.target.value = "";
+        return;
+      }
+
+      setUploading(true);
+      try {
+        await user.setProfileImage({ file });
+        await refetchMe();
+        addToast({
+          title: "Foto actualizada",
+          description: "Tu foto de perfil se actualizó correctamente.",
+          color: "success",
+        });
+      } catch (err) {
+        addToast({
+          title: "Error al subir foto",
+          description: resolveClerkError(err),
+          color: "danger",
+        });
+      } finally {
+        setUploading(false);
+        e.target.value = "";
+      }
+    },
+    [user, refetchMe]
+  );
+
+  const imageUrl = user?.imageUrl ?? profile.image_url ?? null;
 
   return (
     <div className="space-y-4 lg:space-y-5">
+      {/* ── Editar mi perfil (foto + nombre) ── */}
+      <GlassCard>
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Mi cuenta</p>
+            <p className="font-sora font-bold text-white text-base leading-tight mt-1">
+              Editar foto y datos personales
+            </p>
+          </div>
+          <Link
+            href="/admin/account"
+            className="text-[0.75rem] font-semibold text-[#9b74ff] hover:text-[#b89eff] transition-colors flex items-center gap-1.5"
+          >
+            <Icon icon="solar:settings-bold-duotone" width={16} />
+            Correo, contraseña y seguridad
+          </Link>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-6">
+          {/* Avatar con upload */}
+          <div className="flex flex-col items-center gap-2 shrink-0">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={handleImageChange}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="relative group rounded-2xl overflow-hidden border border-white/[0.12] focus:outline-none focus:ring-2 focus:ring-[#9b74ff]/50"
+            >
+              {imageUrl ? (
+                <div className="h-24 w-24 shrink-0">
+                  <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                </div>
+              ) : (
+                <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-[#5e2cec]/25 border border-[#5e2cec]/30">
+                  <Icon icon="solar:user-id-bold-duotone" className="text-[#9b74ff]" width={40} />
+                </div>
+              )}
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                {uploading ? (
+                  <Icon icon="solar:spinner-bold-duotone" className="text-white text-2xl animate-spin" />
+                ) : (
+                  <Icon icon="solar:camera-bold-duotone" className="text-white text-2xl" />
+                )}
+              </div>
+            </button>
+            <span className="text-[0.65rem] text-white/40">Clic para cambiar</span>
+          </div>
+
+          {/* Nombre editable */}
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Nombre"
+              value={firstName}
+              onValueChange={setFirstName}
+              placeholder="Tu nombre"
+              classNames={{
+                inputWrapper: inputDark,
+                input: "!text-white/95 placeholder:!text-white/38",
+                label: "!text-white/70",
+              }}
+            />
+            <Input
+              label="Apellido"
+              value={lastName}
+              onValueChange={setLastName}
+              placeholder="Tu apellido"
+              classNames={{
+                inputWrapper: inputDark,
+                input: "!text-white/95 placeholder:!text-white/38",
+                label: "!text-white/70",
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-white/[0.08]">
+          <Button
+            size="sm"
+            className="btn-newayzi-primary"
+            onPress={handleSaveProfile}
+            isLoading={saving}
+            isDisabled={!firstName.trim()}
+            startContent={!saving && <Icon icon="solar:check-circle-bold-duotone" width={18} />}
+          >
+            {success ? "Guardado" : "Guardar cambios"}
+          </Button>
+          {success && (
+            <span className="text-emerald-400 text-[0.75rem] font-medium flex items-center gap-1">
+              <Icon icon="solar:check-circle-bold-duotone" width={14} />
+              Cambios guardados
+            </span>
+          )}
+        </div>
+      </GlassCard>
+
       {/* ── Header island (avatar + nombre + rol) ── */}
       <GlassCard className="flex flex-col sm:flex-row sm:items-center gap-6 py-6">
         <div className="flex items-center gap-5">
-          {profile.image_url ? (
+          {imageUrl ? (
             <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-white/[0.12]">
-              <img
-                src={profile.image_url}
-                alt={displayName}
-                className="h-full w-full object-cover"
-              />
+              <img src={imageUrl} alt={displayName} className="h-full w-full object-cover" />
             </div>
           ) : (
             <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-[#5e2cec]/25 border border-[#5e2cec]/30">

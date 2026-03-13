@@ -363,6 +363,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 Mi perfil
               </DropdownItem>
               <DropdownItem
+                key="account"
+                startContent={<Icon icon="solar:settings-outline" width={18} />}
+                className="text-white/90 data-[hover=true]:bg-white/10 rounded-lg"
+                onPress={() => router.push("/admin/account")}
+              >
+                Mi cuenta (correo, contraseña)
+              </DropdownItem>
+              <DropdownItem
                 key="signout"
                 startContent={<Icon icon="solar:logout-2-outline" width={18} />}
                 className="text-red-400 data-[hover=true]:bg-red-500/20 rounded-lg"

@@ -7,34 +7,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { SignInResource } from "@clerk/types";
 
+import { resolveClerkError } from "@/lib/clerk-errors";
+
 type Step = "credentials" | "forgot" | "reset_code" | "needs_new_password" | "second_factor";
-
-/* ── Mapeo de errores Clerk → mensajes en español ── */
-const CLERK_ERROR_MESSAGES: Record<string, string> = {
-  form_identifier_not_found: "No encontramos una cuenta con ese correo electrónico.",
-  form_password_incorrect: "La contraseña es incorrecta. Inténtalo de nuevo.",
-  form_password_pwned: "Esta contraseña es muy común. Elige una más segura.",
-  form_password_length_too_short: "La contraseña debe tener al menos 8 caracteres.",
-  form_identifier_exists: "Ya existe una cuenta con ese correo electrónico.",
-  form_param_missing: "Por favor completa todos los campos obligatorios.",
-  form_code_incorrect: "El código ingresado es incorrecto. Verifica e intenta de nuevo.",
-  too_many_requests: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
-  session_exists: "Ya tienes una sesión activa.",
-};
-
-function resolveClerkError(err: unknown): string {
-  const clerkErr = (err as { errors?: { code?: string; longMessage?: string; message?: string }[] })?.errors?.[0];
-  if (!clerkErr) {
-    return (err as { message?: string })?.message || "Ocurrió un error inesperado. Inténtalo de nuevo.";
-  }
-  const code = clerkErr.code ?? "";
-  return (
-    CLERK_ERROR_MESSAGES[code] ||
-    clerkErr.longMessage ||
-    clerkErr.message ||
-    "Ocurrió un error inesperado. Inténtalo de nuevo."
-  );
-}
 
 /* ── Componentes UI internos ── */
 function Label({ children }: { children: React.ReactNode }) {

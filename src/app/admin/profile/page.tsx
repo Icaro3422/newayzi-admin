@@ -6,7 +6,7 @@ export default function AdminProfilePage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Mi perfil"
-        subtitle="Información personal, rol y datos de Newayzi Rewards según tu cuenta."
+        subtitle="Edita tu foto y datos personales. Para correo, contraseña y seguridad, usa Mi cuenta."
       />
       <AdminProfileClient />
     </div>
