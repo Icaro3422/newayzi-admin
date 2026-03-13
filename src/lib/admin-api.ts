@@ -694,7 +694,7 @@ export const reviewsApi = {
     if (params.search) q.set("search", params.search);
     if (params.page != null) q.set("page", String(params.page));
     const res = await authFetch(`/api/admin/reviews/?${q}`);
-    return res as ReviewsListResponse;
+    return (await res.json()) as ReviewsListResponse;
   },
   async approve(reviewId: number, note?: string): Promise<{ ok: boolean; status: string }> {
     return postJson(`/api/admin/reviews/${reviewId}/approve/`, { note: note || "" });
