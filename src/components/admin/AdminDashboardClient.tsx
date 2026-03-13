@@ -5,7 +5,8 @@ import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { useAdmin } from "@/contexts/AdminContext";
 import { adminApi, ROLE_META } from "@/lib/admin-api";
-import type { PMSConnectionListItem, PropertyListItem, Agency } from "@/lib/admin-api";
+import type { PMSConnectionListItem, PropertyListItem, Agency, OperatorRewardsData } from "@/lib/admin-api";
+import { rewardsAgreementsApi } from "@/lib/admin-api";
 import { RewardPoolStatus } from "./RewardPoolStatus";
 
 /* ─── Primitivos de UI (estilo imagen) ───────────────── */
@@ -104,6 +105,7 @@ export function AdminDashboardClient() {
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [operators, setOperators] = useState<{ results: { id: number }[] } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [operatorRewards, setOperatorRewards] = useState<OperatorRewardsData | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,6 +131,16 @@ export function AdminDashboardClient() {
     load();
     return () => { cancelled = true; };
   }, [canAccess, role]);
+
+  // Cargar acuerdo comercial del operador
+  useEffect(() => {
+    if (role !== "operador" || !me?.operator_id) return;
+    let cancelled = false;
+    rewardsAgreementsApi.getForOperator(me.operator_id)
+      .then((data) => { if (!cancelled) setOperatorRewards(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [role, me?.operator_id]);
 
   const totalSynced = connections.reduce(
     (s, c) => s + (c.counts?.room_types_synced ?? c.counts?.properties_synced ?? 0),
@@ -408,105 +420,192 @@ export function AdminDashboardClient() {
           </div>
         </GlassCard>
 
-        {/* Card Newayzi Rewards (estilo imagen, datos reales) */}
-        <AccentCard className="flex flex-col">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Newayzi Rewards</p>
-              <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
-                {loyalty ? `Nivel ${loyalty.level}` : "Programa de lealtad"}
-              </p>
-            </div>
-            <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-              <Icon icon="solar:crown-bold-duotone" className="text-yellow-300 text-base" />
-            </div>
-          </div>
-
-          {loyalty ? (
-            <>
-              <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-4 mb-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-white/55 text-[0.65rem] uppercase tracking-wide">Puntos acumulados</p>
-                  <p className="font-sora font-black text-white text-3xl leading-none mt-0.5">
-                    {loyalty.points.toLocaleString()}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-white/55 text-[0.65rem] uppercase tracking-wide">Reservas totales</p>
-                  <p className="font-sora font-black text-white text-3xl leading-none mt-0.5">
-                    {loyalty.completedBookings}
-                  </p>
-                </div>
+        {/* Card: Acuerdo comercial (operador) o Newayzi Rewards (otros roles) */}
+        {role === "operador" ? (
+          <AccentCard className="flex flex-col">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Acuerdo Comercial</p>
+                <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
+                  {operatorRewards?.activeAgreement
+                    ? operatorRewards.activeAgreement.rewardsLabelDisplay
+                    : "Socio Newayzi"}
+                </p>
               </div>
+              <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                <Icon icon="solar:handshake-bold-duotone" className="text-yellow-300 text-base" />
+              </div>
+            </div>
 
-              {loyalty.progressToNextLevel && (
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-white/65 text-[0.7rem]">Progreso al siguiente nivel</p>
-                    <p className="text-white/65 text-[0.7rem]">
-                      {loyalty.progressToNextLevel.current} / {loyalty.progressToNextLevel.required}{" "}
-                      <span className="text-white/40">{loyalty.progressToNextLevel.type}</span>
+            {operatorRewards?.activeAgreement ? (
+              <>
+                <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-4 mb-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-white/55 text-[0.65rem] uppercase tracking-wide">Cashback a huéspedes</p>
+                    <p className="font-sora font-black text-white text-3xl leading-none mt-0.5">
+                      {operatorRewards.activeAgreement.cashbackContributionPct}
                     </p>
                   </div>
-                  <div className="w-full h-1.5 rounded-full overflow-hidden bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-[#9b74ff] transition-all duration-700"
-                      style={{
-                        width: `${Math.min(
-                          (loyalty.progressToNextLevel.current / loyalty.progressToNextLevel.required) * 100,
-                          100
-                        )}%`,
-                      }}
-                    />
+                  <div className="text-right">
+                    <p className="text-white/55 text-[0.65rem] uppercase tracking-wide">Reservas recompensadas</p>
+                    <p className="font-sora font-black text-white text-3xl leading-none mt-0.5">
+                      {operatorRewards.stats.bookingsRewarded}
+                    </p>
                   </div>
                 </div>
-              )}
 
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="rounded-2xl bg-white/[0.08] border border-white/[0.12] px-3.5 py-3">
-                  <p className="text-white/50 text-[0.62rem] uppercase tracking-wide">Este mes</p>
-                  <p className="font-sora font-bold text-white text-xl mt-0.5">{loyalty.monthlyBookings}</p>
-                  <p className="text-white/50 text-[0.65rem]">reservas</p>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="rounded-2xl bg-white/[0.08] border border-white/[0.12] px-3.5 py-3">
+                    <p className="text-white/50 text-[0.62rem] uppercase tracking-wide">Visibilidad</p>
+                    <p className="font-sora font-bold text-white text-sm mt-0.5 leading-tight">
+                      {operatorRewards.activeAgreement.visibilityBoostDisplay}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-white/[0.08] border border-white/[0.12] px-3.5 py-3">
+                    <p className="text-white/50 text-[0.62rem] uppercase tracking-wide">Cashback emitido</p>
+                    <p className="font-sora font-bold text-white text-sm mt-0.5">
+                      ${operatorRewards.stats.cashbackEmitted.toLocaleString()}
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-2xl bg-white/[0.08] border border-white/[0.12] px-3.5 py-3">
-                  <p className="text-white/50 text-[0.62rem] uppercase tracking-wide">Total gastado</p>
-                  <p className="font-sora font-bold text-white text-xl mt-0.5">
-                    ${loyalty.totalSpent.toLocaleString()}
+
+                <div className="mt-3 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                  <p className="text-white/50 text-[0.68rem]">
+                    Vigente desde {new Date(operatorRewards.activeAgreement.effectiveFrom).toLocaleDateString("es-CO")}
+                    {operatorRewards.activeAgreement.effectiveUntil
+                      ? ` · Hasta ${new Date(operatorRewards.activeAgreement.effectiveUntil).toLocaleDateString("es-CO")}`
+                      : " · Sin fecha de vencimiento"}
                   </p>
-                  <p className="text-white/50 text-[0.65rem]">acumulado</p>
                 </div>
+              </>
+            ) : (
+              <>
+                <p className="text-white/70 text-[0.82rem] leading-relaxed mb-4">
+                  Aún no tienes un acuerdo comercial activo con Newayzi. Contacta al equipo para configurarlo.
+                </p>
+                {[
+                  { name: "Partner", badge: "Socio base", color: "30%", accent: "rgba(160,160,180,0.9)" },
+                  { name: "Premium Partner", badge: "Socio preferente", color: "65%", accent: "#9b74ff" },
+                  { name: "Elite Partner", badge: "Socio estratégico", color: "95%", accent: "#fbbf24" },
+                ].map((lvl) => (
+                  <div
+                    key={lvl.name}
+                    className="flex items-center gap-3 rounded-2xl px-4 py-2.5 bg-white/[0.08] border border-white/[0.1] mb-2"
+                  >
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ background: lvl.accent }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-sora font-bold text-white text-sm leading-none">{lvl.name}</p>
+                      <p className="text-white/55 text-[0.7rem] mt-0.5">{lvl.badge}</p>
+                    </div>
+                    <div className="w-20 h-1.5 rounded-full overflow-hidden bg-white/10">
+                      <div className="h-full rounded-full" style={{ width: lvl.color, background: lvl.accent }} />
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </AccentCard>
+        ) : (
+          <AccentCard className="flex flex-col">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Newayzi Rewards</p>
+                <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
+                  {loyalty ? `Nivel ${loyalty.level}` : "Programa de lealtad"}
+                </p>
               </div>
-            </>
-          ) : (
-            <>
-              <p className="text-white/70 text-[0.82rem] leading-relaxed mb-4">
-                Cada reserva confirmada acumula puntos que se convierten en descuentos directos.
-              </p>
-              {[
-                { name: "Member", badge: "Nivel base", color: "30%", accent: "rgba(160,160,180,0.9)" },
-                { name: "Plus", badge: "Nivel medio", color: "60%", accent: "#9b74ff" },
-                { name: "Premium", badge: "Nivel máximo", color: "95%", accent: "#fbbf24" },
-              ].map((lvl) => (
-                <div
-                  key={lvl.name}
-                  className="flex items-center gap-3 rounded-2xl px-4 py-2.5 bg-white/[0.08] border border-white/[0.1] mb-2"
-                >
-                  <div className="w-2 h-2 rounded-full shrink-0" style={{ background: lvl.accent }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-sora font-bold text-white text-sm leading-none">{lvl.name}</p>
-                    <p className="text-white/55 text-[0.7rem] mt-0.5">{lvl.badge}</p>
+              <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                <Icon icon="solar:crown-bold-duotone" className="text-yellow-300 text-base" />
+              </div>
+            </div>
+
+            {loyalty ? (
+              <>
+                <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-4 mb-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-white/55 text-[0.65rem] uppercase tracking-wide">Puntos acumulados</p>
+                    <p className="font-sora font-black text-white text-3xl leading-none mt-0.5">
+                      {loyalty.points.toLocaleString()}
+                    </p>
                   </div>
-                  <div className="w-20 h-1.5 rounded-full overflow-hidden bg-white/10">
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: lvl.color, background: lvl.accent }}
-                    />
+                  <div className="text-right">
+                    <p className="text-white/55 text-[0.65rem] uppercase tracking-wide">Reservas totales</p>
+                    <p className="font-sora font-black text-white text-3xl leading-none mt-0.5">
+                      {loyalty.completedBookings}
+                    </p>
                   </div>
                 </div>
-              ))}
-            </>
-          )}
-        </AccentCard>
+
+                {loyalty.progressToNextLevel && (
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-white/65 text-[0.7rem]">Progreso al siguiente nivel</p>
+                      <p className="text-white/65 text-[0.7rem]">
+                        {loyalty.progressToNextLevel.current} / {loyalty.progressToNextLevel.required}{" "}
+                        <span className="text-white/40">{loyalty.progressToNextLevel.type}</span>
+                      </p>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full overflow-hidden bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-[#9b74ff] transition-all duration-700"
+                        style={{
+                          width: `${Math.min(
+                            (loyalty.progressToNextLevel.current / loyalty.progressToNextLevel.required) * 100,
+                            100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="rounded-2xl bg-white/[0.08] border border-white/[0.12] px-3.5 py-3">
+                    <p className="text-white/50 text-[0.62rem] uppercase tracking-wide">Este mes</p>
+                    <p className="font-sora font-bold text-white text-xl mt-0.5">{loyalty.monthlyBookings}</p>
+                    <p className="text-white/50 text-[0.65rem]">reservas</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/[0.08] border border-white/[0.12] px-3.5 py-3">
+                    <p className="text-white/50 text-[0.62rem] uppercase tracking-wide">Total gastado</p>
+                    <p className="font-sora font-bold text-white text-xl mt-0.5">
+                      ${loyalty.totalSpent.toLocaleString()}
+                    </p>
+                    <p className="text-white/50 text-[0.65rem]">acumulado</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-white/70 text-[0.82rem] leading-relaxed mb-4">
+                  Cada reserva confirmada acumula puntos que se convierten en descuentos directos.
+                </p>
+                {[
+                  { name: "Member", badge: "Nivel base", color: "30%", accent: "rgba(160,160,180,0.9)" },
+                  { name: "Plus", badge: "Nivel medio", color: "60%", accent: "#9b74ff" },
+                  { name: "Premium", badge: "Nivel máximo", color: "95%", accent: "#fbbf24" },
+                ].map((lvl) => (
+                  <div
+                    key={lvl.name}
+                    className="flex items-center gap-3 rounded-2xl px-4 py-2.5 bg-white/[0.08] border border-white/[0.1] mb-2"
+                  >
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ background: lvl.accent }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-sora font-bold text-white text-sm leading-none">{lvl.name}</p>
+                      <p className="text-white/55 text-[0.7rem] mt-0.5">{lvl.badge}</p>
+                    </div>
+                    <div className="w-20 h-1.5 rounded-full overflow-hidden bg-white/10">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: lvl.color, background: lvl.accent }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </AccentCard>
+        )}
 
         {/* Card Accesos rápidos — filtrados por rol */}
         <GlassCard className="flex flex-col">

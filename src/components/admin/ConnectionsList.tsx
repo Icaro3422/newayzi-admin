@@ -30,18 +30,10 @@ export function ConnectionsList({ refreshKey = 0 }: { refreshKey?: number }) {
     setLoading(true);
     adminApi
       .getConnections()
-      .then((res) => {
-        const all = res?.results ?? [];
-        // El backend ya filtra por operador en la mayoría de los casos,
-        // pero aplicamos filtro adicional en el cliente como capa extra de seguridad.
-        const filtered = isOperador && operatorId
-          ? all.filter((c) => !c.operator_name || c.operator_name === me?.operator_name)
-          : all;
-        setList(filtered);
-      })
+      .then((res) => setList(res?.results ?? []))
       .catch(() => setList([]))
       .finally(() => setLoading(false));
-  }, [refreshKey, isOperador, operatorId, me?.operator_name]);
+  }, [refreshKey, isOperador, operatorId]);
 
   if (loading) {
     return (
@@ -59,9 +51,9 @@ export function ConnectionsList({ refreshKey = 0 }: { refreshKey?: number }) {
         </div>
         <p className="font-sora font-bold text-white text-base">Sin conexiones</p>
         <p className="mt-2 text-sm text-white/50">
-          {isSuperAdmin
-            ? "Crea una nueva conexión PMS para comenzar."
-            : "No tienes conexiones PMS asignadas aún. Contacta a un administrador."}
+          {isOperador
+            ? "Aún no tienes conexiones PMS. Usa el botón \"Nueva conexión\" para agregar tu PMS."
+            : "Crea una nueva conexión PMS para comenzar."}
         </p>
       </GlassCard>
     );

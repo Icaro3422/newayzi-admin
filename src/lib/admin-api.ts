@@ -141,6 +141,7 @@ export interface PMSConnectionListItem {
 export interface PMSConnectionType {
   code: string;
   label: string;
+  operator_count?: number;
 }
 
 export interface UnitsSummary {
