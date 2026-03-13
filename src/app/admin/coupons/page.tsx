@@ -3,23 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-
-interface Coupon {
-  id: number;
-  code: string;
-  description: string;
-  discount_type: "percentage" | "fixed";
-  discount_value: string;
-  max_discount_amount: string | null;
-  min_booking_amount: string;
-  max_uses: number | null;
-  max_uses_per_user: number;
-  times_used: number;
-  valid_from: string;
-  valid_until: string | null;
-  status: "active" | "paused" | "expired";
-  created: string;
-}
+import { couponsApi, type AdminCoupon } from "@/lib/admin-api";
 
 const STATUS_BADGE: Record<string, string> = {
   active:  "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
@@ -32,42 +16,6 @@ const STATUS_LABEL: Record<string, string> = {
   paused:  "Pausado",
   expired: "Expirado",
 };
-
-function getApiBase(): string {
-  const env = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (env) return env.replace(/\/$/, "");
-  if (typeof window !== "undefined") {
-    const h = window.location.hostname;
-    if (h === "portal.newayzi.com") return "https://api.newayzi.com";
-    if (h === "portal.staging.newayzi.com") return "https://api.staging.newayzi.com";
-  }
-  return "http://localhost:8000";
-}
-
-async function authFetch(path: string, options: RequestInit = {}) {
-  const base = getApiBase();
-  const url = `${base}${path}`;
-  let token: string | null = null;
-  try {
-    const { Clerk } = window as any;
-    if (Clerk?.session?.getToken) {
-      token = await Clerk.session.getToken({ template: "newayzi-backend" });
-    }
-  } catch {}
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
-  };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(url, { ...options, headers, credentials: "include" });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API ${res.status}: ${text}`);
-  }
-  if (res.status === 204) return null;
-  return res.json();
-}
 
 const EMPTY_FORM = {
   code: "",
@@ -83,7 +31,7 @@ const EMPTY_FORM = {
 };
 
 export default function AdminCouponsPage() {
-  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [coupons, setCoupons] = useState<AdminCoupon[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,16 +50,17 @@ export default function AdminCouponsPage() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ page: String(p) });
-      if (search) params.set("search", search);
-      if (statusFilter) params.set("status", statusFilter);
-      const data = await authFetch(`/api/admin/coupons/?${params}`);
+      const data = await couponsApi.list({
+        page: p,
+        search: search || undefined,
+        status: statusFilter || undefined,
+      });
       setCoupons(data.results);
       setTotal(data.count);
       setNumPages(data.num_pages);
       setPage(data.page);
     } catch (e: any) {
-      setError(e.message);
+      setError(e?.message || "Error al cargar cupones");
     } finally {
       setLoading(false);
     }
@@ -168,16 +117,17 @@ export default function AdminCouponsPage() {
     }
 
     try {
-      await authFetch("/api/admin/coupons/", {
-        method: "POST",
-        body: JSON.stringify({
-          ...form,
-          discount_value: form.discount_value || "0",
-          max_discount_amount: form.max_discount_amount ? form.max_discount_amount : null,
-          max_uses: form.max_uses ? parseInt(form.max_uses) : null,
-          max_uses_per_user: parseInt(form.max_uses_per_user) || 1,
-          valid_until: form.valid_until || null,
-        }),
+      await couponsApi.create({
+        code: form.code,
+        description: form.description || undefined,
+        discount_type: form.discount_type,
+        discount_value: form.discount_value || "0",
+        max_discount_amount: form.max_discount_amount ? form.max_discount_amount : null,
+        min_booking_amount: form.min_booking_amount || "0",
+        max_uses: form.max_uses ? parseInt(form.max_uses) : null,
+        max_uses_per_user: parseInt(form.max_uses_per_user) || 1,
+        valid_from: form.valid_from,
+        valid_until: form.valid_until || null,
       });
       setShowForm(false);
       setForm(EMPTY_FORM);
@@ -189,25 +139,22 @@ export default function AdminCouponsPage() {
     }
   }
 
-  async function handleStatusChange(coupon: Coupon, newStatus: string) {
+  async function handleStatusChange(coupon: AdminCoupon, newStatus: string) {
     try {
-      await authFetch(`/api/admin/coupons/${coupon.id}/`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: newStatus }),
-      });
+      await couponsApi.patch(coupon.id, { status: newStatus });
       load(page);
     } catch (e: any) {
-      alert(e.message);
+      alert(e?.message || "Error al actualizar");
     }
   }
 
   async function handleDelete(id: number) {
     if (!confirm("¿Seguro que quieres eliminar este cupón?")) return;
     try {
-      await authFetch(`/api/admin/coupons/${id}/`, { method: "DELETE" });
+      await couponsApi.delete(id);
       load(page);
     } catch (e: any) {
-      alert(e.message);
+      alert(e?.message || "Error al eliminar");
     }
   }
 

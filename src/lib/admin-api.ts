@@ -687,6 +687,73 @@ export interface ReviewsListResponse {
   results: AdminReview[];
 }
 
+// ─────────────────────────────────────────────────────────────────────────── //
+//  Coupons (admin)
+// ─────────────────────────────────────────────────────────────────────────── //
+
+export interface AdminCoupon {
+  id: number;
+  code: string;
+  description: string;
+  discount_type: "percentage" | "fixed";
+  discount_value: string;
+  max_discount_amount: string | null;
+  min_booking_amount: string;
+  max_uses: number | null;
+  max_uses_per_user: number;
+  times_used: number;
+  valid_from: string;
+  valid_until: string | null;
+  status: "active" | "paused" | "expired";
+  created: string;
+}
+
+export interface CouponsListResponse {
+  count: number;
+  page: number;
+  num_pages: number;
+  results: AdminCoupon[];
+}
+
+export const couponsApi = {
+  async list(params: { page?: number; search?: string; status?: string }): Promise<CouponsListResponse> {
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", String(params.page));
+    if (params.search) q.set("search", params.search);
+    if (params.status) q.set("status", params.status);
+    const res = await authFetch(`/api/admin/coupons/?${q}`);
+    return (await res.json()) as CouponsListResponse;
+  },
+  async create(data: {
+    code: string;
+    description?: string;
+    discount_type: "percentage" | "fixed";
+    discount_value: string;
+    max_discount_amount?: string | null;
+    min_booking_amount?: string;
+    max_uses?: number | null;
+    max_uses_per_user?: number;
+    valid_from?: string;
+    valid_until?: string | null;
+  }): Promise<AdminCoupon> {
+    return postJson<AdminCoupon>("/api/admin/coupons/", data);
+  },
+  async patch(id: number, data: { status?: string }): Promise<AdminCoupon> {
+    return patchJson<AdminCoupon>(`/api/admin/coupons/${id}/`, data);
+  },
+  async delete(id: number): Promise<void> {
+    const res = await authFetch(`/api/admin/coupons/${id}/`, { method: "DELETE" });
+    if (res.status !== 204) {
+      const text = await res.text();
+      throw new Error(`API ${res.status}: ${text}`);
+    }
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────── //
+//  Reviews (admin moderation)
+// ─────────────────────────────────────────────────────────────────────────── //
+
 export const reviewsApi = {
   async list(params: { status?: string; search?: string; page?: number }): Promise<ReviewsListResponse> {
     const q = new URLSearchParams();
