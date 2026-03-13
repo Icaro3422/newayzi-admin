@@ -336,6 +336,21 @@ async function getJson<T>(path: string): Promise<T | null> {
   return res.json() as Promise<T>;
 }
 
+async function authFetchMultipart(path: string, method: string, body: FormData) {
+  const url = `${API_BASE.replace(/\/$/, "")}${path}`;
+  const token = tokenGetter ? await tokenGetter() : null;
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(url, { method, body, headers, credentials: "include" });
+  if (!res.ok) {
+    const text = await res.text();
+    let detail = text;
+    try { detail = JSON.parse(text).detail ?? text; } catch { /* keep raw text */ }
+    throw new Error(detail || `Error ${res.status}`);
+  }
+  return res;
+}
+
 async function patchJson<T>(path: string, body: unknown): Promise<T> {
   const res = await authFetch(path, { method: "PATCH", body: JSON.stringify(body) });
   return res.json() as Promise<T>;
@@ -998,6 +1013,8 @@ export const ROLE_META: Record<AdminRole, { label: string; icon: string; color: 
 /** Permisos de acceso a módulos */
 export function canAccessModule(role: AdminRole | null, module: string): boolean {
   if (!role) return false;
+  // Super admin no ve "Mi Billetera" — es parte del equipo Newayzi, no usa rewards personales
+  if (role === "super_admin" && module === "wallet") return false;
   if (role === "super_admin") return true;
   switch (module) {
     case "profile":
@@ -1187,6 +1204,160 @@ export const agentWallets = {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return null;
+    return res.json();
+  },
+};
+
+// ─── Contratos de Operador ──────────────────────────────────────────────────
+
+export type ContractStatus = "draft" | "sent_to_operator" | "signed" | "active" | "superseded";
+
+export interface OperatorContract {
+  id: number;
+  contractNumber: string;
+  operatorId: number;
+  operatorName: string;
+  title: string;
+  status: ContractStatus;
+  statusDisplay: string;
+  validFrom: string | null;
+  validUntil: string | null;
+  documentPdfUrl: string | null;
+  signedByNewayziName: string;
+  signedByNewayziAt: string | null;
+  signedByOperatorName: string;
+  signedByOperatorAt: string | null;
+  operatorIp: string | null;
+  contentHash: string;
+  isLocked: boolean;
+  tokenExpiresAt: string | null;
+  isTokenValid: boolean;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateContractPayload {
+  title: string;
+  document_pdf: File;
+  valid_from?: string;
+  valid_until?: string;
+  notes?: string;
+}
+
+export interface SignNewayziPayload {
+  signer_name: string;
+}
+
+export const operatorContracts = {
+  async list(operatorId: number): Promise<OperatorContract[]> {
+    const res = await authFetch(`/api/admin/operators/${operatorId}/contracts/`);
+    return res.json();
+  },
+
+  async create(operatorId: number, payload: CreateContractPayload): Promise<OperatorContract> {
+    const form = new FormData();
+    form.append("title", payload.title);
+    form.append("document_pdf", payload.document_pdf);
+    if (payload.valid_from) form.append("valid_from", payload.valid_from);
+    if (payload.valid_until) form.append("valid_until", payload.valid_until);
+    if (payload.notes) form.append("notes", payload.notes);
+    const res = await authFetchMultipart(`/api/admin/operators/${operatorId}/contracts/`, "POST", form);
+    return res.json();
+  },
+
+  async get(operatorId: number, contractId: number): Promise<OperatorContract> {
+    const res = await authFetch(`/api/admin/operators/${operatorId}/contracts/${contractId}/`);
+    return res.json();
+  },
+
+  async patch(
+    operatorId: number,
+    contractId: number,
+    data: Partial<{ title: string; valid_from: string; valid_until: string; notes: string; document_pdf: File }>,
+  ): Promise<OperatorContract> {
+    const form = new FormData();
+    if (data.title !== undefined) form.append("title", data.title);
+    if (data.valid_from !== undefined) form.append("valid_from", data.valid_from);
+    if (data.valid_until !== undefined) form.append("valid_until", data.valid_until);
+    if (data.notes !== undefined) form.append("notes", data.notes);
+    if (data.document_pdf) form.append("document_pdf", data.document_pdf);
+    const res = await authFetchMultipart(`/api/admin/operators/${operatorId}/contracts/${contractId}/`, "PATCH", form);
+    return res.json();
+  },
+
+  async signNewayzi(operatorId: number, contractId: number, signerName: string): Promise<OperatorContract> {
+    const res = await authFetch(`/api/admin/operators/${operatorId}/contracts/${contractId}/sign-newayzi/`, {
+      method: "POST",
+      body: JSON.stringify({ signer_name: signerName }),
+    });
+    return res.json();
+  },
+
+  async resendLink(operatorId: number, contractId: number): Promise<OperatorContract> {
+    const res = await authFetch(`/api/admin/operators/${operatorId}/contracts/${contractId}/resend-link/`, { method: "POST" });
+    return res.json();
+  },
+
+  async activate(operatorId: number, contractId: number): Promise<OperatorContract> {
+    const res = await authFetch(`/api/admin/operators/${operatorId}/contracts/${contractId}/activate/`, { method: "POST" });
+    return res.json();
+  },
+};
+
+// ─── Políticas de Cancelación de Propiedad ──────────────────────────────────
+
+export type CancellationPolicyType = "flexible" | "moderate" | "strict" | "custom";
+export type RefundType = "cash" | "credits" | "none";
+
+export interface CancellationTier {
+  days_before_checkin: number;
+  refund_pct: number;
+  refund_type: RefundType;
+}
+
+export interface PropertyCancellationPolicy {
+  id: number;
+  propertyId: number;
+  contractId: number | null;
+  contractNumber: string | null;
+  policyType: CancellationPolicyType;
+  policyTypeDisplay: string;
+  tiers: CancellationTier[];
+  isActive: boolean;
+  effectiveFrom: string | null;
+  effectiveUntil: string | null;
+  isLocked: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CancellationPolicyResponse {
+  activePolicy: PropertyCancellationPolicy | null;
+  history: PropertyCancellationPolicy[];
+  presets: Record<string, CancellationTier[]>;
+}
+
+export const propertyCancellationPolicies = {
+  async get(propertyId: number): Promise<CancellationPolicyResponse> {
+    const res = await authFetch(`/api/admin/properties/${propertyId}/cancellation-policy/`);
+    return res.json();
+  },
+
+  async set(
+    propertyId: number,
+    payload: {
+      policy_type: CancellationPolicyType;
+      tiers?: CancellationTier[];
+      effective_from?: string;
+      effective_until?: string;
+    },
+  ): Promise<PropertyCancellationPolicy> {
+    const res = await authFetch(`/api/admin/properties/${propertyId}/cancellation-policy/`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
     return res.json();
   },
 };

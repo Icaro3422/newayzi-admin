@@ -13,6 +13,7 @@ import { adminApi, type PropertyDetail } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useRouter, useParams } from "next/navigation";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { PropertyCancellationPolicyPanel } from "./PropertyCancellationPolicyPanel";
 
 /* ─── Primitivos (línea visual) ───────────────────────── */
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -272,6 +273,24 @@ export function PropertyEditClient() {
           </p>
         </GlassCard>
       ) : null}
+
+      {/* ── Política de cancelación ── */}
+      {property && (
+        <div className="rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-400/20 flex items-center justify-center">
+              <Icon icon="solar:shield-minimalistic-bold-duotone" className="text-orange-400 text-lg" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white/90">Política de Cancelación</h2>
+              <p className="text-xs text-white/50">
+                Define las reglas de reembolso por cancelación vinculadas al contrato del operador.
+              </p>
+            </div>
+          </div>
+          <PropertyCancellationPolicyPanel propertyId={propertyId} readOnly={!canEditProperty} />
+        </div>
+      )}
     </div>
   );
 }

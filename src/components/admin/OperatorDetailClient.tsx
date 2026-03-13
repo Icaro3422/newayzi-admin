@@ -8,6 +8,7 @@ import { useParams } from "next/navigation";
 import { adminApi, isModuleReadOnly, type Operator } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 import { OperatorRewardsPanel } from "./OperatorRewardsPanel";
+import { OperatorContractPanel } from "./OperatorContractPanel";
 
 function GlassCard({
   children,
@@ -195,6 +196,24 @@ export function OperatorDetailClient() {
             )}
           </div>
           <OperatorRewardsPanel operatorId={id} readOnly={!canEdit} />
+        </div>
+      )}
+
+      {/* ── Contratos de Servicio — solo super_admin ── */}
+      {canEdit && (
+        <div className="rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-400/20 flex items-center justify-center">
+              <Icon icon="solar:document-text-bold-duotone" className="text-blue-400 text-lg" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white/90">Contratos de Servicio</h2>
+              <p className="text-xs text-white/50">
+                Gestiona el contrato legal firmado digitalmente con este operador y sus políticas de cancelación.
+              </p>
+            </div>
+          </div>
+          <OperatorContractPanel operatorId={id} readOnly={!canEdit} />
         </div>
       )}
     </div>

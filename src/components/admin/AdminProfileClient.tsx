@@ -214,8 +214,8 @@ export function AdminProfileClient() {
         </div>
       </GlassCard>
 
-      {/* ── Newayzi Rewards ── */}
-      {loyalty ? (
+      {/* ── Newayzi Rewards (oculto para super_admin: es equipo Newayzi, no usa billetera personal) ── */}
+      {role !== "super_admin" && (loyalty ? (
         <AccentCard>
           <div className="flex items-start justify-between gap-4 mb-5 min-w-0">
             <div>
@@ -280,7 +280,7 @@ export function AdminProfileClient() {
             Este perfil no tiene datos de Newayzi Rewards. Los perfiles de staff pueden no tener loyalty si no han realizado reservas como huéspedes.
           </p>
         </GlassCard>
-      )}
+      ))}
 
       {/* ── Acuerdo Rewards del operador ── */}
       {role === "operador" && (
