@@ -24,8 +24,8 @@ export default function AdminConnectionsPage() {
             : "Gestiona las integraciones con PMS. Solo el super-admin puede crear y activar/desactivar conexiones."
         }
       >
-        {/* Solo super_admin puede crear nuevas conexiones */}
-        {isSuperAdmin && <ConnectionCreateButton onCreated={() => setRefreshKey((k) => k + 1)} />}
+        {/* super_admin y operador pueden crear conexiones */}
+        {(isSuperAdmin || isOperador) && <ConnectionCreateButton onCreated={() => setRefreshKey((k) => k + 1)} />}
       </AdminPageHeader>
 
       {isOperador && (

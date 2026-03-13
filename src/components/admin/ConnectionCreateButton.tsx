@@ -20,7 +20,8 @@ import { useAdmin } from "@/contexts/AdminContext";
 const inputDark = "rounded-xl border";
 
 export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }) {
-  const { canAccess } = useAdmin();
+  const { canAccess, role } = useAdmin();
+  const isOperador = role === "operador";
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [pmsType, setPmsType] = useState("");
@@ -207,28 +208,31 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
               }}
             />
 
-            <Select
-              label="Operador (opcional)"
-              items={[{ id: "none", name: "Sin asignar" }, ...operators]}
-              selectedKeys={operatorId ? [operatorId] : ["none"]}
-              onSelectionChange={(s) => {
-                const v = Array.from(s)[0] as string;
-                setOperatorId(v === "none" ? "" : v ?? "");
-              }}
-              placeholder="Sin asignar"
-              classNames={{
-                trigger: inputDark,
-                label: "!text-white/70",
-                value: "!text-white/92 font-medium",
-                innerWrapper: "!text-white",
-                selectorIcon: "!text-white/50",
-                popoverContent: "bg-[#0f1220] border border-white/[0.1]",
-              }}
-            >
-              {(item) => (
-                <SelectItem key={String(item.id)} className="text-white">{item.name}</SelectItem>
-              )}
-            </Select>
+            {/* El operador se auto-asigna en el backend — solo super_admin elige operador */}
+            {!isOperador && (
+              <Select
+                label="Operador (opcional)"
+                items={[{ id: "none", name: "Sin asignar" }, ...operators]}
+                selectedKeys={operatorId ? [operatorId] : ["none"]}
+                onSelectionChange={(s) => {
+                  const v = Array.from(s)[0] as string;
+                  setOperatorId(v === "none" ? "" : v ?? "");
+                }}
+                placeholder="Sin asignar"
+                classNames={{
+                  trigger: inputDark,
+                  label: "!text-white/70",
+                  value: "!text-white/92 font-medium",
+                  innerWrapper: "!text-white",
+                  selectorIcon: "!text-white/50",
+                  popoverContent: "bg-[#0f1220] border border-white/[0.1]",
+                }}
+              >
+                {(item) => (
+                  <SelectItem key={String(item.id)} className="text-white">{item.name}</SelectItem>
+                )}
+              </Select>
+            )}
           </ModalBody>
           <ModalFooter>
             <Button
