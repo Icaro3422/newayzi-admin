@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { adminApi } from "@/lib/admin-api";
 
 interface KPIs {
   total_revenue: string;
@@ -42,33 +43,6 @@ interface AnalyticsData {
   time_series: TimeSeriesPoint[];
   top_properties: TopProperty[];
   status_distribution: StatusDist[];
-}
-
-function getApiBase(): string {
-  const env = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (env) return env.replace(/\/$/, "");
-  if (typeof window !== "undefined") {
-    const h = window.location.hostname;
-    if (h === "portal.newayzi.com") return "https://api.newayzi.com";
-    if (h === "portal.staging.newayzi.com") return "https://api.staging.newayzi.com";
-  }
-  return "http://localhost:8000";
-}
-
-async function authFetch(path: string) {
-  const base = getApiBase();
-  let token: string | null = null;
-  try {
-    const { Clerk } = window as any;
-    if (Clerk?.session?.getToken) {
-      token = await Clerk.session.getToken({ template: "newayzi-backend" });
-    }
-  } catch {}
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${base}${path}`, { headers, credentials: "include" });
-  if (!res.ok) throw new Error(`API ${res.status}`);
-  return res.json();
 }
 
 function formatCurrency(val: string | number): string {
@@ -144,9 +118,11 @@ export default function AdminAnalyticsPage() {
 
   useEffect(() => {
     setLoading(true);
-    authFetch(`/api/admin/analytics/dashboard/?days=${days}`)
-      .then(setData)
-      .catch((e) => setError(e.message))
+    setError(null);
+    adminApi
+      .getAnalyticsDashboard(days)
+      .then((d) => setData((d ?? null) as AnalyticsData | null))
+      .catch((e) => setError(e instanceof Error ? e.message : "Error al cargar analytics"))
       .finally(() => setLoading(false));
   }, [days]);
 

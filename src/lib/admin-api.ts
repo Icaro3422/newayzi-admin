@@ -379,6 +379,15 @@ export const adminApi = {
     return getJson<RewardPoolSummary>("/api/admin/loyalty/pool/");
   },
 
+  async getAnalyticsDashboard(days: number): Promise<{
+    kpis: Record<string, unknown>;
+    time_series: { date: string; bookings: number; revenue: number }[];
+    top_properties: { property_id: number; name: string; bookings: number; revenue: number }[];
+    status_distribution: { status: string; count: number }[];
+  } | null> {
+    return getJson(`/api/admin/analytics/dashboard/?days=${days}`);
+  },
+
   async clearMustChangePassword(): Promise<void> {
     await patchJson("/api/admin/me/password-changed/", { must_change_password: false });
   },
