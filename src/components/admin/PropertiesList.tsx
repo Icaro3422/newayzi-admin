@@ -58,13 +58,13 @@ export function PropertiesList() {
     async function load() {
       setLoading(true);
       try {
-        const params: { is_active?: boolean; city?: string; pms_connection_id?: number; operator?: number } = {};
+        const params: { is_active?: boolean; city?: string; pms_connection_id?: number; operator_id?: number } = {};
         if (filterActive === "true") params.is_active = true;
         if (filterActive === "false") params.is_active = false;
         if (filterCity.trim()) params.city = filterCity.trim();
         if (filterPms !== "all") params.pms_connection_id = parseInt(filterPms, 10);
         // Los operadores solo ven sus propias propiedades
-        if (isOperador && operatorId) params.operator = operatorId;
+        if (isOperador && operatorId) params.operator_id = operatorId;
         const res = await adminApi.getProperties(params);
         if (cancelled) return;
         setList(res?.results ?? []);
