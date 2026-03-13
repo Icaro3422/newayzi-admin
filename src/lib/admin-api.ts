@@ -571,6 +571,8 @@ export const adminApi = {
     role: AdminRole;
     operator_id?: number | null;
     password: string;
+    initial_level?: string;
+    initial_points?: number;
   }): Promise<AdminUserListItem> {
     return postJson<AdminUserListItem>("/api/admin/users/create/", data);
   },
@@ -866,6 +868,11 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
       return role === "comercial"; // comercial ve operadores (solo lectura)
     case "communications":
       return role === "comercial"; // comercial usa comunicaciones
+    case "wallet":
+      // Cualquier usuario con admin_role puede ver su propia billetera
+      return ["agente", "comercial", "visualizador", "operador"].includes(role);
+    case "agent-wallets":
+      return false; // solo super_admin (ya retornó arriba)
     case "agents":
     case "payments":
     case "bookings":
@@ -937,3 +944,104 @@ export async function fetchPlatformStats(): Promise<PlatformStats | null> {
     return null;
   }
 }
+
+// ─── Agent Wallets (unificado con Newayzi Rewards / LoyaltyUserSummary) ────────
+
+export type WalletMovementReason =
+  | "cashback"
+  | "redemption"
+  | "adjustment"
+  | "booking_commission"
+  | "bonus"
+  | "correction";
+
+export type LoyaltyLevelValue = "member" | "plus" | "premium";
+
+export interface AgentWalletMovement {
+  id: number;
+  amount: number;
+  reason: WalletMovementReason;
+  reason_label: string;
+  note: string;
+  created_at: string;
+  is_expired: boolean;
+  expires_at: string | null;
+}
+
+/** La billetera del agente ES su LoyaltyUserSummary — mismo sistema que los huéspedes */
+export interface AgentWallet {
+  exists: boolean;
+  profile_id: number;
+  agent_name: string;
+  agent_email: string;
+  agent_role: string;
+  points: number;
+  level: LoyaltyLevelValue;
+  level_label: string;
+  completed_bookings: number;
+  total_spent: number;
+  updated_at: string | null;
+  movements: AgentWalletMovement[];
+}
+
+export const LEVEL_OPTIONS: { value: LoyaltyLevelValue; label: string }[] = [
+  { value: "member", label: "Member" },
+  { value: "plus", label: "Plus" },
+  { value: "premium", label: "Premium" },
+];
+
+export const WALLET_REASON_OPTIONS: { value: WalletMovementReason; label: string }[] = [
+  { value: "adjustment", label: "Ajuste manual" },
+  { value: "booking_commission", label: "Comisión por reserva cerrada" },
+  { value: "bonus", label: "Bono / incentivo" },
+  { value: "redemption", label: "Redención" },
+  { value: "correction", label: "Corrección" },
+];
+
+export const agentWallets = {
+  /** Super admin: listar billeteras de todos los agentes/personal */
+  async list(token: string): Promise<AgentWallet[]> {
+    const res = await fetch(`${API_BASE}/api/admin/agent-wallets/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    const data = await res.json();
+    return data.results ?? [];
+  },
+
+  /** Ver billetera de un agente específico (super_admin o el propio agente) */
+  async get(profileId: number, token: string): Promise<AgentWallet | null> {
+    const res = await fetch(`${API_BASE}/api/admin/users/${profileId}/wallet/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  },
+
+  /** Super admin: ajustar saldo y/o nivel (crea LoyaltyUserSummary si no existe) */
+  async adjust(
+    profileId: number,
+    token: string,
+    payload: { amount?: number; reason?: WalletMovementReason; note?: string; level?: LoyaltyLevelValue }
+  ): Promise<AgentWallet> {
+    const res = await fetch(`${API_BASE}/api/admin/users/${profileId}/wallet/`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail ?? `Error ${res.status}`);
+    }
+    return res.json();
+  },
+
+  /** El propio agente ve su billetera Newayzi Rewards */
+  async getOwn(token: string): Promise<AgentWallet | null> {
+    const res = await fetch(`${API_BASE}/api/agent/wallet/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  },
+};
