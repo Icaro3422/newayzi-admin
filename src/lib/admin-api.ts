@@ -1039,6 +1039,7 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
     case "agents":
     case "payments":
     case "bookings":
+      return role === "operador"; // operador ve reservas de sus propiedades
     case "analytics":
     case "reviews":
     case "coupons":
