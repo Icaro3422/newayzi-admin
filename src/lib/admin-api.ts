@@ -651,6 +651,62 @@ export const adminApi = {
   },
 };
 
+// ─────────────────────────────────────────────────────────────────────────── //
+//  Reviews (admin moderation)
+// ─────────────────────────────────────────────────────────────────────────── //
+
+export interface AdminReview {
+  id: number;
+  property_id: number;
+  property_name: string;
+  booking_id: number | null;
+  clerk_user_id: string;
+  author_name: string;
+  rating: number;
+  cleanliness: number | null;
+  comfort: number | null;
+  location: number | null;
+  value: number | null;
+  title: string;
+  body: string;
+  status: "pending" | "approved" | "rejected";
+  moderated_by: string;
+  moderation_note: string;
+  moderated_at: string | null;
+  operator_response: string;
+  operator_response_at: string | null;
+  created: string;
+}
+
+export interface ReviewsListResponse {
+  count: number;
+  page: number;
+  page_size: number;
+  num_pages: number;
+  pending_count: number;
+  results: AdminReview[];
+}
+
+export const reviewsApi = {
+  async list(params: { status?: string; search?: string; page?: number }): Promise<ReviewsListResponse> {
+    const q = new URLSearchParams();
+    if (params.status) q.set("status", params.status);
+    if (params.search) q.set("search", params.search);
+    if (params.page != null) q.set("page", String(params.page));
+    const res = await authFetch(`/api/admin/reviews/?${q}`);
+    return res as ReviewsListResponse;
+  },
+  async approve(reviewId: number, note?: string): Promise<{ ok: boolean; status: string }> {
+    return postJson(`/api/admin/reviews/${reviewId}/approve/`, { note: note || "" });
+  },
+  async reject(reviewId: number, note?: string): Promise<{ ok: boolean; status: string }> {
+    return postJson(`/api/admin/reviews/${reviewId}/reject/`, { note: note || "" });
+  },
+  async respond(reviewId: number, response: string): Promise<{ ok: boolean }> {
+    return postJson(`/api/admin/reviews/${reviewId}/respond/`, { response });
+  },
+};
+
 export interface CommunicationTemplate {
   id: string;
   name: string;

@@ -2,38 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
-
-interface AdminReview {
-  id: number;
-  property_id: number;
-  property_name: string;
-  booking_id: number | null;
-  clerk_user_id: string;
-  author_name: string;
-  rating: number;
-  cleanliness: number | null;
-  comfort: number | null;
-  location: number | null;
-  value: number | null;
-  title: string;
-  body: string;
-  status: "pending" | "approved" | "rejected";
-  moderated_by: string;
-  moderation_note: string;
-  moderated_at: string | null;
-  operator_response: string;
-  operator_response_at: string | null;
-  created: string;
-}
-
-interface ReviewsListResponse {
-  count: number;
-  page: number;
-  page_size: number;
-  num_pages: number;
-  pending_count: number;
-  results: AdminReview[];
-}
+import { reviewsApi, type AdminReview } from "@/lib/admin-api";
 
 const STATUS_BADGE: Record<string, string> = {
   pending:  "bg-amber-500/15 text-amber-400 border-amber-500/20",
@@ -94,41 +63,6 @@ export function ReviewsList() {
     error: string | null;
   } | null>(null);
 
-  function getApiBase(): string {
-    const env = process.env.NEXT_PUBLIC_API_URL?.trim();
-    if (env) return env.replace(/\/$/, "");
-    if (typeof window !== "undefined") {
-      const h = window.location.hostname;
-      if (h === "portal.newayzi.com") return "https://api.newayzi.com";
-      if (h === "portal.staging.newayzi.com") return "https://api.staging.newayzi.com";
-    }
-    return "http://localhost:8000";
-  }
-
-  async function authFetch(path: string, options: RequestInit = {}) {
-    const base = getApiBase();
-    const url = `${base}${path}`;
-    let token: string | null = null;
-    try {
-      const { Clerk } = window as any;
-      if (Clerk?.session?.getToken) {
-        token = await Clerk.session.getToken({ template: "newayzi-backend" });
-      }
-    } catch {}
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(options.headers as Record<string, string>),
-    };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(url, { ...options, headers, credentials: "include" });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`API ${res.status}: ${text}`);
-    }
-    return res.json();
-  }
-
   const [debouncedSearch, setDebouncedSearch] = useState(search);
 
   useEffect(() => {
@@ -140,11 +74,11 @@ export function ReviewsList() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams();
-      if (statusFilter) params.set("status", statusFilter);
-      if (debouncedSearch) params.set("search", debouncedSearch);
-      params.set("page", String(p));
-      const data: ReviewsListResponse = await authFetch(`/api/admin/reviews/?${params}`);
+      const data = await reviewsApi.list({
+        status: statusFilter || undefined,
+        search: debouncedSearch || undefined,
+        page: p,
+      });
       setReviews(data.results);
       setTotal(data.count);
       setTotalPages(data.num_pages);
@@ -163,12 +97,11 @@ export function ReviewsList() {
     if (!moderateModal) return;
     setModerateModal((prev) => prev ? { ...prev, loading: true, error: null } : null);
     try {
-      const endpoint = moderateModal.action === "approve" ? "approve" : "reject";
-      await authFetch(`/api/admin/reviews/${moderateModal.review.id}/${endpoint}/`, {
-        method: "POST",
-        body: JSON.stringify({ note: moderateModal.note }),
-      });
-      // Mostrar estado de éxito brevemente antes de cerrar
+      if (moderateModal.action === "approve") {
+        await reviewsApi.approve(moderateModal.review.id, moderateModal.note);
+      } else {
+        await reviewsApi.reject(moderateModal.review.id, moderateModal.note);
+      }
       setModerateModal((prev) => prev ? { ...prev, loading: false, done: true } : null);
       await loadReviews(page);
       setTimeout(() => setModerateModal(null), 1500);
@@ -181,10 +114,7 @@ export function ReviewsList() {
     if (!responseModal) return;
     setResponseModal((prev) => prev ? { ...prev, loading: true, error: null } : null);
     try {
-      await authFetch(`/api/admin/reviews/${responseModal.review.id}/respond/`, {
-        method: "POST",
-        body: JSON.stringify({ response: responseModal.text }),
-      });
+      await reviewsApi.respond(responseModal.review.id, responseModal.text);
       setResponseModal(null);
       await loadReviews(page);
     } catch (e: any) {
