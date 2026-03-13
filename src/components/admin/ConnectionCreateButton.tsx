@@ -13,6 +13,7 @@ import {
   SelectItem,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
+import { addToast } from "@heroui/react";
 import { adminApi, type PMSConnectionType, type Operator } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 
@@ -32,6 +33,32 @@ const PMS_DESCRIPTIONS: Record<string, string> = {
   generic: "Cualquier PMS vía API genérica (Booking, OTAs propias, etc.)",
 };
 
+/** Campos de credenciales requeridos por cada tipo de PMS */
+const PMS_CONFIG_FIELDS: Record<
+  string,
+  { key: string; label: string; type?: string; required?: boolean; placeholder?: string; description?: string }[]
+> = {
+  kunas: [
+    { key: "token", label: "Token OTASync", required: true, placeholder: "Tu token de OTASync" },
+    { key: "key", label: "Key OTASync", required: true, placeholder: "Tu key de OTASync", type: "password" },
+    { key: "id_properties", label: "ID de propiedades", required: true, placeholder: "Ej: 12345", description: "ID de la propiedad en Kunas/OTASync" },
+  ],
+  cloudbeds: [
+    { key: "api_key", label: "API Key / Access Token", required: true, placeholder: "Token de CloudBeds", type: "password", description: "Obtén tu token en CloudBeds API" },
+    { key: "property_id", label: "Property ID (opcional)", required: false, placeholder: "ID del hotel en CloudBeds" },
+  ],
+  stays: [
+    { key: "base_url", label: "URL de la API", required: true, placeholder: "https://partner.stays.net", type: "url", description: "URL base del endpoint Stays" },
+    { key: "username", label: "Usuario", required: true, placeholder: "Email o usuario API" },
+    { key: "password", label: "Contraseña", required: true, placeholder: "Contraseña API", type: "password" },
+  ],
+  generic: [
+    { key: "base_url", label: "URL de la API", required: true, placeholder: "https://api.ejemplo.com", type: "url" },
+    { key: "username", label: "Usuario", required: true, placeholder: "Usuario o API key" },
+    { key: "password", label: "Contraseña", required: true, placeholder: "Contraseña o API secret", type: "password" },
+  ],
+};
+
 export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }) {
   const { canAccess, role } = useAdmin();
   const isOperador = role === "operador";
@@ -43,9 +70,7 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
   const [name, setName] = useState("");
   const [pmsType, setPmsType] = useState("");
   const [operatorId, setOperatorId] = useState<string>("");
-  const [baseUrl, setBaseUrl] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [configValues, setConfigValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [connectionTypes, setConnectionTypes] = useState<PMSConnectionType[]>([]);
   const [operators, setOperators] = useState<Operator[]>([]);
@@ -59,56 +84,75 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
     }
   }, [open, isOperador]);
 
-  const isGeneric = pmsType === "generic";
   const selectedType = connectionTypes.find((t) => t.code === pmsType);
 
   function resetForm() {
     setName("");
     setPmsType("");
     setOperatorId("");
-    setBaseUrl("");
-    setUsername("");
-    setPassword("");
+    setConfigValues({});
     setStep(1);
   }
+
+  const fields = PMS_CONFIG_FIELDS[pmsType] ?? [];
+  const allRequiredFilled = fields
+    .filter((f) => f.required)
+    .every((f) => (configValues[f.key] ?? "").trim());
 
   if (!canAccess("connections")) return null;
 
   async function handleCreate() {
     if (!pmsType.trim()) return;
-    if (isGeneric && (!baseUrl.trim() || !username.trim() || !password)) return;
+    if (!allRequiredFilled) return;
 
     setSaving(true);
     try {
-      const payload: {
-        name?: string;
-        pms_type: string;
-        operator_id?: number;
-        config?: { base_url: string; username: string; password: string };
-      } = {
+      const config: Record<string, string> = {};
+      for (const f of fields) {
+        const v = (configValues[f.key] ?? "").trim();
+        if (v) config[f.key] = v;
+      }
+      // CloudBeds acepta api_key o access_token
+      if (pmsType === "cloudbeds" && config.api_key) {
+        config.access_token = config.api_key;
+      }
+
+      const payload = {
         name: name.trim() || undefined,
         pms_type: pmsType.trim(),
         operator_id: operatorId && operatorId !== "none" ? parseInt(operatorId, 10) : undefined,
+        config: Object.keys(config).length ? config : undefined,
       };
-      if (isGeneric) {
-        payload.config = {
-          base_url: baseUrl.trim(),
-          username: username.trim(),
-          password,
-        };
-      }
       await adminApi.createConnection(payload);
       setOpen(false);
       resetForm();
       onCreated?.();
+      addToast({
+        title: "Conexión creada",
+        description: "La conexión PMS se creó correctamente.",
+        color: "success",
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error al crear la conexión.";
+      let detail = msg.replace(/^API \d+:\s*/, "");
+      try {
+        const parsed = JSON.parse(detail);
+        if (typeof parsed?.detail === "string") detail = parsed.detail;
+      } catch {
+        const m = detail.match(/"detail"\s*:\s*"([^"]+)"/);
+        if (m) detail = m[1];
+      }
+      addToast({
+        title: "Error al crear conexión",
+        description: detail || "Revisa los campos e intenta de nuevo.",
+        color: "danger",
+      });
     } finally {
       setSaving(false);
     }
   }
 
-  const canSubmit =
-    pmsType.trim() &&
-    (!isGeneric || (baseUrl.trim() && username.trim() && password));
+  const canSubmit = pmsType.trim() && allRequiredFilled;
 
   const modalClassNames = {
     base: "admin-modal-dark !bg-[#0f1220] rounded-[28px] border border-white/[0.12] backdrop-blur-xl shadow-2xl shadow-black/50 max-h-[90vh] overflow-hidden flex flex-col",
@@ -217,7 +261,7 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
                     isRequired
                     items={connectionTypes}
                     description={
-                      isGeneric
+                      pmsType === "generic"
                         ? "API genérica: integra cualquier PMS con URL, usuario y contraseña (Booking, OTAs, etc.)"
                         : undefined
                     }
@@ -235,60 +279,37 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
                   </Select>
                 )}
 
-                {/* Credenciales para API genérica */}
-                {isGeneric && (
+                {/* Credenciales según tipo de PMS */}
+                {fields.length > 0 && (
                   <div className="rounded-xl border border-white/[0.1] bg-white/[0.05] p-4 space-y-4">
-                    <p className="text-sm font-medium text-white/80">Credenciales de la API</p>
-                    <Input
-                      label="URL de la API"
-                      placeholder="https://api.ejemplo.com"
-                      value={baseUrl}
-                      onValueChange={setBaseUrl}
-                      isRequired
-                      type="url"
-                      description="URL base del endpoint de la API (ej: https://api.booking.com/v1)"
-                      classNames={{
-                        inputWrapper: inputDark,
-                        input: "!text-white/95 placeholder:!text-white/38",
-                        label: "!text-white/70",
-                        description: "!text-white/50",
-                      }}
-                    />
-                    <Input
-                      label="Usuario"
-                      placeholder="Usuario o API key"
-                      value={username}
-                      onValueChange={setUsername}
-                      isRequired
-                      autoComplete="username"
-                      classNames={{
-                        inputWrapper: inputDark,
-                        input: "!text-white/95 placeholder:!text-white/38",
-                        label: "!text-white/70",
-                      }}
-                    />
-                    <Input
-                      label="Contraseña"
-                      placeholder="Contraseña o API secret"
-                      value={password}
-                      onValueChange={setPassword}
-                      isRequired
-                      type="password"
-                      autoComplete="new-password"
-                      description="Se almacena de forma segura. No se mostrará después de guardar."
-                      classNames={{
-                        inputWrapper: inputDark,
-                        input: "!text-white/95 placeholder:!text-white/38",
-                        label: "!text-white/70",
-                        description: "!text-white/50",
-                      }}
-                    />
+                    <p className="text-sm font-medium text-white/80">
+                      Credenciales {selectedType ? `para ${selectedType.label}` : "de la API"}
+                    </p>
+                    {fields.map((f) => (
+                      <Input
+                        key={f.key}
+                        label={f.label}
+                        placeholder={f.placeholder}
+                        value={configValues[f.key] ?? ""}
+                        onValueChange={(v) => setConfigValues((prev) => ({ ...prev, [f.key]: v }))}
+                        isRequired={f.required}
+                        type={f.type ?? "text"}
+                        description={f.description}
+                        autoComplete={f.key === "password" ? "new-password" : f.key === "username" ? "username" : "off"}
+                        classNames={{
+                          inputWrapper: inputDark,
+                          input: "!text-white/95 placeholder:!text-white/38",
+                          label: "!text-white/70",
+                          description: "!text-white/50",
+                        }}
+                      />
+                    ))}
                   </div>
                 )}
 
                 <Input
                   label="Nombre (opcional)"
-                  placeholder={isGeneric ? "Ej: Booking.com - Hotel Central" : "Ej: Mi conexión Kunas"}
+                  placeholder={selectedType ? `Ej: Mi conexión ${selectedType.label}` : "Ej: Mi conexión"}
                   value={name}
                   onValueChange={setName}
                   classNames={{

@@ -74,19 +74,6 @@ function LoyaltyBadge({ level }: { level: string }) {
   );
 }
 
-function InfoField({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-white/[0.05] border border-white/[0.08] px-4 py-3.5">
-      <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.12em] font-semibold mb-1">
-        {label}
-      </p>
-      <p className="font-sora font-semibold text-white text-[0.9375rem] leading-tight">
-        {value}
-      </p>
-    </div>
-  );
-}
-
 function useOperatorRewards(operatorId: number | null) {
   const [data, setData] = useState<OperatorRewardsData | null>(null);
   const load = useCallback(async () => {
@@ -117,12 +104,6 @@ export function AdminProfileClient() {
 
   const { profile, operator_name, loyalty, operator_id } = me;
   const isOperator = (role?.toLowerCase?.() ?? "") === "operador";
-  // Preferir datos de Clerk (actualizados al editar) sobre me del backend
-  const displayName =
-    (user ? [user.firstName, user.lastName].filter(Boolean).join(" ").trim() : null) ||
-    profile.full_name ||
-    `${profile.first_name} ${profile.last_name}`.trim() ||
-    profile.email;
   const operatorRewards = useOperatorRewards(isOperator ? (operator_id ?? null) : null);
 
   // Sincronizar nombre desde Clerk o me
@@ -238,191 +219,158 @@ export function AdminProfileClient() {
 
   return (
     <div className="space-y-4 lg:space-y-5">
-      {/* ── Editar mi perfil (foto + nombre) ── */}
+      {/* ── Tarjeta única: Perfil editable + datos de cuenta ── */}
       <GlassCard>
-        <div className="flex items-start justify-between gap-4 mb-5">
-          <div>
-            <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Mi cuenta</p>
-            <p className="font-sora font-bold text-white text-base leading-tight mt-1">
-              Editar foto y datos personales
-            </p>
-          </div>
-          <Link
-            href="/admin/account"
-            className="text-[0.75rem] font-semibold text-[#9b74ff] hover:text-[#b89eff] transition-colors flex items-center gap-1.5"
-          >
-            <Icon icon="solar:settings-bold-duotone" width={16} />
-            Correo, contraseña y seguridad
-          </Link>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-6">
-          {/* Avatar con upload */}
-          <div className="flex flex-col items-center gap-2 shrink-0">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              className="hidden"
-              onChange={handleImageChange}
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading || !user}
-              className="relative group rounded-2xl overflow-hidden border border-white/[0.12] focus:outline-none focus:ring-2 focus:ring-[#9b74ff]/50 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {imageUrl ? (
-                <div className="h-24 w-24 shrink-0">
-                  <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+        <div className="flex flex-col lg:flex-row lg:items-start gap-6 lg:gap-8">
+          {/* Columna izquierda: avatar + edición */}
+          <div className="flex flex-col sm:flex-row sm:items-start gap-6 shrink-0">
+            <div className="flex flex-col items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={handleImageChange}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading || !user}
+                className="relative group rounded-2xl overflow-hidden border border-white/[0.12] focus:outline-none focus:ring-2 focus:ring-[#9b74ff]/50 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {imageUrl ? (
+                  <div className="h-20 w-20 sm:h-24 sm:w-24 shrink-0">
+                    <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="flex h-20 w-20 sm:h-24 sm:w-24 shrink-0 items-center justify-center rounded-2xl bg-[#5e2cec]/25 border border-[#5e2cec]/30">
+                    <Icon icon="solar:user-id-bold-duotone" className="text-[#9b74ff]" width={36} />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  {uploading ? (
+                    <Icon icon="solar:spinner-bold-duotone" className="text-white text-xl animate-spin" />
+                  ) : (
+                    <Icon icon="solar:camera-bold-duotone" className="text-white text-xl" />
+                  )}
                 </div>
-              ) : (
-                <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-[#5e2cec]/25 border border-[#5e2cec]/30">
-                  <Icon icon="solar:user-id-bold-duotone" className="text-[#9b74ff]" width={40} />
+              </button>
+              <span className="text-[0.65rem] text-white/40">Clic para cambiar</span>
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <h2 className="font-sora text-xl sm:text-2xl font-black text-white leading-tight mb-3">
+                Mi perfil
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <Input
+                  label="Nombre"
+                  value={firstName}
+                  onValueChange={setFirstName}
+                  placeholder="Tu nombre"
+                  size="sm"
+                  classNames={{
+                    inputWrapper: inputDark,
+                    input: "!text-white/95 placeholder:!text-white/38",
+                    label: "!text-white/60",
+                  }}
+                />
+                <Input
+                  label="Apellido"
+                  value={lastName}
+                  onValueChange={setLastName}
+                  placeholder="Tu apellido"
+                  size="sm"
+                  classNames={{
+                    inputWrapper: inputDark,
+                    input: "!text-white/95 placeholder:!text-white/38",
+                    label: "!text-white/60",
+                  }}
+                />
+              </div>
+              {!clerkLoaded && (
+                <p className="text-white/50 text-xs flex items-center gap-2 mb-3">
+                  <Icon icon="solar:loading-line-duotone" className="animate-spin" />
+                  Cargando sesión…
+                </p>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  className="btn-newayzi-primary"
+                  onPress={handleSaveProfile}
+                  isLoading={saving}
+                  isDisabled={!firstName.trim() || !user}
+                  startContent={!saving && <Icon icon="solar:check-circle-bold-duotone" width={16} />}
+                >
+                  {success ? "Guardado" : "Guardar"}
+                </Button>
+                {success && (
+                  <span className="text-emerald-400 text-[0.75rem] font-medium flex items-center gap-1">
+                    <Icon icon="solar:check-circle-bold-duotone" width={14} />
+                    Guardado
+                  </span>
+                )}
+                <Link
+                  href="/admin/account"
+                  className="text-[0.75rem] font-medium text-[#9b74ff] hover:text-[#b89eff] transition-colors flex items-center gap-1.5 ml-2"
+                >
+                  <Icon icon="solar:settings-bold-duotone" width={14} />
+                  Correo y contraseña
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Columna derecha: datos de cuenta (compactos) */}
+          <div className="lg:border-l lg:border-white/[0.08] lg:pl-8 lg:min-w-[200px]">
+            <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.12em] font-semibold mb-3">Datos de cuenta</p>
+            <dl className="space-y-2.5 text-sm">
+              <div>
+                <dt className="text-white/45 text-[0.7rem] uppercase tracking-wide">Correo</dt>
+                <dd className="text-white/90 font-medium mt-0.5">{profile.email}</dd>
+              </div>
+              <div>
+                <dt className="text-white/45 text-[0.7rem] uppercase tracking-wide">Rol</dt>
+                <dd className="flex items-center gap-2 mt-0.5">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#5e2cec]/20 border border-[#5e2cec]/30">
+                    <span className="w-1 h-1 rounded-full bg-[#9b74ff]" />
+                    <span className="text-[#b89eff] text-[0.7rem] font-semibold uppercase">
+                      {ROLE_LABELS[role ?? "super_admin"]}
+                    </span>
+                  </span>
+                  {!isOperator && loyalty && <LoyaltyBadge level={loyalty.level} />}
+                </dd>
+              </div>
+              {isOperator && operator_name && (
+                <div>
+                  <dt className="text-white/45 text-[0.7rem] uppercase tracking-wide">Operador</dt>
+                  <dd className="text-white/80 font-medium mt-0.5">{operator_name}</dd>
                 </div>
               )}
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                {uploading ? (
-                  <Icon icon="solar:spinner-bold-duotone" className="text-white text-2xl animate-spin" />
-                ) : (
-                  <Icon icon="solar:camera-bold-duotone" className="text-white text-2xl" />
-                )}
-              </div>
-            </button>
-            <span className="text-[0.65rem] text-white/40">Clic para cambiar</span>
-          </div>
-
-          {/* Nombre editable */}
-          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Nombre"
-              value={firstName}
-              onValueChange={setFirstName}
-              placeholder="Tu nombre"
-              classNames={{
-                inputWrapper: inputDark,
-                input: "!text-white/95 placeholder:!text-white/38",
-                label: "!text-white/70",
-              }}
-            />
-            <Input
-              label="Apellido"
-              value={lastName}
-              onValueChange={setLastName}
-              placeholder="Tu apellido"
-              classNames={{
-                inputWrapper: inputDark,
-                input: "!text-white/95 placeholder:!text-white/38",
-                label: "!text-white/70",
-              }}
-            />
-          </div>
-        </div>
-
-        {!clerkLoaded && (
-          <p className="text-white/50 text-sm mt-2 flex items-center gap-2">
-            <Icon icon="solar:loading-line-duotone" className="animate-spin text-base" />
-            Cargando datos de sesión…
-          </p>
-        )}
-        <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-white/[0.08]">
-          <Button
-            size="sm"
-            className="btn-newayzi-primary"
-            onPress={handleSaveProfile}
-            isLoading={saving}
-            isDisabled={!firstName.trim() || !user}
-            startContent={!saving && <Icon icon="solar:check-circle-bold-duotone" width={18} />}
-          >
-            {success ? "Guardado" : "Guardar cambios"}
-          </Button>
-          {success && (
-            <span className="text-emerald-400 text-[0.75rem] font-medium flex items-center gap-1">
-              <Icon icon="solar:check-circle-bold-duotone" width={14} />
-              Cambios guardados
-            </span>
-          )}
-        </div>
-      </GlassCard>
-
-      {/* ── Header island (avatar + nombre + rol) ── */}
-      <GlassCard className="flex flex-col sm:flex-row sm:items-center gap-6 py-6">
-        <div className="flex items-center gap-5">
-          {imageUrl ? (
-            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-white/[0.12]">
-              <img src={imageUrl} alt={displayName} className="h-full w-full object-cover" />
-            </div>
-          ) : (
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-[#5e2cec]/25 border border-[#5e2cec]/30">
-              <Icon icon="solar:user-id-bold-duotone" className="text-[#9b74ff]" width={40} />
-            </div>
-          )}
-          <div className="min-w-0">
-            <h2 className="font-sora text-2xl font-black text-white leading-tight tracking-tight">
-              {displayName}
-            </h2>
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#5e2cec]/20 border border-[#5e2cec]/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#9b74ff]" />
-                <span className="text-[#b89eff] text-[0.65rem] font-semibold uppercase tracking-wider">
-                  {ROLE_LABELS[role ?? "super_admin"]}
-                </span>
-              </span>
-              {/* Nivel de loyalty solo para no-operadores (agente/comercial/visualizador) */}
-              {!isOperator && loyalty && <LoyaltyBadge level={loyalty.level} />}
-            </div>
-            <p className="mt-2 text-sm text-white/50">{profile.email}</p>
-            {profile.phone && (
-              <p className="text-sm text-white/50">{profile.phone}</p>
-            )}
-            {isOperator && operator_name && (
-              <p className="mt-2 text-[0.8125rem] text-white/60">
-                Operador: <span className="font-medium text-white/80">{operator_name}</span>
-              </p>
-            )}
-            {role === "agente" && (
-              <p className="mt-2 text-[0.8125rem] text-white/50">
-                Cuenta de agencia. Acceso a dashboard y disponibilidad.
-              </p>
-            )}
-          </div>
-        </div>
-      </GlassCard>
-
-      {/* ── Información personal ── */}
-      <GlassCard>
-        <div className="flex items-start justify-between gap-4 mb-5 min-w-0">
-          <div>
-            <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Información personal</p>
-            <p className="font-sora font-bold text-white text-base leading-tight mt-1">
-              Datos de tu cuenta
-            </p>
-          </div>
-          <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
-            <Icon icon="solar:user-circle-bold-duotone" className="text-[#9b74ff] text-base" />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {[
-            { label: "Nombre completo", value: displayName },
-            { label: "Correo", value: profile.email },
-            ...(profile.phone ? [{ label: "Teléfono", value: profile.phone }] : []),
-            { label: "Rol en el admin", value: ROLE_LABELS[role ?? "super_admin"] },
-            ...(profile.created
-              ? [
-                  {
-                    label: "Miembro desde",
-                    value: new Date(profile.created).toLocaleDateString("es", {
+              {profile.phone && (
+                <div>
+                  <dt className="text-white/45 text-[0.7rem] uppercase tracking-wide">Teléfono</dt>
+                  <dd className="text-white/90 font-medium mt-0.5">{profile.phone}</dd>
+                </div>
+              )}
+              {profile.created && (
+                <div>
+                  <dt className="text-white/45 text-[0.7rem] uppercase tracking-wide">Miembro desde</dt>
+                  <dd className="text-white/80 mt-0.5">
+                    {new Date(profile.created).toLocaleDateString("es", {
                       year: "numeric",
                       month: "long",
                       day: "numeric",
-                    }),
-                  },
-                ]
-              : []),
-          ].map((item) => (
-            <InfoField key={item.label} label={item.label} value={item.value} />
-          ))}
+                    })}
+                  </dd>
+                </div>
+              )}
+              {role === "agente" && (
+                <p className="text-white/50 text-xs italic mt-1">Cuenta de agencia. Acceso a dashboard y disponibilidad.</p>
+              )}
+            </dl>
+          </div>
         </div>
       </GlassCard>
 

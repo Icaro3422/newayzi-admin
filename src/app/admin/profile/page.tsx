@@ -6,7 +6,7 @@ export default function AdminProfilePage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Mi perfil"
-        subtitle="Edita tu foto y datos personales. Para correo, contraseña y seguridad, usa Mi cuenta."
+        subtitle="Edita tu foto, nombre y datos. Para correo y contraseña, usa el enlace de la tarjeta."
       />
       <AdminProfileClient />
     </div>
