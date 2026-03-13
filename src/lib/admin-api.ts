@@ -311,9 +311,21 @@ async function authFetch(path: string, options: RequestInit = {}) {
     headers,
     credentials: "include",
   });
-  if (!res.ok && res.status !== 404) {
-    const text = await res.text();
-    throw new Error(`API ${res.status}: ${text || res.statusText}`);
+  if (!res.ok) {
+    if (res.status === 401) {
+      // Sesión expirada: redirigir al login
+      if (typeof window !== "undefined") {
+        window.location.href = "/sign-in?reason=session_expired";
+      }
+      throw new Error("Sesión expirada. Redirigiendo al inicio de sesión...");
+    }
+    if (res.status === 403) {
+      throw new Error("No tienes permisos para realizar esta acción.");
+    }
+    if (res.status !== 404) {
+      const text = await res.text();
+      throw new Error(`API ${res.status}: ${text || res.statusText}`);
+    }
   }
   return res;
 }
@@ -706,6 +718,127 @@ export const rewardsAgreementsApi = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Bookings Admin
+// ---------------------------------------------------------------------------
+
+export interface AdminBookingTransaction {
+  id: number;
+  gateway: string;
+  amount: string;
+  currency: string;
+  status: string;
+  external_reference: string;
+  created: string;
+}
+
+export interface AdminBookingListItem {
+  id: number;
+  reference: string;
+  clerk_user_id: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  property_id: number;
+  property_name: string;
+  room_type_id: number;
+  room_type_name: string;
+  operator_name: string;
+  check_in: string;
+  check_out: string;
+  nights: number;
+  guests_count: number;
+  status: string;
+  currency: string;
+  total_amount: string;
+  payment_status: string;
+  payment_gateway: string;
+  payment_reference: string;
+  notes: string;
+  metadata: Record<string, unknown>;
+  coupon_code: string | null;
+  coupon_discount: string | null;
+  refund_attempted: boolean;
+  refund_success: boolean;
+  refund_requires_manual: boolean;
+  refund_gateway: string | null;
+  cancellation_refund_amount: string | null;
+  cancellation_refund_type: string | null;
+  cancellation_refund_pct: number | null;
+  created: string;
+  updated: string;
+  agency_id: number | null;
+  profile_id: number | null;
+  transactions: AdminBookingTransaction[];
+}
+
+export interface AdminBookingDetail extends AdminBookingListItem {
+  guests: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+    is_primary: boolean;
+  }[];
+  profile: { id: number; clerk_user_id: string } | null;
+}
+
+export interface AdminBookingListResponse {
+  count: number;
+  page: number;
+  page_size: number;
+  num_pages: number;
+  results: AdminBookingListItem[];
+}
+
+export interface AdminBookingStats {
+  total: number;
+  confirmed: number;
+  cancelled: number;
+  pending: number;
+  this_month_count: number;
+  this_month_revenue: string;
+}
+
+export const adminBookings = {
+  async list(params?: {
+    status?: string;
+    search?: string;
+    page?: number;
+    operator_id?: number;
+    date_from?: string;
+    date_to?: string;
+  }): Promise<AdminBookingListResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set("status", params.status);
+    if (params?.search) searchParams.set("search", params.search);
+    if (params?.page) searchParams.set("page", String(params.page));
+    if (params?.operator_id) searchParams.set("operator_id", String(params.operator_id));
+    if (params?.date_from) searchParams.set("date_from", params.date_from);
+    if (params?.date_to) searchParams.set("date_to", params.date_to);
+    const qs = searchParams.toString() ? `?${searchParams.toString()}` : "";
+    const data = await getJson<AdminBookingListResponse>(`/api/admin/bookings/${qs}`);
+    return data ?? { count: 0, page: 1, page_size: 25, num_pages: 0, results: [] };
+  },
+
+  async stats(): Promise<AdminBookingStats> {
+    const data = await getJson<AdminBookingStats>(`/api/admin/bookings/stats/`);
+    return data ?? { total: 0, confirmed: 0, cancelled: 0, pending: 0, this_month_count: 0, this_month_revenue: "0" };
+  },
+
+  async get(id: number): Promise<AdminBookingDetail | null> {
+    return getJson<AdminBookingDetail>(`/api/admin/bookings/${id}/`);
+  },
+
+  async cancel(
+    id: number,
+    data: { reason?: string; has_justification?: boolean }
+  ): Promise<{ ok: boolean; refund_type: string; refund_pct: number; refund_amount: string; reason: string }> {
+    return postJson(`/api/admin/bookings/${id}/cancel/`, data);
+  },
+};
+
 /** Metadatos visuales por rol — icono, color, label y descripción */
 export const ROLE_META: Record<AdminRole, { label: string; icon: string; color: string; description: string }> = {
   super_admin:  { label: "Super Admin",  icon: "solar:shield-star-bold-duotone",     color: "#fbbf24", description: "Acceso completo a todas las funciones" },
@@ -735,6 +868,10 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
       return role === "comercial"; // comercial usa comunicaciones
     case "agents":
     case "payments":
+    case "bookings":
+    case "analytics":
+    case "reviews":
+    case "coupons":
     case "users":
     case "audit":
       return false; // solo super_admin (ya retornó arriba)

@@ -23,8 +23,12 @@ function pathnameToModule(pathname: string): string | null {
   if (pathname.startsWith("/admin/agents")) return "agents";
   if (pathname.startsWith("/admin/availability")) return "availability";
   if (pathname.startsWith("/admin/payments")) return "payments";
+  if (pathname.startsWith("/admin/bookings")) return "bookings";
   if (pathname.startsWith("/admin/users")) return "users";
   if (pathname.startsWith("/admin/communications")) return "communications";
+  if (pathname.startsWith("/admin/analytics")) return "analytics";
+  if (pathname.startsWith("/admin/reviews")) return "reviews";
+  if (pathname.startsWith("/admin/coupons")) return "coupons";
   return null;
 }
 
@@ -37,7 +41,11 @@ const NAV_ITEMS_BASE: { href: string; label: string; icon: string; module: strin
   { href: "/admin/operators",    label: "Operadores",      icon: "solar:users-group-rounded-bold-duotone",    module: "operators"     },
   { href: "/admin/agents",       label: "Agentes",         icon: "solar:bag-4-bold-duotone",                  module: "agents"        },
   { href: "/admin/availability", label: "Disponibilidad",  icon: "solar:calendar-bold-duotone",               module: "availability"  },
+  { href: "/admin/bookings",     label: "Reservas",        icon: "solar:bookmark-bold-duotone",               module: "bookings"      },
   { href: "/admin/payments",     label: "Pagos",           icon: "solar:wallet-money-bold-duotone",           module: "payments"      },
+  { href: "/admin/analytics",    label: "Analytics",       icon: "solar:chart-2-bold-duotone",                module: "analytics"     },
+  { href: "/admin/reviews",      label: "Reseñas",         icon: "solar:stars-bold-duotone",                  module: "reviews"       },
+  { href: "/admin/coupons",      label: "Cupones",         icon: "solar:tag-price-bold-duotone",              module: "coupons"       },
   { href: "/admin/users",        label: "Usuarios y roles", icon: "solar:user-id-bold-duotone",               module: "users"         },
   { href: "/admin/communications", label: "Comunicaciones", icon: "solar:letter-bold-duotone",               module: "communications"},
 ];

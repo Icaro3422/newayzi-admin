@@ -523,14 +523,18 @@ export function AdminDashboardClient() {
           </div>
           <div className="flex flex-col gap-2">
             {[
-              { href: "/admin/properties", icon: "solar:buildings-2-bold-duotone", label: role === "operador" ? "Mis propiedades" : "Propiedades", count: properties.length, show: canAccess("properties") },
-              { href: "/admin/connections", icon: "solar:link-circle-bold-duotone", label: role === "operador" ? "Mis conexiones" : "Conexiones PMS", count: connections.length, show: canAccess("connections") },
-              { href: "/admin/availability", icon: "solar:calendar-bold-duotone", label: role === "operador" ? "Mi disponibilidad" : "Disponibilidad", count: undefined, show: canAccess("availability") },
-              { href: "/admin/operators", icon: "solar:users-group-rounded-bold-duotone", label: "Operadores", count: operatorsCount, show: canAccess("operators") },
-              { href: "/admin/agents", icon: "solar:bag-4-bold-duotone", label: "Agencias", count: agencies.length, show: canAccess("agents") },
-              { href: "/admin/communications", icon: "solar:letter-bold-duotone", label: "Comunicaciones", count: undefined, show: canAccess("communications") },
-              { href: "/admin/users", icon: "solar:user-id-bold-duotone", label: "Usuarios y roles", count: undefined, show: canAccess("users") },
-              { href: "/admin/payments", icon: "solar:wallet-money-bold-duotone", label: "Pagos", count: undefined, show: canAccess("payments") },
+              { href: "/admin/bookings",      icon: "solar:bookmark-bold-duotone",           label: "Reservas",        count: undefined,          show: canAccess("bookings") },
+              { href: "/admin/reviews",       icon: "solar:stars-bold-duotone",              label: "Reseñas",         count: undefined,          show: canAccess("reviews") },
+              { href: "/admin/analytics",     icon: "solar:chart-2-bold-duotone",            label: "Analytics",       count: undefined,          show: canAccess("analytics") },
+              { href: "/admin/coupons",       icon: "solar:tag-price-bold-duotone",          label: "Cupones",         count: undefined,          show: canAccess("coupons") },
+              { href: "/admin/properties",    icon: "solar:buildings-2-bold-duotone",        label: role === "operador" ? "Mis propiedades" : "Propiedades", count: properties.length, show: canAccess("properties") },
+              { href: "/admin/connections",   icon: "solar:link-circle-bold-duotone",        label: role === "operador" ? "Mis conexiones" : "Conexiones PMS", count: connections.length, show: canAccess("connections") },
+              { href: "/admin/availability",  icon: "solar:calendar-bold-duotone",           label: role === "operador" ? "Mi disponibilidad" : "Disponibilidad", count: undefined, show: canAccess("availability") },
+              { href: "/admin/operators",     icon: "solar:users-group-rounded-bold-duotone",label: "Operadores",      count: operatorsCount,     show: canAccess("operators") },
+              { href: "/admin/agents",        icon: "solar:bag-4-bold-duotone",              label: "Agencias",        count: agencies.length,    show: canAccess("agents") },
+              { href: "/admin/communications",icon: "solar:letter-bold-duotone",             label: "Comunicaciones",  count: undefined,          show: canAccess("communications") },
+              { href: "/admin/users",         icon: "solar:user-id-bold-duotone",            label: "Usuarios y roles",count: undefined,          show: canAccess("users") },
+              { href: "/admin/payments",      icon: "solar:wallet-money-bold-duotone",       label: "Pagos",           count: undefined,          show: canAccess("payments") },
             ]
               .filter((l) => l.show)
               .map((l) => (
