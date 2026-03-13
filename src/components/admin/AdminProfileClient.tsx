@@ -104,7 +104,7 @@ function useOperatorRewards(operatorId: number | null) {
 
 export function AdminProfileClient() {
   const { me, role, refetchMe } = useAdmin();
-  const { user } = useUser();
+  const { user, isLoaded: clerkLoaded } = useUser();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [firstName, setFirstName] = useState("");
@@ -116,13 +116,14 @@ export function AdminProfileClient() {
   if (!me) return null;
 
   const { profile, operator_name, loyalty, operator_id } = me;
+  const isOperator = (role?.toLowerCase?.() ?? "") === "operador";
   // Preferir datos de Clerk (actualizados al editar) sobre me del backend
   const displayName =
     (user ? [user.firstName, user.lastName].filter(Boolean).join(" ").trim() : null) ||
     profile.full_name ||
     `${profile.first_name} ${profile.last_name}`.trim() ||
     profile.email;
-  const operatorRewards = useOperatorRewards(role === "operador" ? (operator_id ?? null) : null);
+  const operatorRewards = useOperatorRewards(isOperator ? (operator_id ?? null) : null);
 
   // Sincronizar nombre desde Clerk o me
   useEffect(() => {
@@ -133,7 +134,14 @@ export function AdminProfileClient() {
   }, [user?.firstName, user?.lastName, profile.first_name, profile.last_name]);
 
   const handleSaveProfile = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      addToast({
+        title: "Sesión en carga",
+        description: "Espera un momento e intenta de nuevo. Si el problema persiste, cierra sesión y vuelve a entrar.",
+        color: "warning",
+      });
+      return;
+    }
     const fn = firstName.trim();
     const ln = lastName.trim();
     if (!fn) {
@@ -173,7 +181,16 @@ export function AdminProfileClient() {
   const handleImageChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (!file || !user) return;
+      if (!file || !user) {
+        if (!user) {
+          addToast({
+            title: "Sesión en carga",
+            description: "Espera un momento e intenta de nuevo.",
+            color: "warning",
+          });
+        }
+        return;
+      }
 
       if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
         addToast({
@@ -252,8 +269,8 @@ export function AdminProfileClient() {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="relative group rounded-2xl overflow-hidden border border-white/[0.12] focus:outline-none focus:ring-2 focus:ring-[#9b74ff]/50"
+              disabled={uploading || !user}
+              className="relative group rounded-2xl overflow-hidden border border-white/[0.12] focus:outline-none focus:ring-2 focus:ring-[#9b74ff]/50 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {imageUrl ? (
                 <div className="h-24 w-24 shrink-0">
@@ -302,13 +319,19 @@ export function AdminProfileClient() {
           </div>
         </div>
 
+        {!clerkLoaded && (
+          <p className="text-white/50 text-sm mt-2 flex items-center gap-2">
+            <Icon icon="solar:loading-line-duotone" className="animate-spin text-base" />
+            Cargando datos de sesión…
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-white/[0.08]">
           <Button
             size="sm"
             className="btn-newayzi-primary"
             onPress={handleSaveProfile}
             isLoading={saving}
-            isDisabled={!firstName.trim()}
+            isDisabled={!firstName.trim() || !user}
             startContent={!saving && <Icon icon="solar:check-circle-bold-duotone" width={18} />}
           >
             {success ? "Guardado" : "Guardar cambios"}
@@ -346,13 +369,13 @@ export function AdminProfileClient() {
                 </span>
               </span>
               {/* Nivel de loyalty solo para no-operadores (agente/comercial/visualizador) */}
-              {role !== "operador" && loyalty && <LoyaltyBadge level={loyalty.level} />}
+              {!isOperator && loyalty && <LoyaltyBadge level={loyalty.level} />}
             </div>
             <p className="mt-2 text-sm text-white/50">{profile.email}</p>
             {profile.phone && (
               <p className="text-sm text-white/50">{profile.phone}</p>
             )}
-            {role === "operador" && operator_name && (
+            {isOperator && operator_name && (
               <p className="mt-2 text-[0.8125rem] text-white/60">
                 Operador: <span className="font-medium text-white/80">{operator_name}</span>
               </p>
@@ -404,7 +427,7 @@ export function AdminProfileClient() {
       </GlassCard>
 
       {/* ── OPERADOR: Programa de Socios (rewards de operadores, no de huéspedes) ── */}
-      {role === "operador" && (
+      {isOperator && (
         <AccentCard>
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
@@ -500,8 +523,8 @@ export function AdminProfileClient() {
         </AccentCard>
       )}
 
-      {/* ── No-operadores: Newayzi Rewards (programa de huéspedes) ── */}
-      {role !== "super_admin" && role !== "operador" && (loyalty ? (
+      {/* ── No-operadores: Newayzi Rewards (programa de huéspedes) — nunca para operadores ── */}
+      {!isOperator && role !== "super_admin" && (loyalty ? (
         <AccentCard>
           <div className="flex items-start justify-between gap-4 mb-5 min-w-0">
             <div>
