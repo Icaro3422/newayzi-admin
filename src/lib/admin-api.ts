@@ -510,6 +510,8 @@ export const adminApi = {
     name: string;
     contact_email: string;
     contact_phone?: string;
+    initial_level?: string;
+    initial_points?: number;
   }): Promise<Agency & { email_sent?: boolean }> {
     return postJson<Agency>("/api/admin/agencies/", data);
   },
@@ -520,6 +522,17 @@ export const adminApi = {
 
   async getAgencyLevels(): Promise<AgencyLevelConfig[] | null> {
     return getJson<AgencyLevelConfig[]>("/api/admin/agencies/levels/");
+  },
+
+  async getAgencyWallet(agencyId: number): Promise<AgentWallet | null> {
+    return getJson<AgentWallet>(`/api/admin/agencies/${agencyId}/wallet/`);
+  },
+
+  async adjustAgencyWallet(
+    agencyId: number,
+    payload: { amount?: number; reason?: WalletMovementReason; note?: string; level?: LoyaltyLevelValue }
+  ): Promise<AgentWallet> {
+    return postJson<AgentWallet>(`/api/admin/agencies/${agencyId}/wallet/`, payload);
   },
 
   async getAvailability(params?: {
