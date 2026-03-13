@@ -3,12 +3,11 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { Icon } from "@iconify/react";
 import { useUser } from "@clerk/nextjs";
-import Link from "next/link";
 import { Input, Button, addToast } from "@heroui/react";
 import { useAdmin } from "@/contexts/AdminContext";
 import { rewardsAgreementsApi } from "@/lib/admin-api";
 import { resolveClerkError } from "@/lib/clerk-errors";
-import type { AdminRole, AdminLoyalty, OperatorRewardsData } from "@/lib/admin-api";
+import type { AdminRole, OperatorRewardsData } from "@/lib/admin-api";
 
 const inputDark = "rounded-xl border border-white/[0.12] bg-white/[0.04]";
 const MAX_IMAGE_SIZE_MB = 10;
@@ -94,11 +93,35 @@ export function AdminProfileClient() {
   const { user, isLoaded: clerkLoaded } = useUser();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Nombre ──────────────────────────────────────────────
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  // ── Correo ───────────────────────────────────────────────
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [emailStep, setEmailStep] = useState<"idle" | "pending_code" | "done">("idle");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [emailObj, setEmailObj] = useState<any>(null);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [codeError, setCodeError] = useState("");
+
+  // ── Contraseña ───────────────────────────────────────────
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   if (!me) return null;
 
@@ -217,6 +240,134 @@ export function AdminProfileClient() {
 
   const imageUrl = user?.imageUrl ?? profile.image_url ?? null;
 
+  // ── Handler: cambio de correo ────────────────────────────
+  const handleEmailSend = useCallback(async () => {
+    if (!user) return;
+    const email = newEmail.trim().toLowerCase();
+    if (!email) { setEmailError("Ingresa un correo electrónico."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailError("El formato del correo no es válido."); return; }
+    if (email === (user.primaryEmailAddress?.emailAddress ?? "").toLowerCase()) {
+      setEmailError("Ya es tu correo principal. Ingresa uno diferente.");
+      return;
+    }
+    setEmailError("");
+    setEmailSaving(true);
+    try {
+      const obj = await user.createEmailAddress({ email });
+      await obj.prepareVerification({ strategy: "email_code" });
+      setEmailObj(obj);
+      setEmailStep("pending_code");
+      addToast({ title: "Código enviado", description: `Revisa ${email} e ingresa el código de verificación.`, color: "success" });
+    } catch (e) {
+      setEmailError(resolveClerkError(e));
+    } finally {
+      setEmailSaving(false);
+    }
+  }, [user, newEmail]);
+
+  const handleEmailVerify = useCallback(async () => {
+    if (!user || !emailObj) return;
+    const code = verificationCode.trim();
+    if (!code) { setCodeError("Ingresa el código de verificación."); return; }
+    if (!/^\d{6}$/.test(code)) { setCodeError("El código debe ser de 6 dígitos."); return; }
+    setCodeError("");
+    setEmailSaving(true);
+    try {
+      const verified = await emailObj.attemptVerification({ code });
+      // Promover como correo principal
+      await user.update({ primaryEmailAddressId: verified.id });
+      await refetchMe();
+      setEmailStep("done");
+      addToast({ title: "Correo actualizado", description: "Tu nuevo correo es ahora el principal.", color: "success" });
+      setTimeout(() => {
+        setEmailOpen(false);
+        setEmailStep("idle");
+        setNewEmail("");
+        setVerificationCode("");
+        setEmailObj(null);
+      }, 2000);
+    } catch (e) {
+      setCodeError(resolveClerkError(e));
+    } finally {
+      setEmailSaving(false);
+    }
+  }, [user, emailObj, verificationCode, refetchMe]);
+
+  const handleEmailCancel = useCallback(async () => {
+    // Limpiar el email no verificado si existe
+    if (emailObj) {
+      try { await emailObj.destroy(); } catch { /* silencioso */ }
+    }
+    setEmailStep("idle");
+    setNewEmail("");
+    setVerificationCode("");
+    setEmailObj(null);
+    setEmailError("");
+    setCodeError("");
+    setEmailOpen(false);
+  }, [emailObj]);
+
+  // ── Handler: cambio de contraseña ─────────────────────────
+  const handlePasswordChange = useCallback(async () => {
+    if (!user) return;
+    setPasswordError("");
+
+    if (user.passwordEnabled && !currentPassword) {
+      setPasswordError("Ingresa tu contraseña actual.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError("La nueva contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Las contraseñas no coinciden.");
+      return;
+    }
+    if (user.passwordEnabled && newPassword === currentPassword) {
+      setPasswordError("La nueva contraseña debe ser diferente a la actual.");
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      await user.updatePassword({
+        ...(user.passwordEnabled ? { currentPassword } : {}),
+        newPassword,
+        signOutOfOtherSessions: true,
+      });
+      setPasswordSuccess(true);
+      addToast({ title: "Contraseña actualizada", description: "Tu contraseña se cambió correctamente. Las demás sesiones fueron cerradas.", color: "success" });
+      setTimeout(() => {
+        setPasswordOpen(false);
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setPasswordSuccess(false);
+      }, 2000);
+    } catch (e) {
+      setPasswordError(resolveClerkError(e));
+    } finally {
+      setPasswordSaving(false);
+    }
+  }, [user, currentPassword, newPassword, confirmPassword]);
+
+  const passwordStrength = (() => {
+    const p = newPassword;
+    if (!p) return null;
+    let score = 0;
+    if (p.length >= 8) score++;
+    if (p.length >= 12) score++;
+    if (/[A-Z]/.test(p)) score++;
+    if (/[0-9]/.test(p)) score++;
+    if (/[^a-zA-Z0-9]/.test(p)) score++;
+    if (score <= 1) return { label: "Muy débil", color: "bg-red-500", width: "20%" };
+    if (score === 2) return { label: "Débil", color: "bg-orange-400", width: "40%" };
+    if (score === 3) return { label: "Media", color: "bg-yellow-400", width: "60%" };
+    if (score === 4) return { label: "Fuerte", color: "bg-emerald-400", width: "80%" };
+    return { label: "Muy fuerte", color: "bg-emerald-500", width: "100%" };
+  })();
+
   return (
     <div className="space-y-4 lg:space-y-5">
       {/* ── Tarjeta única: Perfil editable + datos de cuenta ── */}
@@ -311,13 +462,6 @@ export function AdminProfileClient() {
                     Guardado
                   </span>
                 )}
-                <Link
-                  href="/admin/account"
-                  className="text-[0.75rem] font-medium text-[#9b74ff] hover:text-[#b89eff] transition-colors flex items-center gap-1.5 ml-2"
-                >
-                  <Icon icon="solar:settings-bold-duotone" width={14} />
-                  Correo y contraseña
-                </Link>
               </div>
             </div>
           </div>
@@ -370,6 +514,322 @@ export function AdminProfileClient() {
                 <p className="text-white/50 text-xs italic mt-1">Cuenta de agencia. Acceso a dashboard y disponibilidad.</p>
               )}
             </dl>
+          </div>
+        </div>
+      </GlassCard>
+
+      {/* ── Seguridad: correo + contraseña ── */}
+      <GlassCard>
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
+            <Icon icon="solar:shield-keyhole-bold-duotone" className="text-[#9b74ff] text-base" />
+          </div>
+          <div>
+            <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Seguridad</p>
+            <p className="font-sora font-bold text-white text-base leading-tight">Correo y contraseña</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {/* ── Cambio de correo ── */}
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] overflow-hidden">
+            <button
+              type="button"
+              onClick={() => {
+                if (emailOpen) { handleEmailCancel(); } else { setEmailOpen(true); }
+              }}
+              className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.04] transition-colors"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <Icon icon="solar:letter-bold-duotone" className="text-[#9b74ff] text-base shrink-0" />
+                <div className="text-left min-w-0">
+                  <p className="text-white/90 text-sm font-medium">Correo electrónico</p>
+                  <p className="text-white/45 text-[0.75rem] truncate">
+                    {user?.primaryEmailAddress?.emailAddress ?? profile.email}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[0.75rem] text-[#9b74ff] font-semibold">
+                  {emailOpen ? "Cancelar" : "Cambiar"}
+                </span>
+                <Icon
+                  icon={emailOpen ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
+                  className="text-white/40 text-sm"
+                />
+              </div>
+            </button>
+
+            {emailOpen && (
+              <div className="px-4 pb-4 border-t border-white/[0.07] pt-4 space-y-4">
+                {emailStep === "idle" && (
+                  <>
+                    <p className="text-white/55 text-[0.8rem]">
+                      Ingresa el nuevo correo. Te enviaremos un código de verificación a esa dirección.
+                    </p>
+                    <div className="space-y-3">
+                      <Input
+                        label="Nuevo correo electrónico"
+                        placeholder="nuevo@correo.com"
+                        value={newEmail}
+                        onValueChange={(v) => { setNewEmail(v); setEmailError(""); }}
+                        type="email"
+                        autoComplete="email"
+                        isInvalid={!!emailError}
+                        errorMessage={emailError}
+                        classNames={{
+                          inputWrapper: inputDark,
+                          input: "!text-white/95 placeholder:!text-white/38",
+                          label: "!text-white/70",
+                          errorMessage: "!text-red-400",
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        className="btn-newayzi-primary"
+                        onPress={handleEmailSend}
+                        isLoading={emailSaving}
+                        isDisabled={!newEmail.trim() || !user}
+                        startContent={!emailSaving && <Icon icon="solar:letter-send-bold-duotone" width={16} />}
+                      >
+                        Enviar código
+                      </Button>
+                    </div>
+                  </>
+                )}
+
+                {emailStep === "pending_code" && (
+                  <>
+                    <div className="flex items-center gap-2 text-sm text-white/70">
+                      <Icon icon="solar:letter-opened-bold-duotone" className="text-[#9b74ff] text-base" />
+                      <span>Código enviado a <span className="text-white font-semibold">{newEmail}</span></span>
+                    </div>
+                    <p className="text-white/50 text-[0.78rem]">
+                      Revisa tu bandeja de entrada (y spam). El código expira en unos minutos.
+                    </p>
+                    <div className="space-y-3">
+                      <Input
+                        label="Código de verificación (6 dígitos)"
+                        placeholder="123456"
+                        value={verificationCode}
+                        onValueChange={(v) => { setVerificationCode(v.replace(/\D/g, "").slice(0, 6)); setCodeError(""); }}
+                        maxLength={6}
+                        inputMode="numeric"
+                        isInvalid={!!codeError}
+                        errorMessage={codeError}
+                        classNames={{
+                          inputWrapper: inputDark,
+                          input: "!text-white/95 placeholder:!text-white/38 tracking-widest font-mono",
+                          label: "!text-white/70",
+                          errorMessage: "!text-red-400",
+                        }}
+                      />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                          size="sm"
+                          className="btn-newayzi-primary"
+                          onPress={handleEmailVerify}
+                          isLoading={emailSaving}
+                          isDisabled={verificationCode.length !== 6 || !user}
+                          startContent={!emailSaving && <Icon icon="solar:check-circle-bold-duotone" width={16} />}
+                        >
+                          Verificar y actualizar
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => { setEmailStep("idle"); setVerificationCode(""); setCodeError(""); }}
+                          className="text-[0.75rem] text-white/50 hover:text-white/80 transition-colors"
+                        >
+                          Reenviar código
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {emailStep === "done" && (
+                  <div className="flex items-center gap-3 py-2">
+                    <Icon icon="solar:check-circle-bold-duotone" className="text-emerald-400 text-2xl" />
+                    <div>
+                      <p className="text-emerald-400 font-semibold text-sm">¡Correo actualizado!</p>
+                      <p className="text-white/55 text-xs">{newEmail} es ahora tu correo principal.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Cambio de contraseña ── */}
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] overflow-hidden">
+            <button
+              type="button"
+              onClick={() => {
+                if (passwordOpen) {
+                  setPasswordOpen(false);
+                  setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); setPasswordError("");
+                } else {
+                  setPasswordOpen(true);
+                }
+              }}
+              className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.04] transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Icon icon="solar:lock-password-bold-duotone" className="text-[#9b74ff] text-base shrink-0" />
+                <div className="text-left">
+                  <p className="text-white/90 text-sm font-medium">Contraseña</p>
+                  <p className="text-white/45 text-[0.75rem]">
+                    {user?.passwordEnabled ? "Actualizar tu contraseña de acceso" : "Crear una contraseña para tu cuenta"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[0.75rem] text-[#9b74ff] font-semibold">
+                  {passwordOpen ? "Cancelar" : user?.passwordEnabled ? "Cambiar" : "Crear"}
+                </span>
+                <Icon
+                  icon={passwordOpen ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
+                  className="text-white/40 text-sm"
+                />
+              </div>
+            </button>
+
+            {passwordOpen && (
+              <div className="px-4 pb-4 border-t border-white/[0.07] pt-4 space-y-3">
+                {!user?.passwordEnabled && (
+                  <div className="flex items-start gap-2 rounded-xl bg-blue-500/10 border border-blue-400/20 px-3 py-2.5">
+                    <Icon icon="solar:info-circle-bold-duotone" className="text-blue-400 text-base mt-0.5 shrink-0" />
+                    <p className="text-blue-300 text-[0.78rem]">
+                      Tu cuenta no tiene contraseña configurada (acceso vía Google u otro proveedor). Puedes crear una contraseña para acceder directamente con correo y contraseña.
+                    </p>
+                  </div>
+                )}
+
+                {user?.passwordEnabled && (
+                  <div className="relative">
+                    <Input
+                      label="Contraseña actual"
+                      placeholder="Tu contraseña actual"
+                      value={currentPassword}
+                      onValueChange={(v) => { setCurrentPassword(v); setPasswordError(""); }}
+                      type={showCurrent ? "text" : "password"}
+                      autoComplete="current-password"
+                      endContent={
+                        <button type="button" onClick={() => setShowCurrent((p) => !p)} className="text-white/40 hover:text-white/70 transition-colors">
+                          <Icon icon={showCurrent ? "solar:eye-closed-bold" : "solar:eye-bold"} width={18} />
+                        </button>
+                      }
+                      classNames={{
+                        inputWrapper: inputDark,
+                        input: "!text-white/95 placeholder:!text-white/38",
+                        label: "!text-white/70",
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div className="relative">
+                  <Input
+                    label="Nueva contraseña"
+                    placeholder="Mínimo 8 caracteres"
+                    value={newPassword}
+                    onValueChange={(v) => { setNewPassword(v); setPasswordError(""); }}
+                    type={showNew ? "text" : "password"}
+                    autoComplete="new-password"
+                    endContent={
+                      <button type="button" onClick={() => setShowNew((p) => !p)} className="text-white/40 hover:text-white/70 transition-colors">
+                        <Icon icon={showNew ? "solar:eye-closed-bold" : "solar:eye-bold"} width={18} />
+                      </button>
+                    }
+                    classNames={{
+                      inputWrapper: inputDark,
+                      input: "!text-white/95 placeholder:!text-white/38",
+                      label: "!text-white/70",
+                    }}
+                  />
+                </div>
+
+                {newPassword && passwordStrength && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-white/45">Seguridad de la contraseña</span>
+                      <span className={
+                        passwordStrength.label === "Muy débil" || passwordStrength.label === "Débil"
+                          ? "text-red-400"
+                          : passwordStrength.label === "Media"
+                            ? "text-yellow-400"
+                            : "text-emerald-400"
+                      }>{passwordStrength.label}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${passwordStrength.color}`}
+                        style={{ width: passwordStrength.width }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="relative">
+                  <Input
+                    label="Confirmar nueva contraseña"
+                    placeholder="Repite la nueva contraseña"
+                    value={confirmPassword}
+                    onValueChange={(v) => { setConfirmPassword(v); setPasswordError(""); }}
+                    type={showConfirm ? "text" : "password"}
+                    autoComplete="new-password"
+                    isInvalid={!!confirmPassword && confirmPassword !== newPassword}
+                    errorMessage={confirmPassword && confirmPassword !== newPassword ? "Las contraseñas no coinciden." : undefined}
+                    endContent={
+                      <button type="button" onClick={() => setShowConfirm((p) => !p)} className="text-white/40 hover:text-white/70 transition-colors">
+                        <Icon icon={showConfirm ? "solar:eye-closed-bold" : "solar:eye-bold"} width={18} />
+                      </button>
+                    }
+                    classNames={{
+                      inputWrapper: inputDark,
+                      input: "!text-white/95 placeholder:!text-white/38",
+                      label: "!text-white/70",
+                      errorMessage: "!text-red-400",
+                    }}
+                  />
+                </div>
+
+                {passwordError && (
+                  <div className="flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-400/20 px-3 py-2.5">
+                    <Icon icon="solar:danger-circle-bold-duotone" className="text-red-400 text-base mt-0.5 shrink-0" />
+                    <p className="text-red-300 text-[0.78rem]">{passwordError}</p>
+                  </div>
+                )}
+
+                {passwordSuccess && (
+                  <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-400/20 px-3 py-2.5">
+                    <Icon icon="solar:check-circle-bold-duotone" className="text-emerald-400 text-base" />
+                    <p className="text-emerald-300 text-sm font-medium">Contraseña actualizada. Las demás sesiones fueron cerradas.</p>
+                  </div>
+                )}
+
+                <Button
+                  size="sm"
+                  className="btn-newayzi-primary"
+                  onPress={handlePasswordChange}
+                  isLoading={passwordSaving}
+                  isDisabled={
+                    !user ||
+                    !newPassword ||
+                    newPassword.length < 8 ||
+                    newPassword !== confirmPassword ||
+                    (!!user?.passwordEnabled && !currentPassword)
+                  }
+                  startContent={!passwordSaving && <Icon icon="solar:lock-password-bold-duotone" width={16} />}
+                >
+                  {user?.passwordEnabled ? "Actualizar contraseña" : "Crear contraseña"}
+                </Button>
+
+                <p className="text-white/35 text-[0.72rem]">
+                  Al cambiar la contraseña, todas las demás sesiones activas serán cerradas automáticamente por seguridad.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </GlassCard>
