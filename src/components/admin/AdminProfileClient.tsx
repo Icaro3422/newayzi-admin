@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useAdmin } from "@/contexts/AdminContext";
-import type { AdminRole, AdminLoyalty } from "@/lib/admin-api";
+import { rewardsAgreementsApi } from "@/lib/admin-api";
+import type { AdminRole, AdminLoyalty, OperatorRewardsData } from "@/lib/admin-api";
 
 const ROLE_LABELS: Record<AdminRole, string> = {
   super_admin: "Super admin",
@@ -78,39 +79,13 @@ function InfoField({ label, value }: { label: string; value: string }) {
   );
 }
 
-interface OperatorRewardsSummary {
-  participates: boolean;
-  activeAgreement: {
-    cashbackContributionPct: string;
-    visibilityBoostDisplay: string;
-    rewardsLabelDisplay: string;
-    effectiveFrom: string;
-    effectiveUntil: string | null;
-    termsNotes: string;
-    signedByNewayzi: string;
-    autoRenew: boolean;
-  } | null;
-  stats: { poolContributions: number; cashbackEmitted: number; bookingsRewarded: number };
-  programBenefits: { icon: string; title: string; description: string }[];
-}
-
 function useOperatorRewards(operatorId: number | null) {
-  const [data, setData] = useState<OperatorRewardsSummary | null>(null);
+  const [data, setData] = useState<OperatorRewardsData | null>(null);
   const load = useCallback(async () => {
     if (!operatorId) return;
     try {
-      const API_BASE =
-        typeof window !== "undefined"
-          ? window.location.origin.includes("portal.newayzi.com")
-            ? "https://api.newayzi.com"
-            : window.location.origin.includes("portal.staging")
-            ? "https://api.staging.newayzi.com"
-            : "http://localhost:8000"
-          : "";
-      const res = await fetch(`${API_BASE}/api/operator/rewards-agreement/`, {
-        credentials: "include",
-      });
-      if (res.ok) setData(await res.json());
+      const res = await rewardsAgreementsApi.getForOperator(operatorId);
+      setData(res);
     } catch {
       // silencioso
     }
@@ -157,7 +132,8 @@ export function AdminProfileClient() {
                   {ROLE_LABELS[role ?? "super_admin"]}
                 </span>
               </span>
-              {loyalty && <LoyaltyBadge level={loyalty.level} />}
+              {/* Nivel de loyalty solo para no-operadores (agente/comercial/visualizador) */}
+              {role !== "operador" && loyalty && <LoyaltyBadge level={loyalty.level} />}
             </div>
             <p className="mt-2 text-sm text-white/50">{profile.email}</p>
             {profile.phone && (
@@ -214,8 +190,105 @@ export function AdminProfileClient() {
         </div>
       </GlassCard>
 
-      {/* ── Newayzi Rewards (oculto para super_admin: es equipo Newayzi, no usa billetera personal) ── */}
-      {role !== "super_admin" && (loyalty ? (
+      {/* ── OPERADOR: Programa de Socios (rewards de operadores, no de huéspedes) ── */}
+      {role === "operador" && (
+        <AccentCard>
+          <div className="flex items-start justify-between gap-4 mb-5">
+            <div>
+              <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Programa de Socios</p>
+              <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
+                {operatorRewards?.activeAgreement
+                  ? operatorRewards.activeAgreement.rewardsLabelDisplay
+                  : "Tu participación en Newayzi"}
+              </p>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+              <Icon icon="solar:handshake-bold-duotone" className="text-yellow-300 text-base" />
+            </div>
+          </div>
+
+          {!operatorRewards && (
+            <div className="flex justify-center py-8">
+              <Icon icon="solar:loading-line-duotone" className="text-white/30 text-2xl animate-spin" />
+            </div>
+          )}
+
+          {operatorRewards && !operatorRewards.activeAgreement && (
+            <div className="rounded-2xl bg-white/[0.08] border border-white/[0.12] px-5 py-6 text-center">
+              <Icon icon="solar:hand-shake-bold-duotone" className="text-white/40 text-3xl mb-3" />
+              <p className="text-white/70 text-sm font-medium">Aún no tienes un acuerdo de socio activo.</p>
+              <p className="text-white/45 text-xs mt-1">Contacta al equipo Newayzi para activar tu nivel y ofrecer cashback a tus huéspedes.</p>
+            </div>
+          )}
+
+          {operatorRewards?.activeAgreement && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-4">
+                  <Icon icon="solar:wallet-money-bold-duotone" className="text-yellow-300/90 text-lg mb-1.5" />
+                  <p className="text-white/55 text-[0.62rem] uppercase tracking-wide">Cashback a huéspedes</p>
+                  <p className="font-sora font-black text-white text-xl leading-none mt-1">
+                    {operatorRewards.activeAgreement.cashbackContributionPct}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-4">
+                  <Icon icon="solar:trending-up-bold-duotone" className="text-yellow-300/90 text-lg mb-1.5" />
+                  <p className="text-white/55 text-[0.62rem] uppercase tracking-wide">Visibilidad</p>
+                  <p className="font-sora font-bold text-white text-sm leading-tight mt-1">
+                    {operatorRewards.activeAgreement.visibilityBoostDisplay}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-4">
+                  <Icon icon="solar:wallet-money-bold-duotone" className="text-yellow-300/90 text-lg mb-1.5" />
+                  <p className="text-white/55 text-[0.62rem] uppercase tracking-wide">Aportado al pool</p>
+                  <p className="font-sora font-black text-white text-2xl leading-none mt-1">
+                    ${Math.round(operatorRewards.stats.poolContributions).toLocaleString("es-CO")}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-4">
+                  <Icon icon="solar:bookmark-bold-duotone" className="text-yellow-300/90 text-lg mb-1.5" />
+                  <p className="text-white/55 text-[0.62rem] uppercase tracking-wide">Reservas premiadas</p>
+                  <p className="font-sora font-black text-white text-2xl leading-none mt-1">
+                    {operatorRewards.stats.bookingsRewarded}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-4 text-xs text-white/45">
+                <span>
+                  Vigente desde{" "}
+                  <span className="text-white/70 font-semibold">
+                    {new Date(operatorRewards.activeAgreement.effectiveFrom).toLocaleDateString("es-CO")}
+                  </span>
+                </span>
+                {operatorRewards.activeAgreement.effectiveUntil ? (
+                  <span>
+                    hasta{" "}
+                    <span className="text-white/70 font-semibold">
+                      {new Date(operatorRewards.activeAgreement.effectiveUntil).toLocaleDateString("es-CO")}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-emerald-400 font-semibold">Sin fecha de vencimiento</span>
+                )}
+                {operatorRewards.activeAgreement.autoRenew && (
+                  <span className="text-blue-400 font-semibold">Auto-renovación activa</span>
+                )}
+              </div>
+
+              {operatorRewards.activeAgreement.termsNotes && (
+                <div className="rounded-xl bg-white/[0.06] border border-white/[0.08] px-4 py-3 text-xs text-white/50">
+                  <span className="font-semibold text-white/60">Condiciones: </span>
+                  {operatorRewards.activeAgreement.termsNotes}
+                </div>
+              )}
+            </div>
+          )}
+        </AccentCard>
+      )}
+
+      {/* ── No-operadores: Newayzi Rewards (programa de huéspedes) ── */}
+      {role !== "super_admin" && role !== "operador" && (loyalty ? (
         <AccentCard>
           <div className="flex items-start justify-between gap-4 mb-5 min-w-0">
             <div>
@@ -271,131 +344,16 @@ export function AdminProfileClient() {
           )}
         </AccentCard>
       ) : (
-        <GlassCard className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 flex items-center justify-center mb-4">
-            <Icon icon="solar:gift-bold-duotone" className="text-[#9b74ff] text-2xl" />
-          </div>
-          <p className="font-sora font-bold text-white text-base">Sin programa de loyalty</p>
-          <p className="mt-2 text-sm text-white/50 max-w-md leading-relaxed">
-            Este perfil no tiene datos de Newayzi Rewards. Los perfiles de staff pueden no tener loyalty si no han realizado reservas como huéspedes.
-          </p>
-        </GlassCard>
-      ))}
-
-      {/* ── Acuerdo Rewards del operador ── */}
-      {role === "operador" && (
-        <GlassCard>
-          <div className="flex items-start justify-between gap-4 mb-5">
-            <div>
-              <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Programa Newayzi Rewards</p>
-              <p className="font-sora font-bold text-white text-base leading-tight mt-1">
-                Tu acuerdo de participación
-              </p>
+          <GlassCard className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 flex items-center justify-center mb-4">
+              <Icon icon="solar:gift-bold-duotone" className="text-[#9b74ff] text-2xl" />
             </div>
-            <div className="w-9 h-9 rounded-xl bg-purple-500/20 flex items-center justify-center shrink-0">
-              <Icon icon="solar:gift-bold-duotone" className="text-purple-300 text-base" />
-            </div>
-          </div>
-
-          {!operatorRewards && (
-            <div className="flex justify-center py-6">
-              <Icon icon="solar:loading-line-duotone" className="text-white/30 text-2xl animate-spin" />
-            </div>
-          )}
-
-          {operatorRewards && !operatorRewards.participates && (
-            <div className="rounded-2xl bg-white/[0.04] border border-white/[0.07] px-5 py-6 text-center">
-              <Icon icon="solar:hand-shake-bold-duotone" className="text-white/30 text-3xl mb-3" />
-              <p className="text-white/60 text-sm font-medium">Tu hotel aún no tiene un acuerdo Rewards activo.</p>
-              <p className="text-white/35 text-xs mt-1">Contacta al equipo comercial de Newayzi para conocer los beneficios del programa.</p>
-            </div>
-          )}
-
-          {operatorRewards?.participates && operatorRewards.activeAgreement && (
-            <div className="space-y-4">
-              {/* Condiciones principales */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="rounded-2xl bg-white/[0.07] border border-white/[0.10] px-4 py-4 text-center">
-                  <p className="text-2xl font-black text-purple-300">{operatorRewards.activeAgreement.cashbackContributionPct}</p>
-                  <p className="text-[10px] text-white/40 font-medium mt-1">Aporte al cashback</p>
-                </div>
-                <div className="rounded-2xl bg-white/[0.07] border border-white/[0.10] px-4 py-4 text-center">
-                  <p className="text-sm font-bold text-white/80">{operatorRewards.activeAgreement.visibilityBoostDisplay}</p>
-                  <p className="text-[10px] text-white/40 font-medium mt-1">Boost de visibilidad</p>
-                </div>
-                <div className="rounded-2xl bg-white/[0.07] border border-white/[0.10] px-4 py-4 text-center">
-                  <p className="text-sm font-bold text-purple-300">{operatorRewards.activeAgreement.rewardsLabelDisplay}</p>
-                  <p className="text-[10px] text-white/40 font-medium mt-1">Tu etiqueta</p>
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: "Aportado al pool", value: `$${Math.round(operatorRewards.stats.poolContributions).toLocaleString("es-CO")}` },
-                  { label: "Cashback generado", value: `$${Math.round(operatorRewards.stats.cashbackEmitted).toLocaleString("es-CO")}` },
-                  { label: "Reservas premiadas", value: String(operatorRewards.stats.bookingsRewarded) },
-                ].map((s) => (
-                  <div key={s.label} className="rounded-2xl bg-white/[0.04] border border-white/[0.07] px-3 py-3 text-center">
-                    <p className="text-base font-black text-white/90">{s.value}</p>
-                    <p className="text-[10px] text-white/35 mt-0.5">{s.label}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Vigencia */}
-              <div className="flex flex-wrap gap-4 text-xs text-white/40 border-t border-white/[0.07] pt-3">
-                <span>
-                  Vigente desde{" "}
-                  <span className="text-white/60 font-semibold">
-                    {new Date(operatorRewards.activeAgreement.effectiveFrom).toLocaleDateString("es-CO")}
-                  </span>
-                </span>
-                {operatorRewards.activeAgreement.effectiveUntil ? (
-                  <span>
-                    hasta{" "}
-                    <span className="text-white/60 font-semibold">
-                      {new Date(operatorRewards.activeAgreement.effectiveUntil).toLocaleDateString("es-CO")}
-                    </span>
-                  </span>
-                ) : (
-                  <span className="text-emerald-400 font-semibold">Sin fecha de vencimiento</span>
-                )}
-                {operatorRewards.activeAgreement.autoRenew && (
-                  <span className="text-blue-400 font-semibold">Auto-renovación activa</span>
-                )}
-                {operatorRewards.activeAgreement.signedByNewayzi && (
-                  <span>Firmado por Newayzi: <span className="text-white/60">{operatorRewards.activeAgreement.signedByNewayzi}</span></span>
-                )}
-              </div>
-
-              {/* Beneficios del programa */}
-              {operatorRewards.programBenefits.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-semibold text-white/30 uppercase tracking-widest mb-2">Beneficios activos</p>
-                  <div className="space-y-2">
-                    {operatorRewards.programBenefits.map((b, i) => (
-                      <div key={i} className="flex items-start gap-3 rounded-xl bg-white/[0.04] border border-white/[0.06] px-4 py-3">
-                        <Icon icon={b.icon ?? "solar:gift-bold-duotone"} className="text-purple-400 text-lg shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-semibold text-white/80">{b.title}</p>
-                          <p className="text-xs text-white/40 mt-0.5">{b.description}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {operatorRewards.activeAgreement.termsNotes && (
-                <div className="rounded-xl bg-white/[0.04] border border-white/[0.07] px-4 py-3 text-xs text-white/45">
-                  <span className="font-semibold text-white/60">Condiciones pactadas: </span>
-                  {operatorRewards.activeAgreement.termsNotes}
-                </div>
-              )}
-            </div>
-          )}
-        </GlassCard>
+            <p className="font-sora font-bold text-white text-base">Sin programa de loyalty</p>
+            <p className="mt-2 text-sm text-white/50 max-w-md leading-relaxed">
+              Este perfil no tiene datos de Newayzi Rewards. Los perfiles de staff pueden no tener loyalty si no han realizado reservas como huéspedes.
+            </p>
+          </GlassCard>
+        )
       )}
     </div>
   );
