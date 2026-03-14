@@ -284,10 +284,69 @@ export interface AvailabilityItem {
   room_type_name: string;
   date: string;
   available: number;
+  total_rooms?: number;
+  locked?: number;
   source: "internal" | "pms";
   block_reason?: string;
   price_per_night?: string;
   currency?: string;
+}
+
+export interface AvailabilityPhysicalRoom {
+  id: number;
+  label: string;
+  floor?: number | null;
+  ical_url?: string | null;
+  last_sync?: string | null;
+  is_available: boolean;
+  lock?: {
+    block_id: number;
+    source: string;
+    note: string;
+    block_start: string;
+    block_end: string;
+    status: string;
+    external_reference?: string | null;
+  } | null;
+}
+
+export interface AvailabilityBlockItem {
+  id: number;
+  room_type_id: number;
+  room_type_name: string;
+  property_id: number;
+  property_name: string;
+  start_date: string;
+  end_date: string;
+  status: "active" | "cancelled" | "released";
+  source: "internal" | "external" | "system";
+  note: string;
+  external_reference?: string | null;
+  locks_count?: number;
+  rooms_affected?: number;
+  created?: string;
+}
+
+export interface AvailabilitySlotDetail {
+  room_type_id: number;
+  room_type_name: string;
+  property_id: number;
+  property_name: string;
+  date: string;
+  total: number;
+  available: number;
+  locked: number;
+  physical_rooms: AvailabilityPhysicalRoom[];
+  active_blocks: Array<{
+    id: number;
+    source: string;
+    status: string;
+    start_date: string;
+    end_date: string;
+    note: string;
+    external_reference?: string | null;
+    rooms_affected: number;
+  }>;
 }
 
 export interface PaymentMethod {
@@ -633,6 +692,56 @@ export const adminApi = {
     return getJson<{ results: AvailabilityItem[] }>(
       `/api/admin/availability/${query ? `?${query}` : ""}`.replace(/\/\?/, "?")
     );
+  },
+
+  async getAvailabilitySlotDetail(params: {
+    room_type_id: number;
+    date: string;
+  }): Promise<AvailabilitySlotDetail | null> {
+    const q = new URLSearchParams();
+    q.set("room_type_id", String(params.room_type_id));
+    q.set("date", params.date);
+    return getJson<AvailabilitySlotDetail>(`/api/admin/availability/slot/?${q.toString()}`);
+  },
+
+  async getAvailabilityBlocks(params?: {
+    property_id?: number;
+    room_type_id?: number;
+    date_from?: string;
+    date_to?: string;
+    status?: "active" | "cancelled" | "released" | "all";
+  }): Promise<{ results: AvailabilityBlockItem[] } | null> {
+    const q = new URLSearchParams();
+    if (params?.property_id != null) q.set("property_id", String(params.property_id));
+    if (params?.room_type_id != null) q.set("room_type_id", String(params.room_type_id));
+    if (params?.date_from) q.set("date_from", params.date_from);
+    if (params?.date_to) q.set("date_to", params.date_to);
+    if (params?.status) q.set("status", params.status);
+    const query = q.toString();
+    return getJson<{ results: AvailabilityBlockItem[] }>(
+      `/api/admin/availability/blocks/${query ? `?${query}` : ""}`
+    );
+  },
+
+  async createAvailabilityBlock(data: {
+    room_type_id: number;
+    start_date: string;
+    end_date: string;
+    note?: string;
+    physical_room_ids?: number[];
+  }): Promise<AvailabilityBlockItem | null> {
+    return postJson<AvailabilityBlockItem>("/api/admin/availability/blocks/", data);
+  },
+
+  async cancelAvailabilityBlock(id: number): Promise<{ id: number; status: string } | null> {
+    return patchJson<{ id: number; status: string }>(`/api/admin/availability/blocks/${id}/`, {
+      status: "cancelled",
+    });
+  },
+
+  async deleteAvailabilityBlock(id: number): Promise<boolean> {
+    const res = await authFetch(`/api/admin/availability/blocks/${id}/`, { method: "DELETE" });
+    return res.ok;
   },
 
   async getPaymentMethods(): Promise<PaymentMethod[] | null> {
