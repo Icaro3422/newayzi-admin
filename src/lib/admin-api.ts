@@ -1097,7 +1097,7 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
     case "operators":
       return role === "comercial"; // comercial ve operadores (solo lectura)
     case "communications":
-      return role === "comercial"; // comercial usa comunicaciones
+      return false; // solo super_admin (ya retornó arriba; backend restringe igual)
     case "wallet":
       // Operador: Programa de Socios. Agente/visualizador: billetera guest. Comercial/super_admin: no (son staff puro)
       return ["agente", "visualizador", "operador"].includes(role);
@@ -1126,7 +1126,7 @@ export function isModuleReadOnly(role: AdminRole | null, module: string): boolea
     case "properties":   return role === "visualizador"; // comercial y operador pueden editar
     case "availability": return role !== "operador" && role !== "comercial";
     case "operators":    return true; // comercial solo ve, no edita
-    case "communications": return role !== "comercial";
+    case "communications": return true; // solo super_admin accede; para el resto no aplica
     default:             return true;
   }
 }

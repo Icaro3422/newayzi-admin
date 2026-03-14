@@ -65,8 +65,7 @@ const ROLE_NAV_OVERRIDES: Partial<Record<AdminRole, Partial<Record<string, strin
     availability:  "Disponibilidad",
   },
   comercial: {
-    operators:     "Operadores",
-    communications: "Comunicaciones",
+    operators: "Operadores",
   },
 };
 
