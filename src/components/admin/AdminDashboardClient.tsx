@@ -742,7 +742,7 @@ export function AdminDashboardClient() {
           </div>
           <div className="flex flex-col gap-2">
             {[
-              { href: "/admin/bookings",      icon: "solar:bookmark-bold-duotone",           label: role === "operador" ? "Mis reservas" : "Reservas", count: undefined, show: canAccess("bookings") },
+              { href: "/admin/bookings",      icon: "solar:bookmark-bold-duotone",           label: ["operador", "agente"].includes(role ?? "") ? "Mis reservas" : "Reservas", count: undefined, show: canAccess("bookings") },
               { href: "/admin/reviews",       icon: "solar:stars-bold-duotone",              label: "Reseñas",         count: undefined,          show: canAccess("reviews") },
               { href: "/admin/analytics",     icon: "solar:chart-2-bold-duotone",            label: "Analytics",       count: undefined,          show: canAccess("analytics") },
               { href: "/admin/coupons",       icon: "solar:tag-price-bold-duotone",          label: "Cupones",         count: undefined,          show: canAccess("coupons") },

@@ -63,7 +63,8 @@ const ROLE_NAV_OVERRIDES: Partial<Record<AdminRole, Partial<Record<string, strin
     wallet:        "Mis Rewards",
   },
   agente: {
-    availability:  "Disponibilidad",
+    availability: "Disponibilidad",
+    bookings:     "Mis reservas",
   },
   comercial: {
     operators: "Operadores",
