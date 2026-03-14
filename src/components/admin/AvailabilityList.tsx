@@ -326,15 +326,23 @@ function RoomTypeDetailPanel({
 }) {
   const [detail, setDetail] = useState<AvailabilitySlotDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [cancellingBlockId, setCancellingBlockId] = useState<number | null>(null);
   const [deletingBlockId, setDeletingBlockId] = useState<number | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
+    setError(null);
     adminApi
       .getAvailabilitySlotDetail({ room_type_id: roomTypeId, date })
-      .then((res) => { setDetail(res); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then((res) => {
+        setDetail(res);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setLoading(false);
+        setError(err instanceof Error ? err.message : "No se pudo cargar el detalle.");
+      });
   }, [roomTypeId, date]);
 
   useEffect(() => { load(); }, [load]);
@@ -364,7 +372,16 @@ function RoomTypeDetailPanel({
   }
 
   if (!detail) {
-    return <p className="text-white/40 text-sm py-4 text-center">No se pudo cargar el detalle.</p>;
+    return (
+      <div className="py-4 px-3 text-center space-y-3">
+        <p className="text-red-300/90 text-sm">
+          {error ?? "No se pudo cargar el detalle."}
+        </p>
+        <Button size="sm" variant="flat" className="bg-white/10 text-white/80 hover:bg-white/15" onPress={load} startContent={<Icon icon="solar:refresh-bold" width={14} />}>
+          Reintentar
+        </Button>
+      </div>
+    );
   }
 
   return (
