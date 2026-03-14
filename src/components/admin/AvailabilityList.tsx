@@ -318,11 +318,13 @@ function RoomTypeDetailPanel({
   date,
   canManage,
   onBlockCreated,
+  fallbackSummary,
 }: {
   roomTypeId: number;
   date: string;
   canManage: boolean;
   onBlockCreated?: () => void;
+  fallbackSummary?: { available: number; totalRooms: number; pricePerNight?: string; currency?: string };
 }) {
   const [detail, setDetail] = useState<AvailabilitySlotDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -373,13 +375,29 @@ function RoomTypeDetailPanel({
 
   if (!detail) {
     return (
-      <div className="py-4 px-3 text-center space-y-3">
-        <p className="text-red-300/90 text-sm">
+      <div className="py-4 px-3 space-y-3">
+        {fallbackSummary && (
+          <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5 mb-2">
+            <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Resumen (del listado)</p>
+            <p className="text-sm text-white/80">
+              {fallbackSummary.available} disponibles
+              {fallbackSummary.totalRooms > 0 && ` de ${fallbackSummary.totalRooms} aloj.`}
+              {fallbackSummary.pricePerNight && (
+                <span className="ml-2 text-[#b89eff] font-medium">
+                  {formatPrice(fallbackSummary.pricePerNight, fallbackSummary.currency)}
+                </span>
+              )}
+            </p>
+          </div>
+        )}
+        <p className="text-red-300/90 text-sm text-center">
           {error ?? "No se pudo cargar el detalle."}
         </p>
-        <Button size="sm" variant="flat" className="bg-white/10 text-white/80 hover:bg-white/15" onPress={load} startContent={<Icon icon="solar:refresh-bold" width={14} />}>
-          Reintentar
-        </Button>
+        <div className="flex justify-center">
+          <Button size="sm" variant="flat" className="bg-white/10 text-white/80 hover:bg-white/15" onPress={load} startContent={<Icon icon="solar:refresh-bold" width={14} />}>
+            Reintentar
+          </Button>
+        </div>
       </div>
     );
   }
@@ -689,6 +707,12 @@ function SlotDetailModal({
                               date={slotDetail.date}
                               canManage={canManage}
                               onBlockCreated={onBlocksChanged}
+                              fallbackSummary={{
+                                available: rt.available,
+                                totalRooms: rt.totalRooms,
+                                pricePerNight: rt.pricePerNight,
+                                currency: rt.currency ?? slotDetail.currency,
+                              }}
                             />
                           </div>
                         )}

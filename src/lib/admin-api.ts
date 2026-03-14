@@ -701,7 +701,12 @@ export const adminApi = {
     const q = new URLSearchParams();
     q.set("room_type_id", String(params.room_type_id));
     q.set("date", params.date);
-    return getJson<AvailabilitySlotDetail>(`/api/admin/availability/slot/?${q.toString()}`);
+    const path = `/api/admin/availability/slot/?${q.toString()}`;
+    const res = await authFetch(path);
+    if (res.status === 404) {
+      throw new Error("Tipo de habitación no encontrado (404). El endpoint puede no existir o el ID es inválido.");
+    }
+    return res.json() as Promise<AvailabilitySlotDetail>;
   },
 
   async getAvailabilityBlocks(params?: {
