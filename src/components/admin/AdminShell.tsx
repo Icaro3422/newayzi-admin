@@ -57,6 +57,7 @@ const ROLE_NAV_OVERRIDES: Partial<Record<AdminRole, Partial<Record<string, strin
   operador: {
     properties:    "Mis propiedades",
     connections:   "Mis conexiones",
+    agents:        "Mis agentes",
     availability:  "Mi disponibilidad",
     bookings:      "Mis reservas",
     wallet:        "Mis Rewards",

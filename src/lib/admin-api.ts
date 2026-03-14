@@ -1135,7 +1135,8 @@ export function isModuleReadOnly(role: AdminRole | null, module: string): boolea
 export function canCreate(role: AdminRole | null, module: string): boolean {
   if (!role) return false;
   if (role === "super_admin") return true;
-  return false; // solo super_admin puede crear por ahora
+  if (role === "operador" && module === "agents") return true; // operador crea sus agentes
+  return false;
 }
 
 export function canEditProperty(role: AdminRole): boolean {
