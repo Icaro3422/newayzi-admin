@@ -110,13 +110,43 @@ export interface PropertyListItem {
   rewards_info?: PropertyRewardsInfo | null;
 }
 
+export interface PropertyPicture {
+  id: number;
+  url: string;
+  is_primary: boolean;
+  order_index: number;
+  created: string;
+}
+
+export interface PropertyFaq {
+  question: string;
+  answer: string;
+}
+
 export interface PropertyDetail extends PropertyListItem {
   description?: string;
+  // Contacto y ubicación
   address?: string;
   phone?: string;
   currency: string;
+  timezone?: string;
+  location?: { lat: number; lng: number } | null;
+  // Horarios
+  check_in_from?: string | null;
+  check_in_until?: string | null;
+  check_out_from?: string | null;
+  check_out_until?: string | null;
+  // Reglas
+  smoking_allowed?: boolean;
+  children_allowed?: boolean;
+  parties_allowed?: boolean;
+  min_age?: number | null;
+  // Contenido
   amenities: string[] | Record<string, unknown>[];
+  important_info?: string[];
+  faqs?: PropertyFaq[];
   room_types: { id: number; name: string; code: string }[];
+  pictures?: PropertyPicture[];
 }
 
 export interface PMSConnectionListItem {
@@ -436,15 +466,52 @@ export const adminApi = {
   async patchProperty(
     id: number,
     data: Partial<{
+      name: string;
+      description: string;
       is_active: boolean;
       is_published: boolean;
       pets_allowed: boolean;
-      name: string;
-      description: string;
+      smoking_allowed: boolean;
+      children_allowed: boolean;
+      parties_allowed: boolean;
+      min_age: number | null;
+      address: string;
+      phone: string;
+      timezone: string;
+      check_in_from: string | null;
+      check_in_until: string | null;
+      check_out_from: string | null;
+      check_out_until: string | null;
       amenities: string[] | Record<string, unknown>[];
+      important_info: string[];
+      faqs: { question: string; answer: string }[];
     }>
   ): Promise<PropertyDetail> {
     return patchJson<PropertyDetail>(`/api/admin/properties/${id}/`, data);
+  },
+
+  async getPropertyPictures(propertyId: number): Promise<PropertyPicture[]> {
+    const result = await getJson<PropertyPicture[]>(`/api/admin/properties/${propertyId}/pictures/`);
+    return result ?? [];
+  },
+
+  async uploadPropertyPicture(propertyId: number, file: File, isPrimary = false): Promise<PropertyPicture> {
+    const fd = new FormData();
+    fd.append("image", file);
+    if (isPrimary) fd.append("is_primary", "true");
+    const res = await authFetchMultipart(`/api/admin/properties/${propertyId}/pictures/`, "POST", fd);
+    return res.json() as Promise<PropertyPicture>;
+  },
+
+  async setPropertyPicturePrimary(propertyId: number, picId: number): Promise<PropertyPicture> {
+    const fd = new FormData();
+    fd.append("is_primary", "true");
+    const res = await authFetchMultipart(`/api/admin/properties/${propertyId}/pictures/${picId}/`, "PATCH", fd);
+    return res.json() as Promise<PropertyPicture>;
+  },
+
+  async deletePropertyPicture(propertyId: number, picId: number): Promise<void> {
+    await authFetch(`/api/admin/properties/${propertyId}/pictures/${picId}/`, { method: "DELETE" });
   },
 
   async getConnectionTypes(): Promise<{ results: PMSConnectionType[] } | null> {
