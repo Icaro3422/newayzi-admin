@@ -117,13 +117,8 @@ export function PropertyEditClient() {
       </GlassCard>
     );
   }
-  if (!canEditProperty) {
-    return (
-      <GlassCard>
-        <p className="text-white/70 font-sora">No tienes permiso para editar esta propiedad.</p>
-      </GlassCard>
-    );
-  }
+
+  const readOnly = !canEditProperty;
 
   return (
     <div className="space-y-6">
@@ -142,8 +137,9 @@ export function PropertyEditClient() {
           <Input
             label="Nombre"
             value={name}
-            onValueChange={setName}
+            onValueChange={readOnly ? undefined : setName}
             fullWidth
+            isReadOnly={readOnly}
             classNames={{
               inputWrapper: inputDark,
               input: "!text-white/95 placeholder:!text-white/38",
@@ -157,10 +153,11 @@ export function PropertyEditClient() {
             </label>
             <RichTextEditor
               value={description}
-              onChange={setDescription}
+              onChange={readOnly ? () => {} : setDescription}
               placeholder="Describe la propiedad, ubicación, servicios y características..."
               minHeight="220px"
               variant="dark"
+              disabled={readOnly}
             />
           </div>
 
@@ -175,44 +172,49 @@ export function PropertyEditClient() {
                   className="inline-flex items-center gap-1.5 rounded-full bg-[#5e2cec]/25 border border-[#5e2cec]/30 px-3 py-1.5 text-sm font-medium text-[#b89eff]"
                 >
                   {a}
-                  <button
-                    type="button"
-                    onClick={() => removeAmenity(a)}
-                    className="hover:bg-[#5e2cec]/30 rounded-full p-0.5 transition-colors text-white/80"
-                    aria-label="Quitar"
-                  >
-                    <Icon icon="solar:close-circle-outline" width={16} />
-                  </button>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => removeAmenity(a)}
+                      className="hover:bg-[#5e2cec]/30 rounded-full p-0.5 transition-colors text-white/80"
+                      aria-label="Quitar"
+                    >
+                      <Icon icon="solar:close-circle-outline" width={16} />
+                    </button>
+                  )}
                 </span>
               ))}
             </div>
-            <div className="flex gap-2">
-              <Input
-                value={newAmenity}
-                onValueChange={setNewAmenity}
-                placeholder="WiFi, Aire acondicionado, Cocina..."
-                fullWidth
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAmenity())}
-                classNames={{
-                  inputWrapper: inputDark,
-                  input: "!text-white/95 placeholder:!text-white/38",
-                }}
-              />
-              <Button
-                size="sm"
-                className="btn-newayzi-primary rounded-xl"
-                onPress={addAmenity}
-              >
-                Añadir
-              </Button>
-            </div>
+            {!readOnly && (
+              <div className="flex gap-2">
+                <Input
+                  value={newAmenity}
+                  onValueChange={setNewAmenity}
+                  placeholder="WiFi, Aire acondicionado, Cocina..."
+                  fullWidth
+                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAmenity())}
+                  classNames={{
+                    inputWrapper: inputDark,
+                    input: "!text-white/95 placeholder:!text-white/38",
+                  }}
+                />
+                <Button
+                  size="sm"
+                  className="btn-newayzi-primary rounded-xl"
+                  onPress={addAmenity}
+                >
+                  Añadir
+                </Button>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-8 pt-2">
             <Switch
               isSelected={is_active}
-              onValueChange={setIsActive}
+              onValueChange={readOnly ? () => {} : setIsActive}
               color="primary"
+              isDisabled={readOnly}
             >
               <span className="text-sm font-medium text-white/85 font-sora">
                 Activo (sistema)
@@ -220,8 +222,9 @@ export function PropertyEditClient() {
             </Switch>
             <Switch
               isSelected={is_published}
-              onValueChange={setIsPublished}
+              onValueChange={readOnly ? () => {} : setIsPublished}
               color="primary"
+              isDisabled={readOnly}
             >
               <span className="text-sm font-medium text-white/85 font-sora">
                 Publicado (visible en frontend)
@@ -229,8 +232,9 @@ export function PropertyEditClient() {
             </Switch>
             <Switch
               isSelected={pets_allowed}
-              onValueChange={setPetsAllowed}
+              onValueChange={readOnly ? () => {} : setPetsAllowed}
               color="primary"
+              isDisabled={readOnly}
             >
               <span className="text-sm font-medium text-white/85 font-sora">
                 Mascotas permitidas
@@ -238,16 +242,18 @@ export function PropertyEditClient() {
             </Switch>
           </div>
 
-          <div className="flex gap-2 pt-2">
-            <Button
-              className="btn-newayzi-primary rounded-xl"
-              onPress={handleSave}
-              isLoading={saving}
-              startContent={!saving ? <Icon icon="solar:diskette-outline" width={18} /> : undefined}
-            >
-              Guardar cambios
-            </Button>
-          </div>
+          {!readOnly && (
+            <div className="flex gap-2 pt-2">
+              <Button
+                className="btn-newayzi-primary rounded-xl"
+                onPress={handleSave}
+                isLoading={saving}
+                startContent={!saving ? <Icon icon="solar:diskette-outline" width={18} /> : undefined}
+              >
+                Guardar cambios
+              </Button>
+            </div>
+          )}
         </div>
       </GlassCard>
 
@@ -288,7 +294,7 @@ export function PropertyEditClient() {
               </p>
             </div>
           </div>
-          <PropertyCancellationPolicyPanel propertyId={propertyId} readOnly={!canEditProperty} />
+          <PropertyCancellationPolicyPanel propertyId={propertyId} readOnly={readOnly} />
         </div>
       )}
     </div>
