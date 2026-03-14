@@ -1099,8 +1099,8 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
     case "communications":
       return role === "comercial"; // comercial usa comunicaciones
     case "wallet":
-      // Cualquier usuario con admin_role puede ver su propia billetera
-      return ["agente", "comercial", "visualizador", "operador"].includes(role);
+      // Operador: Programa de Socios. Agente/visualizador: billetera guest. Comercial/super_admin: no (son staff puro)
+      return ["agente", "visualizador", "operador"].includes(role);
     case "agent-wallets":
       return false; // solo super_admin (ya retornó arriba)
     case "agents":

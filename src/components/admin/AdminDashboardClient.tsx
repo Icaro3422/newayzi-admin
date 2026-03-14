@@ -420,7 +420,7 @@ export function AdminDashboardClient() {
           </div>
         </GlassCard>
 
-        {/* Card: Programa de Socios (operador) o Newayzi Rewards (otros roles) */}
+        {/* Card: Programa de Socios (operador), Newayzi Rewards (agente/visualizador con loyalty), o nada (comercial/super_admin) */}
         {role === "operador" ? (() => {
           const ag = operatorRewards?.activeAgreement ?? null;
           const stats = operatorRewards?.stats;
@@ -626,7 +626,7 @@ export function AdminDashboardClient() {
               )}
             </AccentCard>
           );
-        })() : (
+        })() : !["super_admin", "comercial", "visualizador"].includes(role ?? "") ? (
           <AccentCard className="flex flex-col">
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -725,7 +725,7 @@ export function AdminDashboardClient() {
               </>
             )}
           </AccentCard>
-        )}
+        ) : null}
 
         {/* Card Accesos rápidos — filtrados por rol */}
         <GlassCard className="flex flex-col">

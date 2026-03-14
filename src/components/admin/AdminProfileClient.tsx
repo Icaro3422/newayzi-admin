@@ -128,6 +128,8 @@ export function AdminProfileClient() {
   const { profile, operator_name, loyalty, operator_id } = me;
   const isOperator = (role?.toLowerCase?.() ?? "") === "operador";
   const operatorRewards = useOperatorRewards(isOperator ? (operator_id ?? null) : null);
+  // Roles staff que no deben ver badges ni sección Newayzi Rewards (programa de huéspedes)
+  const isStaffNoGuestRewards = ["super_admin", "comercial", "visualizador"].includes(role ?? "");
 
   // Sincronizar nombre desde Clerk o me
   useEffect(() => {
@@ -483,7 +485,7 @@ export function AdminProfileClient() {
                       {ROLE_LABELS[role ?? "super_admin"]}
                     </span>
                   </span>
-                  {!isOperator && loyalty && <LoyaltyBadge level={loyalty.level} />}
+                  {!isOperator && !isStaffNoGuestRewards && loyalty && <LoyaltyBadge level={loyalty.level} />}
                 </dd>
               </div>
               {isOperator && operator_name && (
@@ -931,8 +933,8 @@ export function AdminProfileClient() {
         </AccentCard>
       )}
 
-      {/* ── No-operadores: Newayzi Rewards (programa de huéspedes) — nunca para operadores ── */}
-      {!isOperator && role !== "super_admin" && (loyalty ? (
+      {/* ── Newayzi Rewards (programa de huéspedes) — oculto para operador y staff (super_admin, comercial, visualizador) ── */}
+      {!isOperator && !isStaffNoGuestRewards && (loyalty ? (
         <AccentCard>
           <div className="flex items-start justify-between gap-4 mb-5 min-w-0">
             <div>
