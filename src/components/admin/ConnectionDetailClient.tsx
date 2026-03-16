@@ -569,8 +569,26 @@ export function ConnectionDetailClient() {
                   </div>
 
                   <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-sm text-white/70 space-y-1">
-                    <p>Propiedades detectadas: <span className="text-white/90 font-medium">{lastSyncResult.summary.properties_synced}</span></p>
-                    <p>Tipos de habitación detectados: <span className="text-white/90 font-medium">{lastSyncResult.summary.room_types_synced}</span></p>
+                    <p>
+                      Propiedades descubiertas en PMS:{" "}
+                      <span className="text-white/90 font-medium">
+                        {lastSyncResult.summary.properties_discovered ?? lastSyncResult.summary.properties_synced}
+                      </span>
+                    </p>
+                    <p>
+                      Propiedades mapeadas localmente:{" "}
+                      <span className="text-white/90 font-medium">{lastSyncResult.summary.properties_synced}</span>
+                    </p>
+                    <p>
+                      Alojamientos descubiertos en PMS:{" "}
+                      <span className="text-white/90 font-medium">
+                        {lastSyncResult.summary.room_types_discovered ?? lastSyncResult.summary.room_types_synced}
+                      </span>
+                    </p>
+                    <p>
+                      Alojamientos mapeados localmente:{" "}
+                      <span className="text-white/90 font-medium">{lastSyncResult.summary.room_types_synced}</span>
+                    </p>
                     {lastSyncResult.window && (
                       <p className="text-white/50">
                         Ventana de sync: {lastSyncResult.window.start_date} a {lastSyncResult.window.end_date}
@@ -858,13 +876,19 @@ export function ConnectionDetailClient() {
             <thead>
               <tr className="border-b border-white/[0.07] bg-white/[0.03]">
                 <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
-                  Propiedad local
+                  Propiedad local (mapeo)
                 </th>
                 {isRoom && (
                   <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
-                    Tipo habitación
+                    Alojamiento local (mapeo)
                   </th>
                 )}
+                <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
+                  Propiedad PMS
+                </th>
+                <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
+                  Alojamiento PMS
+                </th>
                 <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
                   ID PMS
                 </th>
@@ -877,7 +901,7 @@ export function ConnectionDetailClient() {
               {tableData.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={isRoom ? 4 : 3}
+                    colSpan={isRoom ? 6 : 5}
                     className="py-12 text-center text-white/30 text-sm"
                   >
                     No hay unidades en esta categoría
@@ -886,6 +910,11 @@ export function ConnectionDetailClient() {
               ) : (
                 tableData.map((u, i) => {
                   const st = STATUS_STYLES[u.status] ?? STATUS_STYLES.pending;
+                  const pmsPropertyLabel = u.pms_property_name ?? u.pms_property_id ?? "—";
+                  const pmsRoomLabel = u.pms_room_name ?? u.pms_name ?? u.pms_room_id ?? "—";
+                  const pmsIdLabel = isRoom
+                    ? `${u.pms_property_id ?? "—"} / ${u.pms_room_id ?? "—"}`
+                    : (u.pms_property_id ?? "—");
                   return (
                     <tr
                       key={i}
@@ -899,10 +928,14 @@ export function ConnectionDetailClient() {
                           {u.local_room_name ?? u.local_room_type_id ?? "—"}
                         </td>
                       )}
+                      <td className="px-6 py-3 text-white/80">
+                        {pmsPropertyLabel}
+                      </td>
+                      <td className="px-6 py-3 text-white/80">
+                        {pmsRoomLabel}
+                      </td>
                       <td className="px-6 py-3 font-mono text-[0.78rem] text-white/50">
-                        {isRoom
-                          ? (u.pms_room_id ?? u.pms_property_id ?? "—")
-                          : (u.pms_property_id ?? "—")}
+                        {pmsIdLabel}
                       </td>
                       <td className="px-6 py-3">
                         <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${st.text}`}>

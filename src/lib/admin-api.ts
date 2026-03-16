@@ -202,6 +202,8 @@ export interface UnitsSummary {
 export interface UnitItem {
   pms_property_id?: string;
   pms_room_id?: string;
+  pms_property_name?: string | null;
+  pms_room_name?: string | null;
   local_property_id?: number | null;
   local_property_name?: string | null;
   local_room_type_id?: number | null;
@@ -225,7 +227,9 @@ export interface ConnectionSyncNowResponse {
     failed: number;
     draft_mappings_created: number;
     properties_synced: number;
+    properties_discovered?: number;
     room_types_synced: number;
+    room_types_discovered?: number;
     room_type_base_rates_synced: number;
     dynamic_pricing_rules_synced: number;
     errors: string[];
