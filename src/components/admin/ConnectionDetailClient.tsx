@@ -49,14 +49,20 @@ export function ConnectionDetailClient() {
   useEffect(() => {
     if (Number.isNaN(id) || id <= 0) { setLoading(false); return; }
     let cancelled = false;
-    Promise.all([adminApi.getConnection(id), adminApi.getUnitsSummary(id)]).then(
-      ([conn, summary]) => {
+    Promise.all([adminApi.getConnection(id), adminApi.getUnitsSummary(id)])
+      .then(([conn, summary]) => {
         if (cancelled) return;
         setConnection(conn ?? null);
         setUnitsSummary(summary ?? null);
         setLoading(false);
-      }
-    );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setConnection(null);
+          setUnitsSummary(null);
+          setLoading(false);
+        }
+      });
     return () => { cancelled = true; };
   }, [id]);
 
