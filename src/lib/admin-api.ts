@@ -218,6 +218,25 @@ export interface PMSConnectionDetail extends PMSConnectionListItem {
   sync_interval_minutes: number;
 }
 
+export interface ConnectionSyncNowResponse {
+  status: "ok" | "partial" | "error";
+  summary?: {
+    synced: number;
+    failed: number;
+    draft_mappings_created: number;
+    properties_synced: number;
+    room_types_synced: number;
+    room_type_base_rates_synced: number;
+    dynamic_pricing_rules_synced: number;
+    errors: string[];
+  };
+  window?: {
+    start_date: string;
+    end_date: string;
+  };
+  detail?: string;
+}
+
 export interface SyncedUnit {
   pms_property_id?: string;
   pms_room_id?: string;
@@ -621,8 +640,8 @@ export const adminApi = {
     return patchJson<PMSConnectionDetail>(`/api/admin/pms/connections/${id}/`, data);
   },
 
-  async syncConnectionNow(id: number): Promise<{ status: string }> {
-    return postJson<{ status: string }>(`/api/admin/pms/connections/${id}/sync-now/`);
+  async syncConnectionNow(id: number): Promise<ConnectionSyncNowResponse> {
+    return postJson<ConnectionSyncNowResponse>(`/api/admin/pms/connections/${id}/sync-now/`);
   },
 
   async deleteConnection(id: number): Promise<void> {

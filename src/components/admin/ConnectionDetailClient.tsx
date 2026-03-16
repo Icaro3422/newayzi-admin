@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button, Switch, Input, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useParams } from "next/navigation";
-import { adminApi, type PMSConnectionDetail, type UnitsSummary } from "@/lib/admin-api";
+import { adminApi, type PMSConnectionDetail, type UnitsSummary, type ConnectionSyncNowResponse } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 import { addToast } from "@heroui/react";
 
@@ -42,6 +42,8 @@ export function ConnectionDetailClient() {
   const [unitsSummary, setUnitsSummary] = useState<UnitsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncResultModalOpen, setSyncResultModalOpen] = useState(false);
+  const [lastSyncResult, setLastSyncResult] = useState<ConnectionSyncNowResponse | null>(null);
   const [patching, setPatching] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("synced");
   const [viewType, setViewType] = useState<"properties" | "room_types">("room_types");
@@ -92,10 +94,50 @@ export function ConnectionDetailClient() {
     if (!canSyncConnection) return;
     setSyncing(true);
     try {
-      await adminApi.syncConnectionNow(id);
-      const [conn, summary] = await Promise.all([adminApi.getConnection(id), adminApi.getUnitsSummary(id)]);
+      const syncResult = await adminApi.syncConnectionNow(id);
+      setLastSyncResult(syncResult);
+
+      const summary = syncResult.summary;
+      const synced = summary?.synced ?? 0;
+      const failed = summary?.failed ?? 0;
+      const draft = summary?.draft_mappings_created ?? 0;
+      const errorCount = summary?.errors?.length ?? 0;
+
+      if (syncResult.status === "ok") {
+        addToast({
+          title: "Sincronización exitosa",
+          description: `Se procesaron ${synced} registros.`,
+          color: "success",
+        });
+      } else if (syncResult.status === "partial") {
+        const hasOnlyDrafts = synced === 0 && failed === 0 && draft > 0;
+        addToast({
+          title: hasOnlyDrafts ? "Sincronización completada con pendientes" : "Sincronización parcial",
+          description: hasOnlyDrafts
+            ? `Se detectaron ${draft} mapeos pendientes por vincular.`
+            : `Procesados: ${synced}. Fallidos: ${failed}. Errores: ${errorCount}.`,
+          color: hasOnlyDrafts ? "warning" : "danger",
+        });
+      } else {
+        addToast({
+          title: "Sincronización con error",
+          description: syncResult.detail || "No se pudo completar la sincronización.",
+          color: "danger",
+        });
+      }
+
+      setSyncResultModalOpen(true);
+      const [conn, unitsSummaryData] = await Promise.all([adminApi.getConnection(id), adminApi.getUnitsSummary(id)]);
       setConnection(conn ?? null);
-      setUnitsSummary(summary ?? null);
+      setUnitsSummary(unitsSummaryData ?? null);
+      router.refresh();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "No se pudo ejecutar la sincronización.";
+      addToast({
+        title: "Error al sincronizar",
+        description: msg,
+        color: "danger",
+      });
     } finally { setSyncing(false); }
   }
 
@@ -311,6 +353,77 @@ export function ConnectionDetailClient() {
               </Button>
               <Button color="danger" onPress={handleDeleteConnection} isLoading={deleting}>
                 Eliminar
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        <Modal isOpen={syncResultModalOpen} onOpenChange={setSyncResultModalOpen} size="lg" backdrop="blur">
+          <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
+            <ModalHeader className="text-white font-sora flex items-center gap-2">
+              <Icon icon="solar:check-circle-bold" className="text-[#9b74ff]" width={18} />
+              Resumen de sincronización
+            </ModalHeader>
+            <ModalBody>
+              {lastSyncResult?.summary ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Procesados</p>
+                      <p className="text-xl font-semibold text-white">{lastSyncResult.summary.synced}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Fallidos</p>
+                      <p className="text-xl font-semibold text-white">{lastSyncResult.summary.failed}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Mapeos draft</p>
+                      <p className="text-xl font-semibold text-white">{lastSyncResult.summary.draft_mappings_created}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Tarifas base</p>
+                      <p className="text-xl font-semibold text-white">{lastSyncResult.summary.room_type_base_rates_synced}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-sm text-white/70 space-y-1">
+                    <p>Propiedades detectadas: <span className="text-white/90 font-medium">{lastSyncResult.summary.properties_synced}</span></p>
+                    <p>Tipos de habitación detectados: <span className="text-white/90 font-medium">{lastSyncResult.summary.room_types_synced}</span></p>
+                    {lastSyncResult.window && (
+                      <p className="text-white/50">
+                        Ventana de sync: {lastSyncResult.window.start_date} a {lastSyncResult.window.end_date}
+                      </p>
+                    )}
+                  </div>
+
+                  {lastSyncResult.summary.draft_mappings_created > 0 && (
+                    <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-amber-200 text-sm">
+                      Se detectaron unidades PMS sin mapeo local. Revisa la pestaña de pendientes para vincularlas.
+                    </div>
+                  )}
+
+                  {(lastSyncResult.summary.errors?.length ?? 0) > 0 && (
+                    <div className="rounded-xl border border-red-400/25 bg-red-500/10 p-3">
+                      <p className="text-sm font-medium text-red-200 mb-1">Errores reportados</p>
+                      <ul className="text-xs text-red-100/90 space-y-1 max-h-32 overflow-y-auto">
+                        {lastSyncResult.summary.errors.slice(0, 8).map((err, idx) => (
+                          <li key={idx}>- {err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-white/70 text-sm">No hay resumen disponible para esta ejecución.</p>
+              )}
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                variant="flat"
+                onPress={() => setSyncResultModalOpen(false)}
+                className="!text-white/80 bg-white/[0.08] border border-white/[0.12] hover:bg-white/[0.14]"
+              >
+                Cerrar
               </Button>
             </ModalFooter>
           </ModalContent>
