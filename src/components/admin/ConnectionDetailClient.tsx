@@ -6,11 +6,63 @@ import { useRouter } from "next/navigation";
 import { Button, Switch, Input, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useParams } from "next/navigation";
-import { adminApi, type PMSConnectionDetail, type UnitsSummary, type ConnectionSyncNowResponse } from "@/lib/admin-api";
+import {
+  adminApi,
+  type PMSConnectionDetail,
+  type UnitsSummary,
+  type ConnectionSyncNowResponse,
+  type ConnectionSyncStreamEvent,
+} from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 import { addToast } from "@heroui/react";
 
 type TabKey = "synced" | "pending" | "disabled" | "available";
+type SyncPhaseKey = "properties" | "room_types" | "availability" | "rates";
+type PhaseCounter = {
+  current: number;
+  total: number;
+  synced: number;
+  failed: number;
+  skipped: number;
+  draft: number;
+};
+
+function emptySyncCounters(): Record<SyncPhaseKey, PhaseCounter> {
+  return {
+    properties: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
+    room_types: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
+    availability: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
+    rates: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
+  };
+}
+
+function phaseLabel(phase?: string): string {
+  if (phase === "properties") return "Propiedades";
+  if (phase === "room_types") return "Tipos de habitación";
+  if (phase === "availability") return "Disponibilidad";
+  if (phase === "rates") return "Tarifas";
+  return "Sincronización";
+}
+
+function formatSyncEvent(evt: ConnectionSyncStreamEvent): string {
+  if (evt.event === "phase_started") return `Iniciando fase: ${phaseLabel(evt.phase)}`;
+  if (evt.event === "phase_summary") return `Fase ${phaseLabel(evt.phase)} completada.`;
+  if (evt.event === "sync_started") return "Sincronización iniciada.";
+  if (evt.event === "sync_completed") return "Sincronización completada.";
+  if (evt.event === "sync_error") return `Error: ${evt.detail || "No se pudo completar."}`;
+  if (evt.event === "item_progress") {
+    const item = evt.item ?? {};
+    const room = item.pms_room_type_id ? ` • Hab ${item.pms_room_type_id}` : "";
+    const prop = item.pms_property_id ? `Prop ${item.pms_property_id}` : "Elemento";
+    const status =
+      evt.status === "draft_mapping" ? "pendiente de mapeo" :
+      evt.status === "failed" ? "falló" :
+      evt.status === "skipped" ? "omitido" :
+      "sincronizado";
+    return `${phaseLabel(evt.phase)}: ${prop}${room} (${status})`;
+  }
+  return String(evt.detail || "Actualización de sincronización.");
+}
 
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
@@ -42,6 +94,11 @@ export function ConnectionDetailClient() {
   const [unitsSummary, setUnitsSummary] = useState<UnitsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgressModalOpen, setSyncProgressModalOpen] = useState(false);
+  const [syncEvents, setSyncEvents] = useState<ConnectionSyncStreamEvent[]>([]);
+  const [syncCurrentPhase, setSyncCurrentPhase] = useState<string>("Preparando...");
+  const [syncCounters, setSyncCounters] = useState<Record<SyncPhaseKey, PhaseCounter>>(emptySyncCounters);
+  const [syncFallbackUsed, setSyncFallbackUsed] = useState(false);
   const [syncResultModalOpen, setSyncResultModalOpen] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState<ConnectionSyncNowResponse | null>(null);
   const [patching, setPatching] = useState(false);
@@ -90,11 +147,69 @@ export function ConnectionDetailClient() {
     }
   }, [connection?.id, connection?.config, connection?.pms_type]);
 
+  function resetSyncRealtimeState() {
+    setSyncEvents([]);
+    setSyncCurrentPhase("Preparando...");
+    setSyncCounters(emptySyncCounters());
+    setSyncFallbackUsed(false);
+  }
+
+  function registerSyncEvent(evt: ConnectionSyncStreamEvent) {
+    setSyncEvents((prev) => [evt, ...prev].slice(0, 80));
+    if (evt.event === "phase_started") {
+      setSyncCurrentPhase(`Procesando ${phaseLabel(evt.phase)}...`);
+    }
+    if (evt.event === "sync_completed") {
+      setSyncCurrentPhase("Sincronización finalizada.");
+    }
+    if (evt.event === "sync_error") {
+      setSyncCurrentPhase("Sincronización finalizada con error.");
+    }
+
+    if (!evt.phase) return;
+    const phase = evt.phase as SyncPhaseKey;
+    setSyncCounters((prev) => {
+      const current = prev[phase];
+      const updated: PhaseCounter = {
+        ...current,
+        current: typeof evt.current === "number" ? evt.current : current.current,
+        total: typeof evt.total === "number" ? evt.total : current.total,
+      };
+
+      if (evt.event === "item_progress") {
+        if (evt.status === "failed") updated.failed += 1;
+        else if (evt.status === "draft_mapping") updated.draft += 1;
+        else if (evt.status === "skipped") updated.skipped += 1;
+        else updated.synced += 1;
+      }
+
+      return { ...prev, [phase]: updated };
+    });
+  }
+
   async function handleSyncNow() {
     if (!canSyncConnection) return;
     setSyncing(true);
+    setSyncProgressModalOpen(true);
+    resetSyncRealtimeState();
     try {
-      const syncResult = await adminApi.syncConnectionNow(id);
+      let usedFallback = false;
+      let syncResult: ConnectionSyncNowResponse;
+      try {
+        syncResult = await adminApi.syncConnectionWithStream(id, registerSyncEvent);
+      } catch (streamError) {
+        usedFallback = true;
+        setSyncFallbackUsed(true);
+        registerSyncEvent({
+          event: "message",
+          detail:
+            streamError instanceof Error
+              ? `No se pudo abrir el stream en vivo (${streamError.message}). Continuamos en modo estándar.`
+              : "No se pudo abrir el stream en vivo. Continuamos en modo estándar.",
+        });
+        syncResult = await adminApi.syncConnectionNow(id);
+      }
+
       setLastSyncResult(syncResult);
 
       const summary = syncResult.summary;
@@ -102,6 +217,14 @@ export function ConnectionDetailClient() {
       const failed = summary?.failed ?? 0;
       const draft = summary?.draft_mappings_created ?? 0;
       const errorCount = summary?.errors?.length ?? 0;
+
+      if (usedFallback) {
+        addToast({
+          title: "Sincronización en modo estándar",
+          description: "No se pudo mostrar progreso en tiempo real para esta ejecución.",
+          color: "warning",
+        });
+      }
 
       if (syncResult.status === "ok") {
         addToast({
@@ -126,6 +249,7 @@ export function ConnectionDetailClient() {
         });
       }
 
+      setSyncProgressModalOpen(false);
       setSyncResultModalOpen(true);
       const [conn, unitsSummaryData] = await Promise.all([adminApi.getConnection(id), adminApi.getUnitsSummary(id)]);
       setConnection(conn ?? null);
@@ -133,12 +257,15 @@ export function ConnectionDetailClient() {
       router.refresh();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "No se pudo ejecutar la sincronización.";
+      setSyncProgressModalOpen(false);
       addToast({
         title: "Error al sincronizar",
         description: msg,
         color: "danger",
       });
-    } finally { setSyncing(false); }
+    } finally {
+      setSyncing(false);
+    }
   }
 
   async function toggleActive() {
@@ -353,6 +480,64 @@ export function ConnectionDetailClient() {
               </Button>
               <Button color="danger" onPress={handleDeleteConnection} isLoading={deleting}>
                 Eliminar
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        <Modal isOpen={syncProgressModalOpen} onOpenChange={setSyncProgressModalOpen} size="lg" backdrop="blur">
+          <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
+            <ModalHeader className="text-white font-sora flex items-center gap-2">
+              <Icon icon="solar:refresh-bold-duotone" className="text-[#9b74ff]" width={18} />
+              Sincronización en vivo
+            </ModalHeader>
+            <ModalBody>
+              <div className="space-y-4">
+                <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-sm text-white/70">
+                  <p className="text-white/90 font-medium">{syncCurrentPhase}</p>
+                  {syncFallbackUsed && (
+                    <p className="mt-1 text-amber-300">
+                      Modo estándar activo: no se pudo abrir el stream en tiempo real.
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {(Object.keys(syncCounters) as SyncPhaseKey[]).map((phase) => (
+                    <div key={phase} className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">{phaseLabel(phase)}</p>
+                      <p className="text-white/90 text-sm mt-1">
+                        {syncCounters[phase].current}/{syncCounters[phase].total || "?"}
+                      </p>
+                      <p className="text-[0.72rem] text-white/55 mt-1">
+                        OK: {syncCounters[phase].synced} · Fallos: {syncCounters[phase].failed}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                  <p className="text-xs uppercase tracking-wider text-white/40 mb-2">Actividad reciente</p>
+                  <ul className="space-y-1 max-h-52 overflow-y-auto text-xs text-white/75">
+                    {syncEvents.length === 0 ? (
+                      <li>Esperando eventos de sincronización...</li>
+                    ) : (
+                      syncEvents.slice(0, 24).map((evt, idx) => (
+                        <li key={`${evt.event}-${idx}`}>- {formatSyncEvent(evt)}</li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                variant="flat"
+                onPress={() => setSyncProgressModalOpen(false)}
+                isDisabled={syncing}
+                className="!text-white/80 bg-white/[0.08] border border-white/[0.12] hover:bg-white/[0.14]"
+              >
+                {syncing ? "Sincronizando..." : "Cerrar"}
               </Button>
             </ModalFooter>
           </ModalContent>

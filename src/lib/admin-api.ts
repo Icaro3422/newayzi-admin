@@ -237,6 +237,37 @@ export interface ConnectionSyncNowResponse {
   detail?: string;
 }
 
+export interface ConnectionSyncStreamEvent {
+  event:
+    | "sync_started"
+    | "phase_started"
+    | "item_progress"
+    | "phase_summary"
+    | "sync_completed"
+    | "sync_error"
+    | "message";
+  phase?: "properties" | "room_types" | "availability" | "rates";
+  current?: number;
+  total?: number;
+  status?: string;
+  item?: {
+    pms_property_id?: string;
+    pms_room_type_id?: string;
+    date?: string | null;
+    name?: string | null;
+  };
+  error?: string;
+  summary?: ConnectionSyncNowResponse["summary"] & {
+    properties_failed?: number;
+    property_errors?: string[];
+    room_types_failed?: number;
+    room_type_errors?: string[];
+  };
+  window?: ConnectionSyncNowResponse["window"];
+  detail?: string;
+  [key: string]: unknown;
+}
+
 export interface SyncedUnit {
   pms_property_id?: string;
   pms_room_id?: string;
@@ -473,6 +504,99 @@ async function postJson<T>(path: string, body?: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function streamSSE(
+  path: string,
+  onEvent?: (event: ConnectionSyncStreamEvent) => void,
+  signal?: AbortSignal
+): Promise<ConnectionSyncNowResponse> {
+  const url = `${API_BASE.replace(/\/$/, "")}${path}`;
+  const token = tokenGetter ? await tokenGetter() : null;
+  const headers: Record<string, string> = { Accept: "text/event-stream" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers,
+    credentials: "include",
+    signal,
+  });
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/sign-in?reason=session_expired";
+      }
+      throw new Error("Sesión expirada. Redirigiendo al inicio de sesión...");
+    }
+    if (res.status === 403) {
+      throw new Error("No tienes permisos para realizar esta acción.");
+    }
+    const text = await res.text();
+    throw new Error(`API ${res.status}: ${text || res.statusText}`);
+  }
+
+  if (!res.body) {
+    throw new Error("El servidor no devolvió stream de sincronización.");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalResult: ConnectionSyncNowResponse | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    while (true) {
+      const separatorIdx = buffer.indexOf("\n\n");
+      if (separatorIdx === -1) break;
+      const rawEvent = buffer.slice(0, separatorIdx);
+      buffer = buffer.slice(separatorIdx + 2);
+
+      const lines = rawEvent.split("\n");
+      let eventName = "message";
+      const dataLines: string[] = [];
+      for (const line of lines) {
+        if (line.startsWith("event:")) {
+          eventName = line.slice(6).trim() || "message";
+        } else if (line.startsWith("data:")) {
+          dataLines.push(line.slice(5).trim());
+        }
+      }
+
+      if (dataLines.length === 0) continue;
+      let payload: Record<string, unknown> = {};
+      try {
+        payload = JSON.parse(dataLines.join("\n")) as Record<string, unknown>;
+      } catch {
+        payload = { detail: dataLines.join("\n") };
+      }
+
+      const event = {
+        event: (payload.event as ConnectionSyncStreamEvent["event"]) ?? (eventName as ConnectionSyncStreamEvent["event"]),
+        ...payload,
+      } as ConnectionSyncStreamEvent;
+      onEvent?.(event);
+
+      if (event.event === "sync_completed") {
+        finalResult = {
+          status: (event.status as ConnectionSyncNowResponse["status"]) ?? "ok",
+          summary: event.summary as ConnectionSyncNowResponse["summary"],
+          window: event.window as ConnectionSyncNowResponse["window"],
+        };
+      }
+      if (event.event === "sync_error") {
+        throw new Error(event.detail || "No se pudo completar la sincronización.");
+      }
+    }
+  }
+
+  if (finalResult) return finalResult;
+  throw new Error("El stream de sincronización finalizó sin resultado.");
+}
+
 export interface RewardPoolMovement {
   id: number;
   kind: "contribution" | "cashback_issued" | "redemption" | "breakage" | "adjustment";
@@ -642,6 +766,14 @@ export const adminApi = {
 
   async syncConnectionNow(id: number): Promise<ConnectionSyncNowResponse> {
     return postJson<ConnectionSyncNowResponse>(`/api/admin/pms/connections/${id}/sync-now/`);
+  },
+
+  async syncConnectionWithStream(
+    id: number,
+    onEvent?: (event: ConnectionSyncStreamEvent) => void,
+    signal?: AbortSignal
+  ): Promise<ConnectionSyncNowResponse> {
+    return streamSSE(`/api/admin/pms/connections/${id}/sync-stream/`, onEvent, signal);
   },
 
   async deleteConnection(id: number): Promise<void> {
