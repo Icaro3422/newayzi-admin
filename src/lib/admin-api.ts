@@ -581,6 +581,14 @@ export const adminApi = {
     return getJson<{ results: PMSConnectionListItem[] }>("/api/admin/pms/connections/");
   },
 
+  async getDashboardStats(): Promise<{
+    average_price_synced: number | null;
+    currency: string;
+    properties_count: number;
+  } | null> {
+    return getJson("/api/admin/dashboard-stats/");
+  },
+
   async createConnection(data: {
     name?: string;
     pms_type: string;
@@ -778,9 +786,23 @@ export const adminApi = {
 
   async patchUser(
     id: number,
-    data: { role?: AdminRole | null; operator_id?: number | null }
+    data: {
+      role?: AdminRole | null;
+      operator_id?: number | null;
+      first_name?: string;
+      last_name?: string;
+      email?: string;
+    }
   ): Promise<AdminUserListItem> {
     return patchJson<AdminUserListItem>(`/api/admin/users/${id}/`, data);
+  },
+
+  async deleteUser(id: number): Promise<void> {
+    const res = await authFetch(`/api/admin/users/${id}/`, { method: "DELETE" });
+    if (res.status !== 204) {
+      const text = await res.text();
+      throw new Error(text || "Error al eliminar usuario");
+    }
   },
 
   async createUserAdmin(data: {

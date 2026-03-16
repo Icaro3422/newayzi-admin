@@ -106,22 +106,29 @@ export function AdminDashboardClient() {
   const [operators, setOperators] = useState<{ results: { id: number }[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [operatorRewards, setOperatorRewards] = useState<OperatorRewardsData | null>(null);
+  const [dashboardStats, setDashboardStats] = useState<{
+    average_price_synced: number | null;
+    currency: string;
+    properties_count: number;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [propsRes, connRes, opRes, agenciesRes] = await Promise.all([
+        const [propsRes, connRes, opRes, agenciesRes, statsRes] = await Promise.all([
           canAccess("properties") ? adminApi.getProperties() : Promise.resolve(null),
           canAccess("connections") ? adminApi.getConnections() : Promise.resolve(null),
           canAccess("operators") ? adminApi.getOperators() : Promise.resolve(null),
           canAccess("agents") ? adminApi.getAgencies() : Promise.resolve(null),
+          (canAccess("properties") || canAccess("connections")) ? adminApi.getDashboardStats() : Promise.resolve(null),
         ]);
         if (cancelled) return;
         if (propsRes?.results) setProperties(propsRes.results);
         if (connRes?.results) setConnections(connRes.results);
         if (opRes?.results) setOperators({ results: opRes.results });
         if (agenciesRes?.results) setAgencies(agenciesRes.results);
+        if (statsRes) setDashboardStats(statsRes);
       } catch {
         // ignore
       } finally {
@@ -305,12 +312,19 @@ export function AdminDashboardClient() {
         {/* Stats en grid — filtradas por rol */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5 pt-4 border-t border-white/[0.08]">
           {[
-            canAccess("properties") && { label: role === "operador" ? "Mis propiedades" : "Propiedades", value: properties.length, icon: "solar:buildings-2-bold-duotone" },
-            canAccess("connections") && { label: role === "operador" ? "Mis conexiones" : "Conexiones", value: connections.length, icon: "solar:link-circle-bold-duotone" },
-            canAccess("connections") && { label: "Sincronizadas", value: totalSynced, icon: "solar:check-circle-bold-duotone" },
-            canAccess("connections") && totalPending > 0 && { label: "Pendientes", value: totalPending, icon: "solar:clock-circle-bold-duotone" },
-            canAccess("operators") && { label: "Operadores", value: operatorsCount, icon: "solar:users-group-rounded-bold-duotone" },
-            canAccess("agents") && { label: "Agencias", value: agencies.length, icon: "solar:bag-4-bold-duotone" },
+            canAccess("properties") && { label: role === "operador" ? "Mis propiedades" : "Propiedades", value: properties.length, icon: "solar:buildings-2-bold-duotone", format: "number" },
+            canAccess("connections") && { label: role === "operador" ? "Mis conexiones" : "Conexiones", value: connections.length, icon: "solar:link-circle-bold-duotone", format: "number" },
+            canAccess("connections") && { label: "Sincronizadas", value: totalSynced, icon: "solar:check-circle-bold-duotone", format: "number" },
+            canAccess("connections") && totalPending > 0 && { label: "Pendientes", value: totalPending, icon: "solar:clock-circle-bold-duotone", format: "number" },
+            canAccess("connections") && totalSynced > 0 && {
+              label: "Precio promedio",
+              value: dashboardStats?.average_price_synced ?? null,
+              icon: "solar:tag-price-bold-duotone",
+              format: "currency",
+              currency: dashboardStats?.currency || "COP",
+            },
+            canAccess("operators") && { label: "Operadores", value: operatorsCount, icon: "solar:users-group-rounded-bold-duotone", format: "number" },
+            canAccess("agents") && { label: "Agencias", value: agencies.length, icon: "solar:bag-4-bold-duotone", format: "number" },
           ]
             .filter(Boolean)
             .map((s: any) => (
@@ -322,10 +336,16 @@ export function AdminDashboardClient() {
                 <div className="flex items-center gap-2">
                   <Icon icon={s.icon} className="text-[#7c4cff] text-base shrink-0" />
                   <p className="font-sora font-black text-white text-xl sm:text-2xl leading-none">
-                    {loading || s.value == null ? (
+                    {loading || (s.format === "currency" && !dashboardStats) ? (
                       <span className="inline-block w-10 h-6 rounded-md bg-white/10 animate-pulse" />
-                    ) : (
+                    ) : s.format === "currency" && s.value != null ? (
+                      `${s.currency === "COP" ? "$" : s.currency + " "}${Number(s.value).toLocaleString("es-CO", { maximumFractionDigits: 0 })}`
+                    ) : s.format === "currency" ? (
+                      "—"
+                    ) : s.value != null ? (
                       s.value.toLocaleString()
+                    ) : (
+                      <span className="inline-block w-10 h-6 rounded-md bg-white/10 animate-pulse" />
                     )}
                   </p>
                 </div>
