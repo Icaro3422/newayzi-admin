@@ -54,7 +54,6 @@ export function ConnectionDetailClient() {
   const [configToken, setConfigToken] = useState("");
   const [configKunasUser, setConfigKunasUser] = useState("");
   const [configKunasPwd, setConfigKunasPwd] = useState("");
-  const [configIdResellers, setConfigIdResellers] = useState("");
 
   useEffect(() => {
     if (Number.isNaN(id) || id <= 0) { setLoading(false); return; }
@@ -86,7 +85,6 @@ export function ConnectionDetailClient() {
     if (connection.pms_type === "kunas") {
       setConfigToken(cfg.token ?? "");
       setConfigKunasUser(cfg.username ?? cfg.user ?? "");
-      setConfigIdResellers(cfg.id_resellers ?? "");
     }
   }, [connection?.id, connection?.config, connection?.pms_type]);
 
@@ -129,7 +127,6 @@ export function ConnectionDetailClient() {
     const newConfig: Record<string, string> = {
       token: configToken.trim(),
       username: configKunasUser.trim() || (cfg.username as string) || (cfg.user as string),
-      id_resellers: configIdResellers.trim(),
     };
     if (configKunasPwd) newConfig.password = configKunasPwd;
     else if (cfg.password && cfg.password !== "••••••••") newConfig.password = cfg.password as string;
@@ -444,7 +441,6 @@ export function ConnectionDetailClient() {
                       const cfg = (connection.config ?? {}) as Record<string, string>;
                       setConfigToken(cfg.token ?? "");
                       setConfigKunasUser(cfg.username ?? cfg.user ?? "");
-                      setConfigIdResellers(cfg.id_resellers ?? "");
                       setConfigKunasPwd("");
                     }}
                   >
@@ -490,21 +486,11 @@ export function ConnectionDetailClient() {
                   size="sm"
                   classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
                 />
-                <Input
-                  label="ID Reseller"
-                  value={configIdResellers}
-                  onValueChange={setConfigIdResellers}
-                  placeholder="Ej: 21 (de la URL ?id_resellers=21)"
-                  size="sm"
-                  description="Requerido para panel Kunas (app.kunas.io)"
-                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
-                />
               </div>
             ) : (
               <div className="text-sm text-white/40 space-y-1">
                 <p>Token: <span className="text-white/70">{configToken ? "••••••••" : "—"}</span></p>
                 <p>Usuario: <span className="text-white/70">{configKunasUser || "—"}</span></p>
-                <p>ID Reseller: <span className="text-white/70">{configIdResellers || "—"}</span></p>
               </div>
             )}
           </div>
