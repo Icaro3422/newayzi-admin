@@ -14,6 +14,12 @@ import {
   SelectItem,
   Input,
   Spinner,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  addToast,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { adminApi, type PropertyListItem, type PMSConnectionListItem } from "@/lib/admin-api";
@@ -45,6 +51,8 @@ export function PropertiesList() {
   const [filterCity, setFilterCity] = useState("");
   const [filterPms, setFilterPms] = useState<string>("all");
   const [patching, setPatching] = useState<number | null>(null);
+  const [deleteModal, setDeleteModal] = useState<PropertyListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     adminApi
@@ -105,6 +113,29 @@ export function PropertiesList() {
       );
     } finally {
       setPatching(null);
+    }
+  }
+
+  async function handleDeleteProperty(p: PropertyListItem) {
+    if (!canEditProperty) return;
+    setDeleting(true);
+    try {
+      await adminApi.deleteProperty(p.id);
+      setList((prev) => prev.filter((x) => x.id !== p.id));
+      addToast({
+        title: "Propiedad eliminada",
+        description: `"${p.name}" fue eliminada correctamente.`,
+        color: "success",
+      });
+    } catch (e) {
+      addToast({
+        title: "Error al eliminar",
+        description: e instanceof Error ? e.message : "No se pudo eliminar la propiedad.",
+        color: "danger",
+      });
+    } finally {
+      setDeleting(false);
+      setDeleteModal(null);
     }
   }
 
@@ -365,6 +396,13 @@ export function PropertiesList() {
                           >
                             {patching === p.id ? "…" : p.is_active ? "Desactivar" : "Activar"}
                           </button>
+                          <button
+                            onClick={() => setDeleteModal(p)}
+                            disabled={patching === p.id}
+                            className="px-3 py-1.5 rounded-xl text-[0.75rem] font-semibold transition-all bg-red-500/20 border border-red-400/30 text-red-300 hover:bg-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Eliminar
+                          </button>
                         </div>
                       </td>
                     )}
@@ -375,6 +413,33 @@ export function PropertiesList() {
           </div>
         </GlassCard>
       )}
+
+      <Modal isOpen={!!deleteModal} onOpenChange={(open) => !open && setDeleteModal(null)}>
+        <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
+          <ModalHeader className="text-white font-sora">Eliminar propiedad</ModalHeader>
+          <ModalBody>
+            {deleteModal && (
+              <p className="text-white/70 text-sm">
+                Se eliminará la propiedad <strong className="text-white">{deleteModal.name}</strong> y todas sus habitaciones
+                asociadas. Esta acción no se puede deshacer.
+              </p>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={() => setDeleteModal(null)} className="!text-white/70">
+              Cancelar
+            </Button>
+            <Button
+              color="danger"
+              onPress={() => deleteModal && handleDeleteProperty(deleteModal)}
+              isLoading={deleting}
+              isDisabled={!deleteModal}
+            >
+              Eliminar
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   );
 }

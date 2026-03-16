@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, Switch, Input, Spinner } from "@heroui/react";
+import { useRouter } from "next/navigation";
+import { Button, Switch, Input, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useParams } from "next/navigation";
 import { adminApi, type PMSConnectionDetail, type UnitsSummary } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
+import { addToast } from "@heroui/react";
 
 type TabKey = "synced" | "pending" | "disabled" | "available";
 
@@ -31,8 +33,11 @@ const inputDark = "rounded-xl border border-white/[0.12] bg-white/[0.04]";
 
 export function ConnectionDetailClient() {
   const params = useParams();
+  const router = useRouter();
   const id = parseInt(String(params?.id ?? "0"), 10);
   const { canEditConnections, canSyncConnection } = useAdmin();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [connection, setConnection] = useState<PMSConnectionDetail | null>(null);
   const [unitsSummary, setUnitsSummary] = useState<UnitsSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,6 +50,11 @@ export function ConnectionDetailClient() {
   const [configUsername, setConfigUsername] = useState("");
   const [configPassword, setConfigPassword] = useState("");
   const [savingConfig, setSavingConfig] = useState(false);
+  // Kunas
+  const [configToken, setConfigToken] = useState("");
+  const [configKunasUser, setConfigKunasUser] = useState("");
+  const [configKunasPwd, setConfigKunasPwd] = useState("");
+  const [configIdResellers, setConfigIdResellers] = useState("");
 
   useEffect(() => {
     if (Number.isNaN(id) || id <= 0) { setLoading(false); return; }
@@ -67,12 +77,18 @@ export function ConnectionDetailClient() {
   }, [id]);
 
   useEffect(() => {
-    if (connection?.pms_type === "generic" && connection?.config) {
-      const cfg = connection.config as Record<string, string>;
+    if (!connection?.config) return;
+    const cfg = connection.config as Record<string, string>;
+    if (connection.pms_type === "generic") {
       setConfigBaseUrl(cfg.base_url ?? cfg.url ?? "");
       setConfigUsername(cfg.username ?? cfg.user ?? "");
     }
-  }, [connection?.id, connection?.config]);
+    if (connection.pms_type === "kunas") {
+      setConfigToken(cfg.token ?? "");
+      setConfigKunasUser(cfg.username ?? cfg.user ?? "");
+      setConfigIdResellers(cfg.id_resellers ?? "");
+    }
+  }, [connection?.id, connection?.config, connection?.pms_type]);
 
   async function handleSyncNow() {
     if (!canSyncConnection) return;
@@ -105,6 +121,51 @@ export function ConnectionDetailClient() {
       setEditingConfig(false);
       setConfigPassword("");
     } finally { setSavingConfig(false); }
+  }
+
+  async function saveKunasConfig() {
+    if (!connection || !canEditConnections || connection.pms_type !== "kunas") return;
+    const cfg = (connection.config ?? {}) as Record<string, unknown>;
+    const newConfig: Record<string, string> = {
+      token: configToken.trim(),
+      username: configKunasUser.trim() || (cfg.username as string) || (cfg.user as string),
+      id_resellers: configIdResellers.trim(),
+    };
+    if (configKunasPwd) newConfig.password = configKunasPwd;
+    else if (cfg.password && cfg.password !== "••••••••") newConfig.password = cfg.password as string;
+    Object.keys(newConfig).forEach((k) => {
+      if (newConfig[k] === undefined || newConfig[k] === "") delete newConfig[k];
+    });
+    setSavingConfig(true);
+    try {
+      const updated = await adminApi.patchConnection(id, { config: newConfig });
+      setConnection(updated);
+      setEditingConfig(false);
+      setConfigKunasPwd("");
+    } finally { setSavingConfig(false); }
+  }
+
+  async function handleDeleteConnection() {
+    if (!connection || !canSyncConnection) return;
+    setDeleting(true);
+    try {
+      await adminApi.deleteConnection(id);
+      addToast({
+        title: "Conexión eliminada",
+        description: "La conexión y las propiedades sincronizadas desde ella fueron eliminadas.",
+        color: "success",
+      });
+      router.push("/admin/connections");
+    } catch (e) {
+      addToast({
+        title: "Error al eliminar",
+        description: e instanceof Error ? e.message : "No se pudo eliminar la conexión.",
+        color: "danger",
+      });
+    } finally {
+      setDeleting(false);
+      setDeleteModalOpen(false);
+    }
   }
 
   if (loading) {
@@ -213,18 +274,50 @@ export function ConnectionDetailClient() {
               </Switch>
             )}
             {canSyncConnection && (
-              <Button
-                className="btn-newayzi-primary"
-                onPress={handleSyncNow}
-                isLoading={syncing}
-                size="sm"
-                startContent={!syncing ? <Icon icon="solar:refresh-bold" width={16} /> : undefined}
-              >
-                Sincronizar ahora
-              </Button>
+              <>
+                <Button
+                  className="btn-newayzi-primary"
+                  onPress={handleSyncNow}
+                  isLoading={syncing}
+                  size="sm"
+                  startContent={!syncing ? <Icon icon="solar:refresh-bold" width={16} /> : undefined}
+                >
+                  Sincronizar ahora
+                </Button>
+                <Button
+                  color="danger"
+                  variant="flat"
+                  size="sm"
+                  onPress={() => setDeleteModalOpen(true)}
+                  startContent={<Icon icon="solar:trash-bin-2-bold" width={16} />}
+                  className="!text-red-300 border border-red-400/30 hover:bg-red-500/20"
+                >
+                  Eliminar conexión
+                </Button>
+              </>
             )}
           </div>
         </div>
+
+        <Modal isOpen={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+          <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
+            <ModalHeader className="text-white font-sora">Eliminar conexión</ModalHeader>
+            <ModalBody>
+              <p className="text-white/70 text-sm">
+                Se eliminará la conexión <strong className="text-white">{connection?.name || connection?.pms_type}</strong> y
+                todas las propiedades sincronizadas desde ella. Esta acción no se puede deshacer.
+              </p>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="flat" onPress={() => setDeleteModalOpen(false)} className="!text-white/70">
+                Cancelar
+              </Button>
+              <Button color="danger" onPress={handleDeleteConnection} isLoading={deleting}>
+                Eliminar
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
 
         {/* Last sync */}
         <div className="mt-5 flex items-center gap-2 text-sm text-white/40">
@@ -318,6 +411,100 @@ export function ConnectionDetailClient() {
                 <p>URL: <span className="text-white/70">{configBaseUrl || "—"}</span></p>
                 <p>Usuario: <span className="text-white/70">{configUsername || "—"}</span></p>
                 <p>Contraseña: <span className="text-white/50 tracking-widest">••••••••</span></p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Kunas credentials */}
+        {connection.pms_type === "kunas" && canEditConnections && (
+          <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:key-bold-duotone" width={17} className="text-[#b89eff]" />
+                <p className="text-sm font-semibold text-white/80">Credenciales Kunas</p>
+              </div>
+              {!editingConfig ? (
+                <Button
+                  size="sm"
+                  variant="flat"
+                  onPress={() => setEditingConfig(true)}
+                  className="!text-white/70 bg-white/[0.07] border border-white/[0.12] hover:bg-white/[0.12]"
+                >
+                  Editar
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    className="!text-white/60 bg-white/[0.05] border border-white/[0.1]"
+                    onPress={() => {
+                      setEditingConfig(false);
+                      const cfg = (connection.config ?? {}) as Record<string, string>;
+                      setConfigToken(cfg.token ?? "");
+                      setConfigKunasUser(cfg.username ?? cfg.user ?? "");
+                      setConfigIdResellers(cfg.id_resellers ?? "");
+                      setConfigKunasPwd("");
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="btn-newayzi-primary"
+                    onPress={saveKunasConfig}
+                    isLoading={savingConfig}
+                    isDisabled={!configToken.trim()}
+                  >
+                    Guardar
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {editingConfig ? (
+              <div className="space-y-3">
+                <Input
+                  label="Token"
+                  value={configToken}
+                  onValueChange={setConfigToken}
+                  placeholder="Token de la URL del panel Kunas"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Usuario"
+                  value={configKunasUser}
+                  onValueChange={setConfigKunasUser}
+                  placeholder="Usuario del panel Kunas"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Contraseña"
+                  type="password"
+                  value={configKunasPwd}
+                  onValueChange={setConfigKunasPwd}
+                  placeholder="Dejar vacío para mantener la actual"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="ID Reseller"
+                  value={configIdResellers}
+                  onValueChange={setConfigIdResellers}
+                  placeholder="Ej: 21 (de la URL ?id_resellers=21)"
+                  size="sm"
+                  description="Requerido para panel Kunas (app.kunas.io)"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+              </div>
+            ) : (
+              <div className="text-sm text-white/40 space-y-1">
+                <p>Token: <span className="text-white/70">{configToken ? "••••••••" : "—"}</span></p>
+                <p>Usuario: <span className="text-white/70">{configKunasUser || "—"}</span></p>
+                <p>ID Reseller: <span className="text-white/70">{configIdResellers || "—"}</span></p>
               </div>
             )}
           </div>

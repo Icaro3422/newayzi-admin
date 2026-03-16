@@ -39,9 +39,12 @@ const PMS_CONFIG_FIELDS: Record<
   { key: string; label: string; type?: string; required?: boolean; placeholder?: string; description?: string }[]
 > = {
   kunas: [
-    { key: "token", label: "Token OTASync", required: true, placeholder: "Tu token de OTASync" },
-    { key: "key", label: "Key OTASync", required: true, placeholder: "Tu key de OTASync", type: "password" },
-    { key: "id_properties", label: "ID de propiedades", required: true, placeholder: "Ej: 12345", description: "ID de la propiedad en Kunas/OTASync" },
+    { key: "token", label: "Token", required: true, placeholder: "Token (de la URL del panel Kunas)", description: "Token de autenticación" },
+    { key: "username", label: "Usuario", required: false, placeholder: "Usuario del panel Kunas" },
+    { key: "password", label: "Contraseña", required: false, placeholder: "Contraseña del panel", type: "password" },
+    { key: "id_resellers", label: "ID Reseller", required: false, placeholder: "Ej: 21", description: "Para panel Kunas (app.kunas.io). Lo ves en la URL: ?id_resellers=21" },
+    { key: "key", label: "Key OTASync (alternativo)", required: false, placeholder: "Key si usas OTASync directo", type: "password" },
+    { key: "id_properties", label: "ID de propiedades (alternativo)", required: false, placeholder: "Ej: 12345", description: "Solo si usas key en lugar de usuario/contraseña" },
   ],
   cloudbeds: [
     { key: "api_key", label: "API Key / Access Token", required: true, placeholder: "Token de CloudBeds", type: "password", description: "Obtén tu token en CloudBeds API" },
@@ -95,9 +98,17 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
   }
 
   const fields = PMS_CONFIG_FIELDS[pmsType] ?? [];
-  const allRequiredFilled = fields
-    .filter((f) => f.required)
-    .every((f) => (configValues[f.key] ?? "").trim());
+  const allRequiredFilled = (() => {
+    if (pmsType === "kunas") {
+      const token = (configValues.token ?? "").trim();
+      const key = (configValues.key ?? "").trim();
+      const idProps = (configValues.id_properties ?? "").trim();
+      const user = (configValues.username ?? "").trim();
+      const pwd = configValues.password ?? "";
+      return token && ((key && idProps) || (user && pwd));
+    }
+    return fields.filter((f) => f.required).every((f) => (configValues[f.key] ?? "").trim());
+  })();
 
   if (!canAccess("connections")) return null;
 

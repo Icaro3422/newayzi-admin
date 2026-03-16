@@ -9,6 +9,11 @@ import {
   Spinner,
   Textarea,
   addToast,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { adminApi, type PropertyDetail, type PropertyPicture, type PropertyFaq } from "@/lib/admin-api";
@@ -66,6 +71,8 @@ export function PropertyEditClient() {
   const [property, setProperty] = useState<PropertyDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // ── Campos editables: contenido principal
   const [name, setName] = useState("");
@@ -193,6 +200,23 @@ export function PropertyEditClient() {
     }
   }
 
+  async function handleDelete() {
+    if (!canEditProperty || !property) return;
+    setDeleting(true);
+    try {
+      await adminApi.deleteProperty(propertyId);
+      addToast({ title: "Propiedad eliminada", color: "success" });
+      router.push("/admin/properties");
+      router.refresh();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error al eliminar";
+      addToast({ title: "Error al eliminar", description: msg, color: "danger" });
+    } finally {
+      setDeleting(false);
+      setDeleteModalOpen(false);
+    }
+  }
+
   if (loading) {
     return (
       <GlassCard className="flex justify-center items-center py-16">
@@ -226,15 +250,43 @@ export function PropertyEditClient() {
 
   return (
     <div className="space-y-6">
-      <Button
-        as={Link}
-        href="/admin/properties"
-        variant="flat"
-        className="text-white/90 hover:bg-white/[0.1] border border-white/[0.15] rounded-xl font-medium bg-white/[0.06]"
-        startContent={<Icon icon="solar:arrow-left-outline" width={18} />}
-      >
-        Volver
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          as={Link}
+          href="/admin/properties"
+          variant="flat"
+          className="text-white/90 hover:bg-white/[0.1] border border-white/[0.15] rounded-xl font-medium bg-white/[0.06]"
+          startContent={<Icon icon="solar:arrow-left-outline" width={18} />}
+        >
+          Volver
+        </Button>
+        {canEditProperty && (
+          <Button
+            variant="flat"
+            color="danger"
+            className="rounded-xl font-medium"
+            startContent={<Icon icon="solar:trash-bin-trash-outline" width={18} />}
+            onPress={() => setDeleteModalOpen(true)}
+          >
+            Eliminar propiedad
+          </Button>
+        )}
+      </div>
+
+      <Modal isOpen={deleteModalOpen} onOpenChange={setDeleteModalOpen} placement="center">
+        <ModalContent>
+          <ModalHeader>Eliminar propiedad</ModalHeader>
+          <ModalBody>
+            <p>¿Estás seguro de que deseas eliminar la propiedad &quot;{property?.name}&quot;? Esta acción no se puede deshacer.</p>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={() => setDeleteModalOpen(false)}>Cancelar</Button>
+            <Button color="danger" onPress={handleDelete} isLoading={deleting} startContent={!deleting ? <Icon icon="solar:trash-bin-trash-outline" width={18} /> : undefined}>
+              Eliminar
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
 
       {/* ── 1. Contenido principal ── */}
       <GlassCard>

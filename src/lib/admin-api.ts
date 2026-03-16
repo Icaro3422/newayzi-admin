@@ -549,6 +549,14 @@ export const adminApi = {
     return patchJson<PropertyDetail>(`/api/admin/properties/${id}/`, data);
   },
 
+  async deleteProperty(id: number): Promise<void> {
+    const res = await authFetch(`/api/admin/properties/${id}/`, { method: "DELETE" });
+    if (res.status !== 204) {
+      const text = await res.text();
+      throw new Error(text || "Error al eliminar propiedad");
+    }
+  },
+
   async getPropertyPictures(propertyId: number): Promise<PropertyPicture[]> {
     const result = await getJson<PropertyPicture[]>(`/api/admin/properties/${propertyId}/pictures/`);
     return result ?? [];
@@ -615,6 +623,14 @@ export const adminApi = {
 
   async syncConnectionNow(id: number): Promise<{ status: string }> {
     return postJson<{ status: string }>(`/api/admin/pms/connections/${id}/sync-now/`);
+  },
+
+  async deleteConnection(id: number): Promise<void> {
+    const res = await authFetch(`/api/admin/pms/connections/${id}/`, { method: "DELETE" });
+    if (res.status !== 204) {
+      const text = await res.text();
+      throw new Error(text || "Error al eliminar conexión");
+    }
   },
 
   async getSyncedUnits(connectionId: number): Promise<SyncedUnit[] | null> {
