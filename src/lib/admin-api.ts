@@ -511,7 +511,7 @@ async function streamSSE(
 ): Promise<ConnectionSyncNowResponse> {
   const url = `${API_BASE.replace(/\/$/, "")}${path}`;
   const token = tokenGetter ? await tokenGetter() : null;
-  const headers: Record<string, string> = { Accept: "text/event-stream" };
+  const headers: Record<string, string> = { Accept: "text/event-stream, application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(url, {

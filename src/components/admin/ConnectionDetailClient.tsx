@@ -202,10 +202,7 @@ export function ConnectionDetailClient() {
         setSyncFallbackUsed(true);
         registerSyncEvent({
           event: "message",
-          detail:
-            streamError instanceof Error
-              ? `No se pudo abrir el stream en vivo (${streamError.message}). Continuamos en modo estándar.`
-              : "No se pudo abrir el stream en vivo. Continuamos en modo estándar.",
+          detail: "El progreso en vivo no está disponible en este momento. Continuamos en modo estándar.",
         });
         syncResult = await adminApi.syncConnectionNow(id);
       }
