@@ -223,6 +223,10 @@ export interface PMSConnectionDetail extends PMSConnectionListItem {
 export interface ConnectionSyncNowResponse {
   status: "ok" | "partial" | "error";
   summary?: {
+    sync_run_id?: string;
+    started_at?: string;
+    completed_at?: string;
+    duration_seconds?: number;
     synced: number;
     failed: number;
     draft_mappings_created: number;
@@ -232,6 +236,7 @@ export interface ConnectionSyncNowResponse {
     room_types_discovered?: number;
     room_type_base_rates_synced: number;
     dynamic_pricing_rules_synced: number;
+    phase_totals?: Record<string, unknown>;
     errors: string[];
   };
   window?: {

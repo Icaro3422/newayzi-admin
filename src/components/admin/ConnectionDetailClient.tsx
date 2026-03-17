@@ -64,6 +64,17 @@ function formatSyncEvent(evt: ConnectionSyncStreamEvent): string {
   return String(evt.detail || "Actualización de sincronización.");
 }
 
+function shouldUseSyncFallback(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    message.includes("stream") ||
+    message.includes("event-stream") ||
+    message.includes("no devolvió stream") ||
+    message.includes("finalizó sin resultado") ||
+    message.includes("failed to fetch")
+  );
+}
+
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <div
@@ -198,11 +209,14 @@ export function ConnectionDetailClient() {
       try {
         syncResult = await adminApi.syncConnectionWithStream(id, registerSyncEvent);
       } catch (streamError) {
+        if (!shouldUseSyncFallback(streamError)) {
+          throw streamError;
+        }
         usedFallback = true;
         setSyncFallbackUsed(true);
         registerSyncEvent({
           event: "message",
-          detail: "El progreso en vivo no está disponible en este momento. Continuamos en modo estándar.",
+          detail: "No fue posible abrir el stream en vivo. Continuamos con sincronización estándar (misma cobertura, sin telemetría en vivo).",
         });
         syncResult = await adminApi.syncConnectionNow(id);
       }
@@ -218,7 +232,7 @@ export function ConnectionDetailClient() {
       if (usedFallback) {
         addToast({
           title: "Sincronización en modo estándar",
-          description: "No se pudo mostrar progreso en tiempo real para esta ejecución.",
+          description: "La sincronización se ejecutó completa, pero sin eventos en tiempo real.",
           color: "warning",
         });
       }
@@ -226,7 +240,7 @@ export function ConnectionDetailClient() {
       if (syncResult.status === "ok") {
         addToast({
           title: "Sincronización exitosa",
-          description: `Se procesaron ${synced} registros.`,
+          description: `Sincronizados: ${synced}. Duración: ${Math.round(summary?.duration_seconds ?? 0)}s.`,
           color: "success",
         });
       } else if (syncResult.status === "partial") {
@@ -594,6 +608,12 @@ export function ConnectionDetailClient() {
                         Ventana de sync: {lastSyncResult.window.start_date} a {lastSyncResult.window.end_date}
                       </p>
                     )}
+                    {lastSyncResult.summary.sync_run_id && (
+                      <p className="text-white/50">Run ID: {lastSyncResult.summary.sync_run_id}</p>
+                    )}
+                    {typeof lastSyncResult.summary.duration_seconds === "number" && (
+                      <p className="text-white/50">Duración: {Math.round(lastSyncResult.summary.duration_seconds)}s</p>
+                    )}
                   </div>
 
                   {lastSyncResult.summary.draft_mappings_created > 0 && (
@@ -764,7 +784,7 @@ export function ConnectionDetailClient() {
                     className="btn-newayzi-primary"
                     onPress={saveKunasConfig}
                     isLoading={savingConfig}
-                    isDisabled={!configToken.trim()}
+                    isDisabled={!configToken.trim() || !configKunasUser.trim()}
                   >
                     Guardar
                   </Button>
