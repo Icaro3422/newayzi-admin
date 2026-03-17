@@ -74,19 +74,23 @@ export function CommunicationsClient() {
     Promise.all([
       adminApi.getCommunicationTemplates(),
       adminApi.getCommunicationGroups(),
-    ]).then(([tRes, gRes]) => {
-      setTemplates(tRes?.templates ?? []);
-      setGroups(gRes?.groups ?? []);
-      if ((tRes?.templates?.length ?? 0) > 0 && !templateId) {
-        setTemplateId(tRes!.templates[0].id);
-      }
-      const groupList = gRes?.groups ?? [];
-      const firstGroup = groupList.find((g) => g.id !== "custom");
-      if (firstGroup && !groupId) {
-        setGroupId(firstGroup.id);
-      }
-      setLoading(false);
-    });
+    ])
+      .then(([tRes, gRes]) => {
+        setTemplates(tRes?.templates ?? []);
+        setGroups(gRes?.groups ?? []);
+        if ((tRes?.templates?.length ?? 0) > 0 && !templateId) {
+          setTemplateId(tRes!.templates[0].id);
+        }
+        const groupList = gRes?.groups ?? [];
+        const firstGroup = groupList.find((g) => g.id !== "custom");
+        if (firstGroup && !groupId) {
+          setGroupId(firstGroup.id);
+        }
+      })
+      .catch(() => {
+        // 403 u otro error: dejar arrays vacíos para mostrar mensaje de permisos
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const selectedGroup = groups.find((g) => g.id === groupId);

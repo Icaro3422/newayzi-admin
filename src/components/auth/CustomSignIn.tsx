@@ -1,40 +1,15 @@
 "use client";
 
-import { useSignIn } from "@clerk/nextjs";
+import { useAuth, useClerk, useSignIn } from "@clerk/nextjs";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { SignInResource } from "@clerk/types";
 
+import { resolveClerkError } from "@/lib/clerk-errors";
+
 type Step = "credentials" | "forgot" | "reset_code" | "needs_new_password" | "second_factor";
-
-/* ── Mapeo de errores Clerk → mensajes en español ── */
-const CLERK_ERROR_MESSAGES: Record<string, string> = {
-  form_identifier_not_found: "No encontramos una cuenta con ese correo electrónico.",
-  form_password_incorrect: "La contraseña es incorrecta. Inténtalo de nuevo.",
-  form_password_pwned: "Esta contraseña es muy común. Elige una más segura.",
-  form_password_length_too_short: "La contraseña debe tener al menos 8 caracteres.",
-  form_identifier_exists: "Ya existe una cuenta con ese correo electrónico.",
-  form_param_missing: "Por favor completa todos los campos obligatorios.",
-  form_code_incorrect: "El código ingresado es incorrecto. Verifica e intenta de nuevo.",
-  too_many_requests: "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
-  session_exists: "Ya tienes una sesión activa.",
-};
-
-function resolveClerkError(err: unknown): string {
-  const clerkErr = (err as { errors?: { code?: string; longMessage?: string; message?: string }[] })?.errors?.[0];
-  if (!clerkErr) {
-    return (err as { message?: string })?.message || "Ocurrió un error inesperado. Inténtalo de nuevo.";
-  }
-  const code = clerkErr.code ?? "";
-  return (
-    CLERK_ERROR_MESSAGES[code] ||
-    clerkErr.longMessage ||
-    clerkErr.message ||
-    "Ocurrió un error inesperado. Inténtalo de nuevo."
-  );
-}
 
 /* ── Componentes UI internos ── */
 function Label({ children }: { children: React.ReactNode }) {
@@ -141,6 +116,51 @@ function ErrorBox({ message }: { message: string }) {
   );
 }
 
+function SessionExistsBox({
+  onSignOutAndRetry,
+  onGoToPanel,
+  loading,
+}: {
+  onSignOutAndRetry: () => void;
+  onGoToPanel: () => void;
+  loading: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-[10px] bg-amber-50 border border-amber-200 px-3.5 py-3">
+      <div className="flex items-start gap-2.5">
+        <Icon icon="solar:shield-warning-bold-duotone" className="text-amber-600 text-lg shrink-0 mt-px" />
+        <div>
+          <p className="font-sora font-semibold text-amber-800 text-[0.8125rem] leading-snug">
+            Ya tienes una sesión activa
+          </p>
+          <p className="font-sora text-amber-700 text-[0.75rem] leading-snug mt-1">
+            Hay una sesión abierta en otro dispositivo o pestaña. Puedes cerrar sesión para usar este dispositivo o ir al panel si ya iniciaste sesión aquí.
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={onGoToPanel}
+          disabled={loading}
+          className="font-sora text-[0.8125rem] font-medium text-amber-800 hover:text-amber-900 underline underline-offset-2 disabled:opacity-60"
+        >
+          Ir al panel
+        </button>
+        <span className="text-amber-600">·</span>
+        <button
+          type="button"
+          onClick={onSignOutAndRetry}
+          disabled={loading}
+          className="font-sora text-[0.8125rem] font-medium text-amber-800 hover:text-amber-900 underline underline-offset-2 disabled:opacity-60"
+        >
+          Cerrar sesión e intentar de nuevo
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SuccessBox({ message }: { message: string }) {
   return (
     <div className="flex items-start gap-2.5 rounded-[10px] bg-green-50 border border-green-200 px-3.5 py-3">
@@ -176,11 +196,22 @@ function BackButton({ onClick }: { onClick: () => void }) {
 }
 
 /* ── Componente principal ── */
+const SESSION_EXISTS_MSG = "Ya tienes una sesión activa.";
+
 export function CustomSignIn() {
+  const { isSignedIn } = useAuth();
+  const { signOut } = useClerk();
   const { isLoaded, signIn, setActive } = useSignIn();
   const router = useRouter();
 
   const [step, setStep] = useState<Step>("credentials");
+
+  // Si ya tiene sesión (ej. otra pestaña), redirigir al panel
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      router.replace("/admin");
+    }
+  }, [isLoaded, isSignedIn, router]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -458,7 +489,25 @@ export function CustomSignIn() {
             />
           </div>
 
-          {error && <ErrorBox message={error} />}
+          {error === SESSION_EXISTS_MSG ? (
+            <SessionExistsBox
+              onGoToPanel={() => { clearMessages(); router.push("/admin"); }}
+              onSignOutAndRetry={async () => {
+                clearMessages();
+                setLoading(true);
+                try {
+                  await signOut?.({ redirectUrl: window.location.href });
+                } catch {
+                  setError("No se pudo cerrar sesión. Inténtalo de nuevo.");
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              loading={loading}
+            />
+          ) : error ? (
+            <ErrorBox message={error} />
+          ) : null}
 
           <PrimaryButton loading={loading}>
             <Icon icon="solar:login-2-bold-duotone" className="text-lg" />

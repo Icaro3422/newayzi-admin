@@ -13,7 +13,7 @@ import {
   SelectItem,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { adminApi, type AdminRole } from "@/lib/admin-api";
+import { adminApi, type AdminRole, LEVEL_OPTIONS, type LoyaltyLevelValue } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 
 const ROLES: { value: AdminRole; label: string }[] = [
@@ -21,6 +21,7 @@ const ROLES: { value: AdminRole; label: string }[] = [
   { value: "visualizador", label: "Visualizador" },
   { value: "comercial", label: "Comercial" },
   { value: "operador", label: "Operador" },
+  { value: "agente", label: "Agente" },
 ];
 
 const inputDark = "rounded-xl border";
@@ -35,6 +36,8 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
   const [role, setRole] = useState<AdminRole>("visualizador");
   const [operator_id, setOperatorId] = useState<string>("");
   const [password, setPassword] = useState("");
+  const [initial_level, setInitialLevel] = useState<LoyaltyLevelValue>("member");
+  const [initial_points, setInitialPoints] = useState<string>("");
   const [operators, setOperators] = useState<{ id: number; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +71,8 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
         role,
         operator_id: operator_id ? parseInt(operator_id, 10) : undefined,
         password,
+        initial_level,
+        initial_points: initial_points ? parseFloat(initial_points) : 0,
       });
       setOpen(false);
       setEmail("");
@@ -76,6 +81,8 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
       setRole("visualizador");
       setOperatorId("");
       setPassword("");
+      setInitialLevel("member");
+      setInitialPoints("");
       onCreated?.();
       setShowSuccess(true);
     } catch (e) {
@@ -211,6 +218,48 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
                 )}
               </Select>
             )}
+            {/* Billetera Rewards inicial */}
+            <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:wallet-bold-duotone" className="text-violet-300 text-lg" />
+                <span className="text-white/80 text-sm font-semibold">Billetera Newayzi Rewards inicial</span>
+              </div>
+              <Select
+                label="Nivel Rewards de inicio"
+                selectedKeys={[initial_level]}
+                onSelectionChange={(s) => {
+                  const v = Array.from(s)[0] as LoyaltyLevelValue;
+                  if (v) setInitialLevel(v);
+                }}
+                items={LEVEL_OPTIONS}
+                classNames={{
+                  trigger: inputDark,
+                  value: "!text-white/92",
+                  label: "!text-white/70",
+                  selectorIcon: "!text-white/50",
+                  popoverContent: "bg-[#0f1220] border border-white/[0.1]",
+                }}
+              >
+                {(item) => (
+                  <SelectItem key={item.value} className="text-white">{item.label}</SelectItem>
+                )}
+              </Select>
+              <Input
+                label="Puntos iniciales (opcional)"
+                type="number"
+                value={initial_points}
+                onValueChange={setInitialPoints}
+                placeholder="Ej: 500"
+                description="Se acreditan como ajuste en el historial de la billetera."
+                classNames={{
+                  inputWrapper: inputDark,
+                  input: "!text-white/95 placeholder:!text-white/38",
+                  label: "!text-white/70",
+                  description: "!text-white/50",
+                }}
+              />
+            </div>
+
             {error && (
               <p className="text-sm text-red-400">{error}</p>
             )}

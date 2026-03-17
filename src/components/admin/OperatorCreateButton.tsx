@@ -9,6 +9,7 @@ import {
   ModalBody,
   ModalFooter,
   Input,
+  addToast,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { adminApi } from "@/lib/admin-api";
@@ -25,12 +26,14 @@ export function OperatorCreateButton({ onCreated }: { onCreated?: () => void }) 
   const [contact_email, setContactEmail] = useState("");
   const [contact_phone, setContactPhone] = useState("");
   const [saving, setSaving] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   if (!canAccess("operators")) return null;
 
   async function handleCreate() {
     if (!name.trim() || !contact_email.trim()) return;
     setSaving(true);
+    setEmailError(null);
     try {
       const res = await adminApi.createOperator({
         name: name.trim(),
@@ -44,6 +47,29 @@ export function OperatorCreateButton({ onCreated }: { onCreated?: () => void }) 
       onCreated?.();
       setInviteStatus(res.invite_status ?? (res.email_sent ? "sent" : "no_resend"));
       setShowSuccess(true);
+    } catch (e) {
+      let msg = e instanceof Error ? e.message : "Error al crear operador.";
+      let detail = msg.replace(/^API \d+:\s*/, "");
+      try {
+        const parsed = JSON.parse(detail);
+        if (typeof parsed?.detail === "string") detail = parsed.detail;
+        else if (Array.isArray(parsed?.contact_email)) detail = parsed.contact_email[0];
+        else if (typeof parsed?.contact_email === "string") detail = parsed.contact_email;
+      } catch {
+        const m = detail.match(/"detail"\s*:\s*"([^"]+)"/);
+        if (m) detail = m[1];
+        else {
+          const m2 = detail.match(/"contact_email"\s*:\s*\[\s*"([^"]+)"\s*\]/);
+          if (m2) detail = m2[1];
+        }
+      }
+      setEmailError(detail || "Revisa los campos e intenta de nuevo.");
+      addToast({
+        title: "Error al crear operador",
+        description: detail || "Revisa los campos e intenta de nuevo.",
+        color: "danger",
+        timeout: 5000,
+      });
     } finally {
       setSaving(false);
     }
@@ -62,7 +88,10 @@ export function OperatorCreateButton({ onCreated }: { onCreated?: () => void }) 
       </Button>
       <Modal
         isOpen={open}
-        onOpenChange={setOpen}
+        onOpenChange={(isOpen) => {
+          setOpen(isOpen);
+          if (!isOpen) setEmailError(null);
+        }}
         size="lg"
         backdrop="blur"
         classNames={{
@@ -92,10 +121,15 @@ export function OperatorCreateButton({ onCreated }: { onCreated?: () => void }) 
             <Input
               label="Email contacto"
               value={contact_email}
-              onValueChange={setContactEmail}
+              onValueChange={(v) => {
+                setContactEmail(v);
+                if (emailError) setEmailError(null);
+              }}
               type="email"
               isRequired
               description="Obligatorio para enviar la invitación"
+              isInvalid={!!emailError}
+              errorMessage={emailError}
               classNames={{
                 inputWrapper: inputDark,
                 input: "!text-white/95 placeholder:!text-white/38",

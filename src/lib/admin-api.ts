@@ -30,8 +30,10 @@ function getApiBase(): string {
   if (typeof window !== "undefined") {
     const h = window.location.hostname;
     if (h === "portal.newayzi.com") return "https://api.newayzi.com";
+    if (h === "admin.production.newayzi.com") return "https://api.production.newayzi.com";
     if (h === "portal.staging.newayzi.com")
       return "https://api.staging.newayzi.com";
+    if (h === "admin.staging.newayzi.com") return "https://api.staging.newayzi.com";
     if (h === "localhost" || h === "127.0.0.1") return "http://localhost:8000";
   }
   return "";
@@ -83,6 +85,19 @@ export interface PropertyPMSConnection {
   pms_type: string;
 }
 
+export interface PropertyRewardsInfo {
+  participates: boolean;
+  status?: "active" | "legacy";
+  label?: string;
+  label_display?: string;
+  cashback_rate?: number;
+  cashback_pct?: number;
+  visibility_boost?: number;
+  visibility_label?: string;
+  min_monthly_bookings?: number | null;
+  auto_renew?: boolean;
+}
+
 export interface PropertyListItem {
   id: number;
   name: string;
@@ -94,15 +109,46 @@ export interface PropertyListItem {
   room_types_count?: number;
   operator_name?: string | null;
   pms_connections?: PropertyPMSConnection[];
+  rewards_info?: PropertyRewardsInfo | null;
+}
+
+export interface PropertyPicture {
+  id: number;
+  url: string;
+  is_primary: boolean;
+  order_index: number;
+  created: string;
+}
+
+export interface PropertyFaq {
+  question: string;
+  answer: string;
 }
 
 export interface PropertyDetail extends PropertyListItem {
   description?: string;
+  // Contacto y ubicación
   address?: string;
   phone?: string;
   currency: string;
+  timezone?: string;
+  location?: { lat: number; lng: number } | null;
+  // Horarios
+  check_in_from?: string | null;
+  check_in_until?: string | null;
+  check_out_from?: string | null;
+  check_out_until?: string | null;
+  // Reglas
+  smoking_allowed?: boolean;
+  children_allowed?: boolean;
+  parties_allowed?: boolean;
+  min_age?: number | null;
+  // Contenido
   amenities: string[] | Record<string, unknown>[];
+  important_info?: string[];
+  faqs?: PropertyFaq[];
   room_types: { id: number; name: string; code: string }[];
+  pictures?: PropertyPicture[];
 }
 
 export interface PMSConnectionListItem {
@@ -127,6 +173,7 @@ export interface PMSConnectionListItem {
 export interface PMSConnectionType {
   code: string;
   label: string;
+  operator_count?: number;
 }
 
 export interface UnitsSummary {
@@ -157,6 +204,8 @@ export interface UnitsSummary {
 export interface UnitItem {
   pms_property_id?: string;
   pms_room_id?: string;
+  pms_property_name?: string | null;
+  pms_room_name?: string | null;
   local_property_id?: number | null;
   local_property_name?: string | null;
   local_room_type_id?: number | null;
@@ -171,6 +220,63 @@ export interface PMSConnectionDetail extends PMSConnectionListItem {
   sync_rates: boolean;
   sync_bookings: boolean;
   sync_interval_minutes: number;
+}
+
+export interface ConnectionSyncNowResponse {
+  status: "ok" | "partial" | "error";
+  summary?: {
+    sync_run_id?: string;
+    started_at?: string;
+    completed_at?: string;
+    duration_seconds?: number;
+    synced: number;
+    failed: number;
+    draft_mappings_created: number;
+    properties_synced: number;
+    properties_discovered?: number;
+    room_types_synced: number;
+    room_types_discovered?: number;
+    room_type_base_rates_synced: number;
+    dynamic_pricing_rules_synced: number;
+    phase_totals?: Record<string, unknown>;
+    errors: string[];
+  };
+  window?: {
+    start_date: string;
+    end_date: string;
+  };
+  detail?: string;
+}
+
+export interface ConnectionSyncStreamEvent {
+  event:
+    | "sync_started"
+    | "phase_started"
+    | "item_progress"
+    | "phase_summary"
+    | "sync_completed"
+    | "sync_error"
+    | "message";
+  phase?: "properties" | "room_types" | "availability" | "rates";
+  current?: number;
+  total?: number;
+  status?: string;
+  item?: {
+    pms_property_id?: string;
+    pms_room_type_id?: string;
+    date?: string | null;
+    name?: string | null;
+  };
+  error?: string;
+  summary?: ConnectionSyncNowResponse["summary"] & {
+    properties_failed?: number;
+    property_errors?: string[];
+    room_types_failed?: number;
+    room_type_errors?: string[];
+  };
+  window?: ConnectionSyncNowResponse["window"];
+  detail?: string;
+  [key: string]: unknown;
 }
 
 export interface SyncedUnit {
@@ -239,10 +345,69 @@ export interface AvailabilityItem {
   room_type_name: string;
   date: string;
   available: number;
+  total_rooms?: number;
+  locked?: number;
   source: "internal" | "pms";
   block_reason?: string;
   price_per_night?: string;
   currency?: string;
+}
+
+export interface AvailabilityPhysicalRoom {
+  id: number;
+  label: string;
+  floor?: number | null;
+  ical_url?: string | null;
+  last_sync?: string | null;
+  is_available: boolean;
+  lock?: {
+    block_id: number;
+    source: string;
+    note: string;
+    block_start: string;
+    block_end: string;
+    status: string;
+    external_reference?: string | null;
+  } | null;
+}
+
+export interface AvailabilityBlockItem {
+  id: number;
+  room_type_id: number;
+  room_type_name: string;
+  property_id: number;
+  property_name: string;
+  start_date: string;
+  end_date: string;
+  status: "active" | "cancelled" | "released";
+  source: "internal" | "external" | "system";
+  note: string;
+  external_reference?: string | null;
+  locks_count?: number;
+  rooms_affected?: number;
+  created?: string;
+}
+
+export interface AvailabilitySlotDetail {
+  room_type_id: number;
+  room_type_name: string;
+  property_id: number;
+  property_name: string;
+  date: string;
+  total: number;
+  available: number;
+  locked: number;
+  physical_rooms: AvailabilityPhysicalRoom[];
+  active_blocks: Array<{
+    id: number;
+    source: string;
+    status: string;
+    start_date: string;
+    end_date: string;
+    note: string;
+    external_reference?: string | null;
+    rooms_affected: number;
+  }>;
 }
 
 export interface PaymentMethod {
@@ -297,9 +462,21 @@ async function authFetch(path: string, options: RequestInit = {}) {
     headers,
     credentials: "include",
   });
-  if (!res.ok && res.status !== 404) {
-    const text = await res.text();
-    throw new Error(`API ${res.status}: ${text || res.statusText}`);
+  if (!res.ok) {
+    if (res.status === 401) {
+      // Sesión expirada: redirigir al login
+      if (typeof window !== "undefined") {
+        window.location.href = "/sign-in?reason=session_expired";
+      }
+      throw new Error("Sesión expirada. Redirigiendo al inicio de sesión...");
+    }
+    if (res.status === 403) {
+      throw new Error("No tienes permisos para realizar esta acción.");
+    }
+    if (res.status !== 404) {
+      const text = await res.text();
+      throw new Error(`API ${res.status}: ${text || res.statusText}`);
+    }
   }
   return res;
 }
@@ -308,6 +485,21 @@ async function getJson<T>(path: string): Promise<T | null> {
   const res = await authFetch(path);
   if (res.status === 404) return null;
   return res.json() as Promise<T>;
+}
+
+async function authFetchMultipart(path: string, method: string, body: FormData) {
+  const url = `${API_BASE.replace(/\/$/, "")}${path}`;
+  const token = tokenGetter ? await tokenGetter() : null;
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(url, { method, body, headers, credentials: "include" });
+  if (!res.ok) {
+    const text = await res.text();
+    let detail = text;
+    try { detail = JSON.parse(text).detail ?? text; } catch { /* keep raw text */ }
+    throw new Error(detail || `Error ${res.status}`);
+  }
+  return res;
 }
 
 async function patchJson<T>(path: string, body: unknown): Promise<T> {
@@ -323,9 +515,136 @@ async function postJson<T>(path: string, body?: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function streamSSE(
+  path: string,
+  onEvent?: (event: ConnectionSyncStreamEvent) => void,
+  signal?: AbortSignal
+): Promise<ConnectionSyncNowResponse> {
+  const url = `${API_BASE.replace(/\/$/, "")}${path}`;
+  const token = tokenGetter ? await tokenGetter() : null;
+  const headers: Record<string, string> = { Accept: "text/event-stream, application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers,
+    credentials: "include",
+    signal,
+  });
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/sign-in?reason=session_expired";
+      }
+      throw new Error("Sesión expirada. Redirigiendo al inicio de sesión...");
+    }
+    if (res.status === 403) {
+      throw new Error("No tienes permisos para realizar esta acción.");
+    }
+    const text = await res.text();
+    throw new Error(`API ${res.status}: ${text || res.statusText}`);
+  }
+
+  if (!res.body) {
+    throw new Error("El servidor no devolvió stream de sincronización.");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalResult: ConnectionSyncNowResponse | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    while (true) {
+      const separatorIdx = buffer.indexOf("\n\n");
+      if (separatorIdx === -1) break;
+      const rawEvent = buffer.slice(0, separatorIdx);
+      buffer = buffer.slice(separatorIdx + 2);
+
+      const lines = rawEvent.split("\n");
+      let eventName = "message";
+      const dataLines: string[] = [];
+      for (const line of lines) {
+        if (line.startsWith("event:")) {
+          eventName = line.slice(6).trim() || "message";
+        } else if (line.startsWith("data:")) {
+          dataLines.push(line.slice(5).trim());
+        }
+      }
+
+      if (dataLines.length === 0) continue;
+      let payload: Record<string, unknown> = {};
+      try {
+        payload = JSON.parse(dataLines.join("\n")) as Record<string, unknown>;
+      } catch {
+        payload = { detail: dataLines.join("\n") };
+      }
+
+      const event = {
+        event: (payload.event as ConnectionSyncStreamEvent["event"]) ?? (eventName as ConnectionSyncStreamEvent["event"]),
+        ...payload,
+      } as ConnectionSyncStreamEvent;
+      onEvent?.(event);
+
+      if (event.event === "sync_completed") {
+        finalResult = {
+          status: (event.status as ConnectionSyncNowResponse["status"]) ?? "ok",
+          summary: event.summary as ConnectionSyncNowResponse["summary"],
+          window: event.window as ConnectionSyncNowResponse["window"],
+        };
+      }
+      if (event.event === "sync_error") {
+        throw new Error(event.detail || "No se pudo completar la sincronización.");
+      }
+    }
+  }
+
+  if (finalResult) return finalResult;
+  throw new Error("El stream de sincronización finalizó sin resultado.");
+}
+
+export interface RewardPoolMovement {
+  id: number;
+  kind: "contribution" | "cashback_issued" | "redemption" | "breakage" | "adjustment";
+  amount: number;
+  notes: string;
+  createdAt: string;
+  bookingId: number | null;
+}
+
+export interface RewardPoolSummary {
+  totalContributed: number;
+  totalIssued: number;
+  totalRedeemed: number;
+  totalBreakage: number;
+  currentBalance: number;
+  liability: number;
+  totalUsersWithPoints: number;
+  totalPointsInCirculation: number;
+  recentMovements: RewardPoolMovement[];
+}
+
 export const adminApi = {
   async getMe(): Promise<AdminMe | null> {
     return getJson<AdminMe>("/api/admin/me/");
+  },
+
+  async getPoolSummary(): Promise<RewardPoolSummary | null> {
+    return getJson<RewardPoolSummary>("/api/admin/loyalty/pool/");
+  },
+
+  async getAnalyticsDashboard(days: number): Promise<{
+    kpis: Record<string, unknown>;
+    time_series: { date: string; bookings: number; revenue: number }[];
+    top_properties: { property_id: number; name: string; bookings: number; revenue: number }[];
+    status_distribution: { status: string; count: number }[];
+  } | null> {
+    return getJson(`/api/admin/analytics/dashboard/?days=${days}`);
   },
 
   async clearMustChangePassword(): Promise<void> {
@@ -360,15 +679,60 @@ export const adminApi = {
   async patchProperty(
     id: number,
     data: Partial<{
+      name: string;
+      description: string;
       is_active: boolean;
       is_published: boolean;
       pets_allowed: boolean;
-      name: string;
-      description: string;
+      smoking_allowed: boolean;
+      children_allowed: boolean;
+      parties_allowed: boolean;
+      min_age: number | null;
+      address: string;
+      phone: string;
+      timezone: string;
+      check_in_from: string | null;
+      check_in_until: string | null;
+      check_out_from: string | null;
+      check_out_until: string | null;
       amenities: string[] | Record<string, unknown>[];
+      important_info: string[];
+      faqs: { question: string; answer: string }[];
     }>
   ): Promise<PropertyDetail> {
     return patchJson<PropertyDetail>(`/api/admin/properties/${id}/`, data);
+  },
+
+  async deleteProperty(id: number): Promise<void> {
+    const res = await authFetch(`/api/admin/properties/${id}/`, { method: "DELETE" });
+    if (res.status !== 204) {
+      const text = await res.text();
+      throw new Error(text || "Error al eliminar propiedad");
+    }
+  },
+
+  async getPropertyPictures(propertyId: number): Promise<PropertyPicture[]> {
+    const result = await getJson<PropertyPicture[]>(`/api/admin/properties/${propertyId}/pictures/`);
+    return result ?? [];
+  },
+
+  async uploadPropertyPicture(propertyId: number, file: File, isPrimary = false): Promise<PropertyPicture> {
+    const fd = new FormData();
+    fd.append("image", file);
+    if (isPrimary) fd.append("is_primary", "true");
+    const res = await authFetchMultipart(`/api/admin/properties/${propertyId}/pictures/`, "POST", fd);
+    return res.json() as Promise<PropertyPicture>;
+  },
+
+  async setPropertyPicturePrimary(propertyId: number, picId: number): Promise<PropertyPicture> {
+    const fd = new FormData();
+    fd.append("is_primary", "true");
+    const res = await authFetchMultipart(`/api/admin/properties/${propertyId}/pictures/${picId}/`, "PATCH", fd);
+    return res.json() as Promise<PropertyPicture>;
+  },
+
+  async deletePropertyPicture(propertyId: number, picId: number): Promise<void> {
+    await authFetch(`/api/admin/properties/${propertyId}/pictures/${picId}/`, { method: "DELETE" });
   },
 
   async getConnectionTypes(): Promise<{ results: PMSConnectionType[] } | null> {
@@ -379,11 +743,19 @@ export const adminApi = {
     return getJson<{ results: PMSConnectionListItem[] }>("/api/admin/pms/connections/");
   },
 
+  async getDashboardStats(): Promise<{
+    average_price_synced: number | null;
+    currency: string;
+    properties_count: number;
+  } | null> {
+    return getJson("/api/admin/dashboard-stats/");
+  },
+
   async createConnection(data: {
     name?: string;
     pms_type: string;
     operator_id?: number;
-    config?: { base_url?: string; username?: string; password?: string };
+    config?: Record<string, string>;
   }): Promise<PMSConnectionListItem> {
     return postJson<PMSConnectionListItem>("/api/admin/pms/connections/", data);
   },
@@ -403,8 +775,24 @@ export const adminApi = {
     return patchJson<PMSConnectionDetail>(`/api/admin/pms/connections/${id}/`, data);
   },
 
-  async syncConnectionNow(id: number): Promise<{ status: string }> {
-    return postJson<{ status: string }>(`/api/admin/pms/connections/${id}/sync-now/`);
+  async syncConnectionNow(id: number): Promise<ConnectionSyncNowResponse> {
+    return postJson<ConnectionSyncNowResponse>(`/api/admin/pms/connections/${id}/sync-now/`);
+  },
+
+  async syncConnectionWithStream(
+    id: number,
+    onEvent?: (event: ConnectionSyncStreamEvent) => void,
+    signal?: AbortSignal
+  ): Promise<ConnectionSyncNowResponse> {
+    return streamSSE(`/api/admin/pms/connections/${id}/sync-stream/`, onEvent, signal);
+  },
+
+  async deleteConnection(id: number): Promise<void> {
+    const res = await authFetch(`/api/admin/pms/connections/${id}/`, { method: "DELETE" });
+    if (res.status !== 204) {
+      const text = await res.text();
+      throw new Error(text || "Error al eliminar conexión");
+    }
   },
 
   async getSyncedUnits(connectionId: number): Promise<SyncedUnit[] | null> {
@@ -450,6 +838,8 @@ export const adminApi = {
     name: string;
     contact_email: string;
     contact_phone?: string;
+    initial_level?: string;
+    initial_points?: number;
   }): Promise<Agency & { email_sent?: boolean }> {
     return postJson<Agency>("/api/admin/agencies/", data);
   },
@@ -460,6 +850,17 @@ export const adminApi = {
 
   async getAgencyLevels(): Promise<AgencyLevelConfig[] | null> {
     return getJson<AgencyLevelConfig[]>("/api/admin/agencies/levels/");
+  },
+
+  async getAgencyWallet(agencyId: number): Promise<AgentWallet | null> {
+    return getJson<AgentWallet>(`/api/admin/agencies/${agencyId}/wallet/`);
+  },
+
+  async adjustAgencyWallet(
+    agencyId: number,
+    payload: { amount?: number; reason?: WalletMovementReason; note?: string; level?: LoyaltyLevelValue }
+  ): Promise<AgentWallet> {
+    return postJson<AgentWallet>(`/api/admin/agencies/${agencyId}/wallet/`, payload);
   },
 
   async getAvailability(params?: {
@@ -477,6 +878,61 @@ export const adminApi = {
     return getJson<{ results: AvailabilityItem[] }>(
       `/api/admin/availability/${query ? `?${query}` : ""}`.replace(/\/\?/, "?")
     );
+  },
+
+  async getAvailabilitySlotDetail(params: {
+    room_type_id: number;
+    date: string;
+  }): Promise<AvailabilitySlotDetail | null> {
+    const q = new URLSearchParams();
+    q.set("room_type_id", String(params.room_type_id));
+    q.set("date", params.date);
+    const path = `/api/admin/availability/slot/?${q.toString()}`;
+    const res = await authFetch(path);
+    if (res.status === 404) {
+      throw new Error("Tipo de habitación no encontrado (404). El endpoint puede no existir o el ID es inválido.");
+    }
+    return res.json() as Promise<AvailabilitySlotDetail>;
+  },
+
+  async getAvailabilityBlocks(params?: {
+    property_id?: number;
+    room_type_id?: number;
+    date_from?: string;
+    date_to?: string;
+    status?: "active" | "cancelled" | "released" | "all";
+  }): Promise<{ results: AvailabilityBlockItem[] } | null> {
+    const q = new URLSearchParams();
+    if (params?.property_id != null) q.set("property_id", String(params.property_id));
+    if (params?.room_type_id != null) q.set("room_type_id", String(params.room_type_id));
+    if (params?.date_from) q.set("date_from", params.date_from);
+    if (params?.date_to) q.set("date_to", params.date_to);
+    if (params?.status) q.set("status", params.status);
+    const query = q.toString();
+    return getJson<{ results: AvailabilityBlockItem[] }>(
+      `/api/admin/availability/blocks/${query ? `?${query}` : ""}`
+    );
+  },
+
+  async createAvailabilityBlock(data: {
+    room_type_id: number;
+    start_date: string;
+    end_date: string;
+    note?: string;
+    physical_room_ids?: number[];
+  }): Promise<AvailabilityBlockItem | null> {
+    return postJson<AvailabilityBlockItem>("/api/admin/availability/blocks/", data);
+  },
+
+  async cancelAvailabilityBlock(id: number): Promise<{ id: number; status: string } | null> {
+    return patchJson<{ id: number; status: string }>(`/api/admin/availability/blocks/${id}/`, {
+      status: "cancelled",
+    });
+  },
+
+  async deleteAvailabilityBlock(id: number): Promise<boolean> {
+    const res = await authFetch(`/api/admin/availability/blocks/${id}/`, { method: "DELETE" });
+    return res.ok;
   },
 
   async getPaymentMethods(): Promise<PaymentMethod[] | null> {
@@ -508,9 +964,23 @@ export const adminApi = {
 
   async patchUser(
     id: number,
-    data: { role?: AdminRole | null; operator_id?: number | null }
+    data: {
+      role?: AdminRole | null;
+      operator_id?: number | null;
+      first_name?: string;
+      last_name?: string;
+      email?: string;
+    }
   ): Promise<AdminUserListItem> {
     return patchJson<AdminUserListItem>(`/api/admin/users/${id}/`, data);
+  },
+
+  async deleteUser(id: number): Promise<void> {
+    const res = await authFetch(`/api/admin/users/${id}/`, { method: "DELETE" });
+    if (res.status !== 204) {
+      const text = await res.text();
+      throw new Error(text || "Error al eliminar usuario");
+    }
   },
 
   async createUserAdmin(data: {
@@ -520,6 +990,8 @@ export const adminApi = {
     role: AdminRole;
     operator_id?: number | null;
     password: string;
+    initial_level?: string;
+    initial_points?: number;
   }): Promise<AdminUserListItem> {
     return postJson<AdminUserListItem>("/api/admin/users/create/", data);
   },
@@ -576,6 +1048,129 @@ export const adminApi = {
   },
 };
 
+// ─────────────────────────────────────────────────────────────────────────── //
+//  Reviews (admin moderation)
+// ─────────────────────────────────────────────────────────────────────────── //
+
+export interface AdminReview {
+  id: number;
+  property_id: number;
+  property_name: string;
+  booking_id: number | null;
+  clerk_user_id: string;
+  author_name: string;
+  rating: number;
+  cleanliness: number | null;
+  comfort: number | null;
+  location: number | null;
+  value: number | null;
+  title: string;
+  body: string;
+  status: "pending" | "approved" | "rejected";
+  moderated_by: string;
+  moderation_note: string;
+  moderated_at: string | null;
+  operator_response: string;
+  operator_response_at: string | null;
+  created: string;
+}
+
+export interface ReviewsListResponse {
+  count: number;
+  page: number;
+  page_size: number;
+  num_pages: number;
+  pending_count: number;
+  results: AdminReview[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────── //
+//  Coupons (admin)
+// ─────────────────────────────────────────────────────────────────────────── //
+
+export interface AdminCoupon {
+  id: number;
+  code: string;
+  description: string;
+  discount_type: "percentage" | "fixed";
+  discount_value: string;
+  max_discount_amount: string | null;
+  min_booking_amount: string;
+  max_uses: number | null;
+  max_uses_per_user: number;
+  times_used: number;
+  valid_from: string;
+  valid_until: string | null;
+  status: "active" | "paused" | "expired";
+  created: string;
+}
+
+export interface CouponsListResponse {
+  count: number;
+  page: number;
+  num_pages: number;
+  results: AdminCoupon[];
+}
+
+export const couponsApi = {
+  async list(params: { page?: number; search?: string; status?: string }): Promise<CouponsListResponse> {
+    const q = new URLSearchParams();
+    if (params.page != null) q.set("page", String(params.page));
+    if (params.search) q.set("search", params.search);
+    if (params.status) q.set("status", params.status);
+    const res = await authFetch(`/api/admin/coupons/?${q}`);
+    return (await res.json()) as CouponsListResponse;
+  },
+  async create(data: {
+    code: string;
+    description?: string;
+    discount_type: "percentage" | "fixed";
+    discount_value: string;
+    max_discount_amount?: string | null;
+    min_booking_amount?: string;
+    max_uses?: number | null;
+    max_uses_per_user?: number;
+    valid_from?: string;
+    valid_until?: string | null;
+  }): Promise<AdminCoupon> {
+    return postJson<AdminCoupon>("/api/admin/coupons/", data);
+  },
+  async patch(id: number, data: { status?: string }): Promise<AdminCoupon> {
+    return patchJson<AdminCoupon>(`/api/admin/coupons/${id}/`, data);
+  },
+  async delete(id: number): Promise<void> {
+    const res = await authFetch(`/api/admin/coupons/${id}/`, { method: "DELETE" });
+    if (res.status !== 204) {
+      const text = await res.text();
+      throw new Error(`API ${res.status}: ${text}`);
+    }
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────── //
+//  Reviews (admin moderation)
+// ─────────────────────────────────────────────────────────────────────────── //
+
+export const reviewsApi = {
+  async list(params: { status?: string; search?: string; page?: number }): Promise<ReviewsListResponse> {
+    const q = new URLSearchParams();
+    if (params.status) q.set("status", params.status);
+    if (params.search) q.set("search", params.search);
+    if (params.page != null) q.set("page", String(params.page));
+    const res = await authFetch(`/api/admin/reviews/?${q}`);
+    return (await res.json()) as ReviewsListResponse;
+  },
+  async approve(reviewId: number, note?: string): Promise<{ ok: boolean; status: string }> {
+    return postJson(`/api/admin/reviews/${reviewId}/approve/`, { note: note || "" });
+  },
+  async reject(reviewId: number, note?: string): Promise<{ ok: boolean; status: string }> {
+    return postJson(`/api/admin/reviews/${reviewId}/reject/`, { note: note || "" });
+  },
+  async respond(reviewId: number, response: string): Promise<{ ok: boolean }> {
+    return postJson(`/api/admin/reviews/${reviewId}/respond/`, { response });
+  },
+};
+
 export interface CommunicationTemplate {
   id: string;
   name: string;
@@ -590,26 +1185,247 @@ export interface CommunicationGroup {
   recipients_count: number;
 }
 
-/** Permisos derivados del rol (plan: super_admin todo, operador solo suyo, agente solo dashboard/availability) */
+// ─────────────────────────────────────────────────────────────────────────── //
+//  Rewards Agreements
+// ─────────────────────────────────────────────────────────────────────────── //
+
+export type AgreementStatus = "draft" | "pending" | "active" | "paused" | "expired" | "cancelled";
+export type VisibilityBoost = 0 | 1 | 2 | 3;
+export type RewardsLabel = "none" | "partner" | "preferred" | "elite";
+
+export interface RewardsAgreement {
+  id: number;
+  operatorId: number;
+  operatorName: string;
+  status: AgreementStatus;
+  statusDisplay: string;
+  cashbackContributionRate: number;
+  cashbackContributionPct: string;
+  visibilityBoost: VisibilityBoost;
+  visibilityBoostDisplay: string;
+  rewardsLabel: RewardsLabel;
+  rewardsLabelDisplay: string;
+  commissionOffsetPct: number;
+  minMonthlyBookings: number;
+  effectiveFrom: string;
+  effectiveUntil: string | null;
+  autoRenew: boolean;
+  renewalNoticeDays: number;
+  termsNotes: string;
+  signedByNewayzi: string;
+  signedByOperator: string;
+  signedAt: string | null;
+  createdBy: string;
+  internalNotes: string;
+  isActiveToday: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OperatorRewardsData {
+  operator: { id: number; name: string; email: string };
+  activeAgreement: RewardsAgreement | null;
+  agreements: RewardsAgreement[];
+  stats: {
+    poolContributions: number;
+    cashbackEmitted: number;
+    bookingsRewarded: number;
+  };
+}
+
+export const rewardsAgreementsApi = {
+  async getForOperator(operatorId: number): Promise<OperatorRewardsData> {
+    return getJson<OperatorRewardsData>(
+      `/api/admin/operators/${operatorId}/rewards-agreements/`
+    ) as Promise<OperatorRewardsData>;
+  },
+
+  async create(
+    operatorId: number,
+    data: Partial<RewardsAgreement>
+  ): Promise<RewardsAgreement> {
+    return postJson<RewardsAgreement>(
+      `/api/admin/operators/${operatorId}/rewards-agreements/`,
+      data
+    );
+  },
+
+  async update(
+    operatorId: number,
+    agreementId: number,
+    data: Partial<RewardsAgreement> & { status?: AgreementStatus }
+  ): Promise<RewardsAgreement> {
+    return patchJson<RewardsAgreement>(
+      `/api/admin/operators/${operatorId}/rewards-agreements/${agreementId}/`,
+      data
+    );
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Bookings Admin
+// ---------------------------------------------------------------------------
+
+export interface AdminBookingTransaction {
+  id: number;
+  gateway: string;
+  amount: string;
+  currency: string;
+  status: string;
+  external_reference: string;
+  created: string;
+}
+
+export interface AdminBookingListItem {
+  id: number;
+  reference: string;
+  clerk_user_id: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  property_id: number;
+  property_name: string;
+  room_type_id: number;
+  room_type_name: string;
+  operator_name: string;
+  check_in: string;
+  check_out: string;
+  nights: number;
+  guests_count: number;
+  status: string;
+  currency: string;
+  total_amount: string;
+  payment_status: string;
+  payment_gateway: string;
+  payment_reference: string;
+  notes: string;
+  metadata: Record<string, unknown>;
+  coupon_code: string | null;
+  coupon_discount: string | null;
+  refund_attempted: boolean;
+  refund_success: boolean;
+  refund_requires_manual: boolean;
+  refund_gateway: string | null;
+  cancellation_refund_amount: string | null;
+  cancellation_refund_type: string | null;
+  cancellation_refund_pct: number | null;
+  created: string;
+  updated: string;
+  agency_id: number | null;
+  profile_id: number | null;
+  transactions: AdminBookingTransaction[];
+}
+
+export interface AdminBookingDetail extends AdminBookingListItem {
+  guests: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+    is_primary: boolean;
+  }[];
+  profile: { id: number; clerk_user_id: string } | null;
+}
+
+export interface AdminBookingListResponse {
+  count: number;
+  page: number;
+  page_size: number;
+  num_pages: number;
+  results: AdminBookingListItem[];
+}
+
+export interface AdminBookingStats {
+  total: number;
+  confirmed: number;
+  cancelled: number;
+  pending: number;
+  this_month_count: number;
+  this_month_revenue: string;
+}
+
+export const adminBookings = {
+  async list(params?: {
+    status?: string;
+    search?: string;
+    page?: number;
+    operator_id?: number;
+    date_from?: string;
+    date_to?: string;
+  }): Promise<AdminBookingListResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set("status", params.status);
+    if (params?.search) searchParams.set("search", params.search);
+    if (params?.page) searchParams.set("page", String(params.page));
+    if (params?.operator_id) searchParams.set("operator_id", String(params.operator_id));
+    if (params?.date_from) searchParams.set("date_from", params.date_from);
+    if (params?.date_to) searchParams.set("date_to", params.date_to);
+    const qs = searchParams.toString() ? `?${searchParams.toString()}` : "";
+    const data = await getJson<AdminBookingListResponse>(`/api/admin/bookings/${qs}`);
+    return data ?? { count: 0, page: 1, page_size: 25, num_pages: 0, results: [] };
+  },
+
+  async stats(): Promise<AdminBookingStats> {
+    const data = await getJson<AdminBookingStats>(`/api/admin/bookings/stats/`);
+    return data ?? { total: 0, confirmed: 0, cancelled: 0, pending: 0, this_month_count: 0, this_month_revenue: "0" };
+  },
+
+  async get(id: number): Promise<AdminBookingDetail | null> {
+    return getJson<AdminBookingDetail>(`/api/admin/bookings/${id}/`);
+  },
+
+  async cancel(
+    id: number,
+    data: { reason?: string; has_justification?: boolean }
+  ): Promise<{ ok: boolean; refund_type: string; refund_pct: number; refund_amount: string; reason: string }> {
+    return postJson(`/api/admin/bookings/${id}/cancel/`, data);
+  },
+};
+
+/** Metadatos visuales por rol — icono, color, label y descripción */
+export const ROLE_META: Record<AdminRole, { label: string; icon: string; color: string; description: string }> = {
+  super_admin:  { label: "Super Admin",  icon: "solar:shield-star-bold-duotone",     color: "#fbbf24", description: "Acceso completo a todas las funciones" },
+  comercial:    { label: "Comercial",    icon: "solar:hand-money-bold-duotone",      color: "#34d399", description: "Gestión comercial y operadores" },
+  visualizador: { label: "Visualizador", icon: "solar:eye-bold-duotone",             color: "#60a5fa", description: "Vista general — solo lectura" },
+  operador:     { label: "Operador",     icon: "solar:buildings-2-bold-duotone",     color: "#a78bfa", description: "Gestión de tus propiedades" },
+  agente:       { label: "Agente",       icon: "solar:bag-4-bold-duotone",           color: "#fb923c", description: "Disponibilidad y reservas" },
+};
+
+/** Permisos de acceso a módulos */
 export function canAccessModule(role: AdminRole | null, module: string): boolean {
   if (!role) return false;
+  // Super admin no ve "Mi Billetera" — es parte del equipo Newayzi, no usa rewards personales
+  if (role === "super_admin" && module === "wallet") return false;
   if (role === "super_admin") return true;
   switch (module) {
     case "profile":
-      return true; // Todos los roles pueden ver su propio perfil
     case "dashboard":
       return true;
     case "properties":
-      return ["super_admin", "visualizador", "comercial", "operador"].includes(role);
+      return ["visualizador", "comercial", "operador"].includes(role);
     case "availability":
-      return ["super_admin", "visualizador", "comercial", "operador", "agente"].includes(role);
+      return ["visualizador", "comercial", "operador", "agente"].includes(role);
     case "connections":
-      return ["super_admin", "operador"].includes(role);
+      return role === "operador";
     case "operators":
+      return role === "comercial"; // comercial ve operadores (solo lectura)
+    case "communications":
+      return false; // solo super_admin (ya retornó arriba; backend restringe igual)
+    case "wallet":
+      // Operador: Programa de Socios. Agente/visualizador: billetera guest. Comercial/super_admin: no (son staff puro)
+      return ["agente", "visualizador", "operador"].includes(role);
+    case "agent-wallets":
+      return false; // solo super_admin (ya retornó arriba)
     case "agents":
     case "payments":
+      return role === "operador";
+    case "bookings":
+      return role === "operador" || role === "agente"; // operador: sus propiedades; agente: sus reservas
+    case "analytics":
+    case "reviews":
+    case "coupons":
     case "users":
-    case "communications":
     case "audit":
       return false; // solo super_admin (ya retornó arriba)
     default:
@@ -617,8 +1433,29 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
   }
 }
 
+/** Si el módulo es de solo lectura para este rol */
+export function isModuleReadOnly(role: AdminRole | null, module: string): boolean {
+  if (!role) return true;
+  if (role === "super_admin") return false;
+  switch (module) {
+    case "properties":   return role === "visualizador"; // comercial y operador pueden editar
+    case "availability": return role !== "operador" && role !== "comercial";
+    case "operators":    return true; // comercial solo ve, no edita
+    case "communications": return true; // solo super_admin accede; para el resto no aplica
+    default:             return true;
+  }
+}
+
+/** Si el rol puede crear entidades en el módulo */
+export function canCreate(role: AdminRole | null, module: string): boolean {
+  if (!role) return false;
+  if (role === "super_admin") return true;
+  if (role === "operador" && module === "agents") return true; // operador crea sus agentes
+  return false;
+}
+
 export function canEditProperty(role: AdminRole): boolean {
-  return ["super_admin", "comercial", "visualizador", "operador"].includes(role);
+  return ["super_admin", "comercial", "operador"].includes(role);
 }
 
 export function canEditConnections(role: AdminRole): boolean {
@@ -654,3 +1491,258 @@ export async function fetchPlatformStats(): Promise<PlatformStats | null> {
     return null;
   }
 }
+
+// ─── Agent Wallets (unificado con Newayzi Rewards / LoyaltyUserSummary) ────────
+
+export type WalletMovementReason =
+  | "cashback"
+  | "redemption"
+  | "adjustment"
+  | "booking_commission"
+  | "bonus"
+  | "correction";
+
+export type LoyaltyLevelValue = "member" | "plus" | "premium";
+
+export interface AgentWalletMovement {
+  id: number;
+  amount: number;
+  reason: WalletMovementReason;
+  reason_label: string;
+  note: string;
+  created_at: string;
+  is_expired: boolean;
+  expires_at: string | null;
+}
+
+/** La billetera del agente ES su LoyaltyUserSummary — mismo sistema que los huéspedes */
+export interface AgentWallet {
+  exists: boolean;
+  profile_id: number;
+  agent_name: string;
+  agent_email: string;
+  agent_role: string;
+  points: number;
+  level: LoyaltyLevelValue;
+  level_label: string;
+  completed_bookings: number;
+  total_spent: number;
+  updated_at: string | null;
+  movements: AgentWalletMovement[];
+}
+
+export const LEVEL_OPTIONS: { value: LoyaltyLevelValue; label: string }[] = [
+  { value: "member", label: "Member" },
+  { value: "plus", label: "Plus" },
+  { value: "premium", label: "Premium" },
+];
+
+export const WALLET_REASON_OPTIONS: { value: WalletMovementReason; label: string }[] = [
+  { value: "adjustment", label: "Ajuste manual" },
+  { value: "booking_commission", label: "Comisión por reserva cerrada" },
+  { value: "bonus", label: "Bono / incentivo" },
+  { value: "redemption", label: "Redención" },
+  { value: "correction", label: "Corrección" },
+];
+
+export const agentWallets = {
+  /** Super admin: listar billeteras de todos los agentes/personal */
+  async list(token: string): Promise<AgentWallet[]> {
+    const res = await fetch(`${API_BASE}/api/admin/agent-wallets/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    const data = await res.json();
+    return data.results ?? [];
+  },
+
+  /** Ver billetera de un agente específico (super_admin o el propio agente) */
+  async get(profileId: number, token: string): Promise<AgentWallet | null> {
+    const res = await fetch(`${API_BASE}/api/admin/users/${profileId}/wallet/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  },
+
+  /** Super admin: ajustar saldo y/o nivel (crea LoyaltyUserSummary si no existe) */
+  async adjust(
+    profileId: number,
+    token: string,
+    payload: { amount?: number; reason?: WalletMovementReason; note?: string; level?: LoyaltyLevelValue }
+  ): Promise<AgentWallet> {
+    const res = await fetch(`${API_BASE}/api/admin/users/${profileId}/wallet/`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail ?? `Error ${res.status}`);
+    }
+    return res.json();
+  },
+
+  /** El propio agente ve su billetera Newayzi Rewards */
+  async getOwn(token: string): Promise<AgentWallet | null> {
+    const res = await fetch(`${API_BASE}/api/agent/wallet/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return res.json();
+  },
+};
+
+// ─── Contratos de Operador ──────────────────────────────────────────────────
+
+export type ContractStatus = "draft" | "sent_to_operator" | "signed" | "active" | "superseded";
+
+export interface OperatorContract {
+  id: number;
+  contractNumber: string;
+  operatorId: number;
+  operatorName: string;
+  title: string;
+  status: ContractStatus;
+  statusDisplay: string;
+  validFrom: string | null;
+  validUntil: string | null;
+  documentPdfUrl: string | null;
+  signedByNewayziName: string;
+  signedByNewayziAt: string | null;
+  signedByOperatorName: string;
+  signedByOperatorAt: string | null;
+  operatorIp: string | null;
+  contentHash: string;
+  isLocked: boolean;
+  tokenExpiresAt: string | null;
+  isTokenValid: boolean;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateContractPayload {
+  title: string;
+  document_pdf: File;
+  valid_from?: string;
+  valid_until?: string;
+  notes?: string;
+}
+
+export interface SignNewayziPayload {
+  signer_name: string;
+}
+
+export const operatorContracts = {
+  async list(operatorId: number): Promise<OperatorContract[]> {
+    const res = await authFetch(`/api/admin/operators/${operatorId}/contracts/`);
+    return res.json();
+  },
+
+  async create(operatorId: number, payload: CreateContractPayload): Promise<OperatorContract> {
+    const form = new FormData();
+    form.append("title", payload.title);
+    form.append("document_pdf", payload.document_pdf);
+    if (payload.valid_from) form.append("valid_from", payload.valid_from);
+    if (payload.valid_until) form.append("valid_until", payload.valid_until);
+    if (payload.notes) form.append("notes", payload.notes);
+    const res = await authFetchMultipart(`/api/admin/operators/${operatorId}/contracts/`, "POST", form);
+    return res.json();
+  },
+
+  async get(operatorId: number, contractId: number): Promise<OperatorContract> {
+    const res = await authFetch(`/api/admin/operators/${operatorId}/contracts/${contractId}/`);
+    return res.json();
+  },
+
+  async patch(
+    operatorId: number,
+    contractId: number,
+    data: Partial<{ title: string; valid_from: string; valid_until: string; notes: string; document_pdf: File }>,
+  ): Promise<OperatorContract> {
+    const form = new FormData();
+    if (data.title !== undefined) form.append("title", data.title);
+    if (data.valid_from !== undefined) form.append("valid_from", data.valid_from);
+    if (data.valid_until !== undefined) form.append("valid_until", data.valid_until);
+    if (data.notes !== undefined) form.append("notes", data.notes);
+    if (data.document_pdf) form.append("document_pdf", data.document_pdf);
+    const res = await authFetchMultipart(`/api/admin/operators/${operatorId}/contracts/${contractId}/`, "PATCH", form);
+    return res.json();
+  },
+
+  async signNewayzi(operatorId: number, contractId: number, signerName: string): Promise<OperatorContract> {
+    const res = await authFetch(`/api/admin/operators/${operatorId}/contracts/${contractId}/sign-newayzi/`, {
+      method: "POST",
+      body: JSON.stringify({ signer_name: signerName }),
+    });
+    return res.json();
+  },
+
+  async resendLink(operatorId: number, contractId: number): Promise<OperatorContract> {
+    const res = await authFetch(`/api/admin/operators/${operatorId}/contracts/${contractId}/resend-link/`, { method: "POST" });
+    return res.json();
+  },
+
+  async activate(operatorId: number, contractId: number): Promise<OperatorContract> {
+    const res = await authFetch(`/api/admin/operators/${operatorId}/contracts/${contractId}/activate/`, { method: "POST" });
+    return res.json();
+  },
+};
+
+// ─── Políticas de Cancelación de Propiedad ──────────────────────────────────
+
+export type CancellationPolicyType = "flexible" | "moderate" | "strict" | "custom";
+export type RefundType = "cash" | "credits" | "none";
+
+export interface CancellationTier {
+  days_before_checkin: number;
+  refund_pct: number;
+  refund_type: RefundType;
+}
+
+export interface PropertyCancellationPolicy {
+  id: number;
+  propertyId: number;
+  contractId: number | null;
+  contractNumber: string | null;
+  policyType: CancellationPolicyType;
+  policyTypeDisplay: string;
+  tiers: CancellationTier[];
+  isActive: boolean;
+  effectiveFrom: string | null;
+  effectiveUntil: string | null;
+  isLocked: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CancellationPolicyResponse {
+  activePolicy: PropertyCancellationPolicy | null;
+  history: PropertyCancellationPolicy[];
+  presets: Record<string, CancellationTier[]>;
+}
+
+export const propertyCancellationPolicies = {
+  async get(propertyId: number): Promise<CancellationPolicyResponse> {
+    const res = await authFetch(`/api/admin/properties/${propertyId}/cancellation-policy/`);
+    return res.json();
+  },
+
+  async set(
+    propertyId: number,
+    payload: {
+      policy_type: CancellationPolicyType;
+      tiers?: CancellationTier[];
+      effective_from?: string;
+      effective_until?: string;
+    },
+  ): Promise<PropertyCancellationPolicy> {
+    const res = await authFetch(`/api/admin/properties/${propertyId}/cancellation-policy/`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+    return res.json();
+  },
+};

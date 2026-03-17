@@ -2,13 +2,78 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, Switch, Input, Spinner } from "@heroui/react";
+import { useRouter } from "next/navigation";
+import { Button, Switch, Input, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useParams } from "next/navigation";
-import { adminApi, type PMSConnectionDetail, type UnitsSummary } from "@/lib/admin-api";
+import {
+  adminApi,
+  type PMSConnectionDetail,
+  type UnitsSummary,
+  type ConnectionSyncNowResponse,
+  type ConnectionSyncStreamEvent,
+} from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
+import { addToast } from "@heroui/react";
 
 type TabKey = "synced" | "pending" | "disabled" | "available";
+type SyncPhaseKey = "properties" | "room_types" | "availability" | "rates";
+type PhaseCounter = {
+  current: number;
+  total: number;
+  synced: number;
+  failed: number;
+  skipped: number;
+  draft: number;
+};
+
+function emptySyncCounters(): Record<SyncPhaseKey, PhaseCounter> {
+  return {
+    properties: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
+    room_types: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
+    availability: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
+    rates: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
+  };
+}
+
+function phaseLabel(phase?: string): string {
+  if (phase === "properties") return "Propiedades";
+  if (phase === "room_types") return "Tipos de habitación";
+  if (phase === "availability") return "Disponibilidad";
+  if (phase === "rates") return "Tarifas";
+  return "Sincronización";
+}
+
+function formatSyncEvent(evt: ConnectionSyncStreamEvent): string {
+  if (evt.event === "phase_started") return `Iniciando fase: ${phaseLabel(evt.phase)}`;
+  if (evt.event === "phase_summary") return `Fase ${phaseLabel(evt.phase)} completada.`;
+  if (evt.event === "sync_started") return "Sincronización iniciada.";
+  if (evt.event === "sync_completed") return "Sincronización completada.";
+  if (evt.event === "sync_error") return `Error: ${evt.detail || "No se pudo completar."}`;
+  if (evt.event === "item_progress") {
+    const item = evt.item ?? {};
+    const room = item.pms_room_type_id ? ` • Hab ${item.pms_room_type_id}` : "";
+    const prop = item.pms_property_id ? `Prop ${item.pms_property_id}` : "Elemento";
+    const status =
+      evt.status === "draft_mapping" ? "pendiente de mapeo" :
+      evt.status === "failed" ? "falló" :
+      evt.status === "skipped" ? "omitido" :
+      "sincronizado";
+    return `${phaseLabel(evt.phase)}: ${prop}${room} (${status})`;
+  }
+  return String(evt.detail || "Actualización de sincronización.");
+}
+
+function shouldUseSyncFallback(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    message.includes("stream") ||
+    message.includes("event-stream") ||
+    message.includes("no devolvió stream") ||
+    message.includes("finalizó sin resultado") ||
+    message.includes("failed to fetch")
+  );
+}
 
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
@@ -31,12 +96,22 @@ const inputDark = "rounded-xl border border-white/[0.12] bg-white/[0.04]";
 
 export function ConnectionDetailClient() {
   const params = useParams();
+  const router = useRouter();
   const id = parseInt(String(params?.id ?? "0"), 10);
   const { canEditConnections, canSyncConnection } = useAdmin();
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [connection, setConnection] = useState<PMSConnectionDetail | null>(null);
   const [unitsSummary, setUnitsSummary] = useState<UnitsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgressModalOpen, setSyncProgressModalOpen] = useState(false);
+  const [syncEvents, setSyncEvents] = useState<ConnectionSyncStreamEvent[]>([]);
+  const [syncCurrentPhase, setSyncCurrentPhase] = useState<string>("Preparando...");
+  const [syncCounters, setSyncCounters] = useState<Record<SyncPhaseKey, PhaseCounter>>(emptySyncCounters);
+  const [syncFallbackUsed, setSyncFallbackUsed] = useState(false);
+  const [syncResultModalOpen, setSyncResultModalOpen] = useState(false);
+  const [lastSyncResult, setLastSyncResult] = useState<ConnectionSyncNowResponse | null>(null);
   const [patching, setPatching] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("synced");
   const [viewType, setViewType] = useState<"properties" | "room_types">("room_types");
@@ -45,38 +120,163 @@ export function ConnectionDetailClient() {
   const [configUsername, setConfigUsername] = useState("");
   const [configPassword, setConfigPassword] = useState("");
   const [savingConfig, setSavingConfig] = useState(false);
+  // Kunas
+  const [configToken, setConfigToken] = useState("");
+  const [configKunasUser, setConfigKunasUser] = useState("");
+  const [configKunasPwd, setConfigKunasPwd] = useState("");
 
   useEffect(() => {
     if (Number.isNaN(id) || id <= 0) { setLoading(false); return; }
     let cancelled = false;
-    Promise.all([adminApi.getConnection(id), adminApi.getUnitsSummary(id)]).then(
-      ([conn, summary]) => {
+    Promise.all([adminApi.getConnection(id), adminApi.getUnitsSummary(id)])
+      .then(([conn, summary]) => {
         if (cancelled) return;
         setConnection(conn ?? null);
         setUnitsSummary(summary ?? null);
         setLoading(false);
-      }
-    );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setConnection(null);
+          setUnitsSummary(null);
+          setLoading(false);
+        }
+      });
     return () => { cancelled = true; };
   }, [id]);
 
   useEffect(() => {
-    if (connection?.pms_type === "generic" && connection?.config) {
-      const cfg = connection.config as Record<string, string>;
+    if (!connection?.config) return;
+    const cfg = connection.config as Record<string, string>;
+    if (connection.pms_type === "generic") {
       setConfigBaseUrl(cfg.base_url ?? cfg.url ?? "");
       setConfigUsername(cfg.username ?? cfg.user ?? "");
     }
-  }, [connection?.id, connection?.config]);
+    if (connection.pms_type === "kunas") {
+      setConfigToken(cfg.token ?? "");
+      setConfigKunasUser(cfg.username ?? cfg.user ?? "");
+    }
+  }, [connection?.id, connection?.config, connection?.pms_type]);
+
+  function resetSyncRealtimeState() {
+    setSyncEvents([]);
+    setSyncCurrentPhase("Preparando...");
+    setSyncCounters(emptySyncCounters());
+    setSyncFallbackUsed(false);
+  }
+
+  function registerSyncEvent(evt: ConnectionSyncStreamEvent) {
+    setSyncEvents((prev) => [evt, ...prev].slice(0, 80));
+    if (evt.event === "phase_started") {
+      setSyncCurrentPhase(`Procesando ${phaseLabel(evt.phase)}...`);
+    }
+    if (evt.event === "sync_completed") {
+      setSyncCurrentPhase("Sincronización finalizada.");
+    }
+    if (evt.event === "sync_error") {
+      setSyncCurrentPhase("Sincronización finalizada con error.");
+    }
+
+    if (!evt.phase) return;
+    const phase = evt.phase as SyncPhaseKey;
+    setSyncCounters((prev) => {
+      const current = prev[phase];
+      const updated: PhaseCounter = {
+        ...current,
+        current: typeof evt.current === "number" ? evt.current : current.current,
+        total: typeof evt.total === "number" ? evt.total : current.total,
+      };
+
+      if (evt.event === "item_progress") {
+        if (evt.status === "failed") updated.failed += 1;
+        else if (evt.status === "draft_mapping") updated.draft += 1;
+        else if (evt.status === "skipped") updated.skipped += 1;
+        else updated.synced += 1;
+      }
+
+      return { ...prev, [phase]: updated };
+    });
+  }
 
   async function handleSyncNow() {
     if (!canSyncConnection) return;
     setSyncing(true);
+    setSyncProgressModalOpen(true);
+    resetSyncRealtimeState();
     try {
-      await adminApi.syncConnectionNow(id);
-      const [conn, summary] = await Promise.all([adminApi.getConnection(id), adminApi.getUnitsSummary(id)]);
+      let usedFallback = false;
+      let syncResult: ConnectionSyncNowResponse;
+      try {
+        syncResult = await adminApi.syncConnectionWithStream(id, registerSyncEvent);
+      } catch (streamError) {
+        if (!shouldUseSyncFallback(streamError)) {
+          throw streamError;
+        }
+        usedFallback = true;
+        setSyncFallbackUsed(true);
+        registerSyncEvent({
+          event: "message",
+          detail: "No fue posible abrir el stream en vivo. Continuamos con sincronización estándar (misma cobertura, sin telemetría en vivo).",
+        });
+        syncResult = await adminApi.syncConnectionNow(id);
+      }
+
+      setLastSyncResult(syncResult);
+
+      const summary = syncResult.summary;
+      const synced = summary?.synced ?? 0;
+      const failed = summary?.failed ?? 0;
+      const draft = summary?.draft_mappings_created ?? 0;
+      const errorCount = summary?.errors?.length ?? 0;
+
+      if (usedFallback) {
+        addToast({
+          title: "Sincronización en modo estándar",
+          description: "La sincronización se ejecutó completa, pero sin eventos en tiempo real.",
+          color: "warning",
+        });
+      }
+
+      if (syncResult.status === "ok") {
+        addToast({
+          title: "Sincronización exitosa",
+          description: `Sincronizados: ${synced}. Duración: ${Math.round(summary?.duration_seconds ?? 0)}s.`,
+          color: "success",
+        });
+      } else if (syncResult.status === "partial") {
+        const hasOnlyDrafts = synced === 0 && failed === 0 && draft > 0;
+        addToast({
+          title: hasOnlyDrafts ? "Sincronización completada con pendientes" : "Sincronización parcial",
+          description: hasOnlyDrafts
+            ? `Se detectaron ${draft} mapeos pendientes por vincular.`
+            : `Procesados: ${synced}. Fallidos: ${failed}. Errores: ${errorCount}.`,
+          color: hasOnlyDrafts ? "warning" : "danger",
+        });
+      } else {
+        addToast({
+          title: "Sincronización con error",
+          description: syncResult.detail || "No se pudo completar la sincronización.",
+          color: "danger",
+        });
+      }
+
+      setSyncProgressModalOpen(false);
+      setSyncResultModalOpen(true);
+      const [conn, unitsSummaryData] = await Promise.all([adminApi.getConnection(id), adminApi.getUnitsSummary(id)]);
       setConnection(conn ?? null);
-      setUnitsSummary(summary ?? null);
-    } finally { setSyncing(false); }
+      setUnitsSummary(unitsSummaryData ?? null);
+      router.refresh();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "No se pudo ejecutar la sincronización.";
+      setSyncProgressModalOpen(false);
+      addToast({
+        title: "Error al sincronizar",
+        description: msg,
+        color: "danger",
+      });
+    } finally {
+      setSyncing(false);
+    }
   }
 
   async function toggleActive() {
@@ -99,6 +299,50 @@ export function ConnectionDetailClient() {
       setEditingConfig(false);
       setConfigPassword("");
     } finally { setSavingConfig(false); }
+  }
+
+  async function saveKunasConfig() {
+    if (!connection || !canEditConnections || connection.pms_type !== "kunas") return;
+    const cfg = (connection.config ?? {}) as Record<string, unknown>;
+    const newConfig: Record<string, string> = {
+      token: configToken.trim(),
+      username: configKunasUser.trim() || (cfg.username as string) || (cfg.user as string),
+    };
+    if (configKunasPwd) newConfig.password = configKunasPwd;
+    else if (cfg.password && cfg.password !== "••••••••") newConfig.password = cfg.password as string;
+    Object.keys(newConfig).forEach((k) => {
+      if (newConfig[k] === undefined || newConfig[k] === "") delete newConfig[k];
+    });
+    setSavingConfig(true);
+    try {
+      const updated = await adminApi.patchConnection(id, { config: newConfig });
+      setConnection(updated);
+      setEditingConfig(false);
+      setConfigKunasPwd("");
+    } finally { setSavingConfig(false); }
+  }
+
+  async function handleDeleteConnection() {
+    if (!connection || !canSyncConnection) return;
+    setDeleting(true);
+    try {
+      await adminApi.deleteConnection(id);
+      addToast({
+        title: "Conexión eliminada",
+        description: "La conexión y las propiedades sincronizadas desde ella fueron eliminadas.",
+        color: "success",
+      });
+      router.push("/admin/connections");
+    } catch (e) {
+      addToast({
+        title: "Error al eliminar",
+        description: e instanceof Error ? e.message : "No se pudo eliminar la conexión.",
+        color: "danger",
+      });
+    } finally {
+      setDeleting(false);
+      setDeleteModalOpen(false);
+    }
   }
 
   if (loading) {
@@ -207,18 +451,203 @@ export function ConnectionDetailClient() {
               </Switch>
             )}
             {canSyncConnection && (
-              <Button
-                className="btn-newayzi-primary"
-                onPress={handleSyncNow}
-                isLoading={syncing}
-                size="sm"
-                startContent={!syncing ? <Icon icon="solar:refresh-bold" width={16} /> : undefined}
-              >
-                Sincronizar ahora
-              </Button>
+              <>
+                <Button
+                  className="btn-newayzi-primary"
+                  onPress={handleSyncNow}
+                  isLoading={syncing}
+                  size="sm"
+                  startContent={!syncing ? <Icon icon="solar:refresh-bold" width={16} /> : undefined}
+                >
+                  Sincronizar ahora
+                </Button>
+                <Button
+                  color="danger"
+                  variant="flat"
+                  size="sm"
+                  onPress={() => setDeleteModalOpen(true)}
+                  startContent={<Icon icon="solar:trash-bin-2-bold" width={16} />}
+                  className="!text-red-300 border border-red-400/30 hover:bg-red-500/20"
+                >
+                  Eliminar conexión
+                </Button>
+              </>
             )}
           </div>
         </div>
+
+        <Modal isOpen={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
+          <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
+            <ModalHeader className="text-white font-sora">Eliminar conexión</ModalHeader>
+            <ModalBody>
+              <p className="text-white/70 text-sm">
+                Se eliminará la conexión <strong className="text-white">{connection?.name || connection?.pms_type}</strong> y
+                todas las propiedades sincronizadas desde ella. Esta acción no se puede deshacer.
+              </p>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="flat" onPress={() => setDeleteModalOpen(false)} className="!text-white/70">
+                Cancelar
+              </Button>
+              <Button color="danger" onPress={handleDeleteConnection} isLoading={deleting}>
+                Eliminar
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        <Modal isOpen={syncProgressModalOpen} onOpenChange={setSyncProgressModalOpen} size="lg" backdrop="blur">
+          <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
+            <ModalHeader className="text-white font-sora flex items-center gap-2">
+              <Icon icon="solar:refresh-bold-duotone" className="text-[#9b74ff]" width={18} />
+              Sincronización en vivo
+            </ModalHeader>
+            <ModalBody>
+              <div className="space-y-4">
+                <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-sm text-white/70">
+                  <p className="text-white/90 font-medium">{syncCurrentPhase}</p>
+                  {syncFallbackUsed && (
+                    <p className="mt-1 text-amber-300">
+                      Modo estándar activo: no se pudo abrir el stream en tiempo real.
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {(Object.keys(syncCounters) as SyncPhaseKey[]).map((phase) => (
+                    <div key={phase} className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">{phaseLabel(phase)}</p>
+                      <p className="text-white/90 text-sm mt-1">
+                        {syncCounters[phase].current}/{syncCounters[phase].total || "?"}
+                      </p>
+                      <p className="text-[0.72rem] text-white/55 mt-1">
+                        OK: {syncCounters[phase].synced} · Fallos: {syncCounters[phase].failed}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                  <p className="text-xs uppercase tracking-wider text-white/40 mb-2">Actividad reciente</p>
+                  <ul className="space-y-1 max-h-52 overflow-y-auto text-xs text-white/75">
+                    {syncEvents.length === 0 ? (
+                      <li>Esperando eventos de sincronización...</li>
+                    ) : (
+                      syncEvents.slice(0, 24).map((evt, idx) => (
+                        <li key={`${evt.event}-${idx}`}>- {formatSyncEvent(evt)}</li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                variant="flat"
+                onPress={() => setSyncProgressModalOpen(false)}
+                isDisabled={syncing}
+                className="!text-white/80 bg-white/[0.08] border border-white/[0.12] hover:bg-white/[0.14]"
+              >
+                {syncing ? "Sincronizando..." : "Cerrar"}
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        <Modal isOpen={syncResultModalOpen} onOpenChange={setSyncResultModalOpen} size="lg" backdrop="blur">
+          <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
+            <ModalHeader className="text-white font-sora flex items-center gap-2">
+              <Icon icon="solar:check-circle-bold" className="text-[#9b74ff]" width={18} />
+              Resumen de sincronización
+            </ModalHeader>
+            <ModalBody>
+              {lastSyncResult?.summary ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Procesados</p>
+                      <p className="text-xl font-semibold text-white">{lastSyncResult.summary.synced}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Fallidos</p>
+                      <p className="text-xl font-semibold text-white">{lastSyncResult.summary.failed}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Mapeos draft</p>
+                      <p className="text-xl font-semibold text-white">{lastSyncResult.summary.draft_mappings_created}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Tarifas base</p>
+                      <p className="text-xl font-semibold text-white">{lastSyncResult.summary.room_type_base_rates_synced}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-sm text-white/70 space-y-1">
+                    <p>
+                      Propiedades descubiertas en PMS:{" "}
+                      <span className="text-white/90 font-medium">
+                        {lastSyncResult.summary.properties_discovered ?? lastSyncResult.summary.properties_synced}
+                      </span>
+                    </p>
+                    <p>
+                      Propiedades mapeadas localmente:{" "}
+                      <span className="text-white/90 font-medium">{lastSyncResult.summary.properties_synced}</span>
+                    </p>
+                    <p>
+                      Alojamientos descubiertos en PMS:{" "}
+                      <span className="text-white/90 font-medium">
+                        {lastSyncResult.summary.room_types_discovered ?? lastSyncResult.summary.room_types_synced}
+                      </span>
+                    </p>
+                    <p>
+                      Alojamientos mapeados localmente:{" "}
+                      <span className="text-white/90 font-medium">{lastSyncResult.summary.room_types_synced}</span>
+                    </p>
+                    {lastSyncResult.window && (
+                      <p className="text-white/50">
+                        Ventana de sync: {lastSyncResult.window.start_date} a {lastSyncResult.window.end_date}
+                      </p>
+                    )}
+                    {lastSyncResult.summary.sync_run_id && (
+                      <p className="text-white/50">Run ID: {lastSyncResult.summary.sync_run_id}</p>
+                    )}
+                    {typeof lastSyncResult.summary.duration_seconds === "number" && (
+                      <p className="text-white/50">Duración: {Math.round(lastSyncResult.summary.duration_seconds)}s</p>
+                    )}
+                  </div>
+
+                  {lastSyncResult.summary.draft_mappings_created > 0 && (
+                    <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-amber-200 text-sm">
+                      Se detectaron unidades PMS sin mapeo local. Revisa la pestaña de pendientes para vincularlas.
+                    </div>
+                  )}
+
+                  {(lastSyncResult.summary.errors?.length ?? 0) > 0 && (
+                    <div className="rounded-xl border border-red-400/25 bg-red-500/10 p-3">
+                      <p className="text-sm font-medium text-red-200 mb-1">Errores reportados</p>
+                      <ul className="text-xs text-red-100/90 space-y-1 max-h-32 overflow-y-auto">
+                        {lastSyncResult.summary.errors.slice(0, 8).map((err, idx) => (
+                          <li key={idx}>- {err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-white/70 text-sm">No hay resumen disponible para esta ejecución.</p>
+              )}
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                variant="flat"
+                onPress={() => setSyncResultModalOpen(false)}
+                className="!text-white/80 bg-white/[0.08] border border-white/[0.12] hover:bg-white/[0.14]"
+              >
+                Cerrar
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
 
         {/* Last sync */}
         <div className="mt-5 flex items-center gap-2 text-sm text-white/40">
@@ -316,6 +745,89 @@ export function ConnectionDetailClient() {
             )}
           </div>
         )}
+
+        {/* Kunas credentials */}
+        {connection.pms_type === "kunas" && canEditConnections && (
+          <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:key-bold-duotone" width={17} className="text-[#b89eff]" />
+                <p className="text-sm font-semibold text-white/80">Credenciales Kunas</p>
+              </div>
+              {!editingConfig ? (
+                <Button
+                  size="sm"
+                  variant="flat"
+                  onPress={() => setEditingConfig(true)}
+                  className="!text-white/70 bg-white/[0.07] border border-white/[0.12] hover:bg-white/[0.12]"
+                >
+                  Editar
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    className="!text-white/60 bg-white/[0.05] border border-white/[0.1]"
+                    onPress={() => {
+                      setEditingConfig(false);
+                      const cfg = (connection.config ?? {}) as Record<string, string>;
+                      setConfigToken(cfg.token ?? "");
+                      setConfigKunasUser(cfg.username ?? cfg.user ?? "");
+                      setConfigKunasPwd("");
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="btn-newayzi-primary"
+                    onPress={saveKunasConfig}
+                    isLoading={savingConfig}
+                    isDisabled={!configToken.trim() || !configKunasUser.trim()}
+                  >
+                    Guardar
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {editingConfig ? (
+              <div className="space-y-3">
+                <Input
+                  label="Token"
+                  value={configToken}
+                  onValueChange={setConfigToken}
+                  placeholder="Token de la URL del panel Kunas"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Usuario"
+                  value={configKunasUser}
+                  onValueChange={setConfigKunasUser}
+                  placeholder="Usuario del panel Kunas"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Contraseña"
+                  type="password"
+                  value={configKunasPwd}
+                  onValueChange={setConfigKunasPwd}
+                  placeholder="Dejar vacío para mantener la actual"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+              </div>
+            ) : (
+              <div className="text-sm text-white/40 space-y-1">
+                <p>Token: <span className="text-white/70">{configToken ? "••••••••" : "—"}</span></p>
+                <p>Usuario: <span className="text-white/70">{configKunasUser || "—"}</span></p>
+              </div>
+            )}
+          </div>
+        )}
       </GlassCard>
 
       {/* Units table card */}
@@ -384,13 +896,19 @@ export function ConnectionDetailClient() {
             <thead>
               <tr className="border-b border-white/[0.07] bg-white/[0.03]">
                 <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
-                  Propiedad local
+                  Propiedad local (mapeo)
                 </th>
                 {isRoom && (
                   <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
-                    Tipo habitación
+                    Alojamiento local (mapeo)
                   </th>
                 )}
+                <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
+                  Propiedad PMS
+                </th>
+                <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
+                  Alojamiento PMS
+                </th>
                 <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
                   ID PMS
                 </th>
@@ -403,7 +921,7 @@ export function ConnectionDetailClient() {
               {tableData.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={isRoom ? 4 : 3}
+                    colSpan={isRoom ? 6 : 5}
                     className="py-12 text-center text-white/30 text-sm"
                   >
                     No hay unidades en esta categoría
@@ -412,6 +930,11 @@ export function ConnectionDetailClient() {
               ) : (
                 tableData.map((u, i) => {
                   const st = STATUS_STYLES[u.status] ?? STATUS_STYLES.pending;
+                  const pmsPropertyLabel = u.pms_property_name ?? u.pms_property_id ?? "—";
+                  const pmsRoomLabel = u.pms_room_name ?? u.pms_name ?? u.pms_room_id ?? "—";
+                  const pmsIdLabel = isRoom
+                    ? `${u.pms_property_id ?? "—"} / ${u.pms_room_id ?? "—"}`
+                    : (u.pms_property_id ?? "—");
                   return (
                     <tr
                       key={i}
@@ -425,10 +948,14 @@ export function ConnectionDetailClient() {
                           {u.local_room_name ?? u.local_room_type_id ?? "—"}
                         </td>
                       )}
+                      <td className="px-6 py-3 text-white/80">
+                        {pmsPropertyLabel}
+                      </td>
+                      <td className="px-6 py-3 text-white/80">
+                        {pmsRoomLabel}
+                      </td>
                       <td className="px-6 py-3 font-mono text-[0.78rem] text-white/50">
-                        {isRoom
-                          ? (u.pms_room_id ?? u.pms_property_id ?? "—")
-                          : (u.pms_property_id ?? "—")}
+                        {pmsIdLabel}
                       </td>
                       <td className="px-6 py-3">
                         <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${st.text}`}>

@@ -14,6 +14,12 @@ import {
   SelectItem,
   Input,
   Spinner,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  addToast,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { adminApi, type PropertyListItem, type PMSConnectionListItem } from "@/lib/admin-api";
@@ -34,7 +40,10 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
 const inputDark = "rounded-xl border";
 
 export function PropertiesList() {
-  const { canEditProperty } = useAdmin();
+  const { canEditProperty, role, me } = useAdmin();
+  const isOperador = role === "operador";
+  const operatorId = me?.operator_id ?? null;
+
   const [list, setList] = useState<PropertyListItem[]>([]);
   const [connections, setConnections] = useState<PMSConnectionListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,6 +51,8 @@ export function PropertiesList() {
   const [filterCity, setFilterCity] = useState("");
   const [filterPms, setFilterPms] = useState<string>("all");
   const [patching, setPatching] = useState<number | null>(null);
+  const [deleteModal, setDeleteModal] = useState<PropertyListItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     adminApi
@@ -55,11 +66,13 @@ export function PropertiesList() {
     async function load() {
       setLoading(true);
       try {
-        const params: { is_active?: boolean; city?: string; pms_connection_id?: number } = {};
+        const params: { is_active?: boolean; city?: string; pms_connection_id?: number; operator_id?: number } = {};
         if (filterActive === "true") params.is_active = true;
         if (filterActive === "false") params.is_active = false;
         if (filterCity.trim()) params.city = filterCity.trim();
         if (filterPms !== "all") params.pms_connection_id = parseInt(filterPms, 10);
+        // Los operadores solo ven sus propias propiedades
+        if (isOperador && operatorId) params.operator_id = operatorId;
         const res = await adminApi.getProperties(params);
         if (cancelled) return;
         setList(res?.results ?? []);
@@ -73,7 +86,7 @@ export function PropertiesList() {
     return () => {
       cancelled = true;
     };
-  }, [filterActive, filterCity, filterPms]);
+  }, [filterActive, filterCity, filterPms, isOperador, operatorId]);
 
   async function togglePublished(p: PropertyListItem) {
     if (!canEditProperty) return;
@@ -100,6 +113,29 @@ export function PropertiesList() {
       );
     } finally {
       setPatching(null);
+    }
+  }
+
+  async function handleDeleteProperty(p: PropertyListItem) {
+    if (!canEditProperty) return;
+    setDeleting(true);
+    try {
+      await adminApi.deleteProperty(p.id);
+      setList((prev) => prev.filter((x) => x.id !== p.id));
+      addToast({
+        title: "Propiedad eliminada",
+        description: `"${p.name}" fue eliminada correctamente.`,
+        color: "success",
+      });
+    } catch (e) {
+      addToast({
+        title: "Error al eliminar",
+        description: e instanceof Error ? e.message : "No se pudo eliminar la propiedad.",
+        color: "danger",
+      });
+    } finally {
+      setDeleting(false);
+      setDeleteModal(null);
     }
   }
 
@@ -223,6 +259,9 @@ export function PropertiesList() {
                   <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
                     Mascotas
                   </th>
+                  <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
+                    Rewards
+                  </th>
                   {canEditProperty && (
                     <th className="text-right py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
                       Acciones
@@ -290,6 +329,42 @@ export function PropertiesList() {
                       </span>
                     </td>
                     <td className="py-4 px-5 text-white/70 text-sm">{p.pets_allowed ? "Sí" : "No"}</td>
+                    <td className="py-4 px-5">
+                      {p.rewards_info?.participates ? (
+                        <div className="flex flex-col gap-1">
+                          {(() => {
+                            const ri = p.rewards_info!;
+                            const isElite = ri.label === "elite";
+                            const isPreferred = ri.label === "preferred";
+                            const badgeClass = isElite
+                              ? "bg-amber-500/20 border-amber-400/30 text-amber-300"
+                              : isPreferred
+                              ? "bg-violet-500/20 border-violet-400/30 text-[#c4a8ff]"
+                              : "bg-[#5e2cec]/20 border-[#5e2cec]/35 text-[#b89eff]";
+                            return (
+                              <>
+                                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.65rem] font-bold border ${badgeClass}`}>
+                                  <Icon icon="solar:gift-bold-duotone" width={10} />
+                                  {ri.label_display ?? "Rewards"}
+                                </span>
+                                {ri.cashback_pct !== undefined && ri.cashback_pct > 0 && (
+                                  <span className="text-[0.6rem] text-emerald-400 font-semibold">
+                                    {ri.cashback_pct}% cashback
+                                  </span>
+                                )}
+                                {ri.visibility_boost !== undefined && ri.visibility_boost > 0 && (
+                                  <span className="text-[0.6rem] text-blue-400/80">
+                                    {ri.visibility_label}
+                                  </span>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      ) : (
+                        <span className="text-white/30 text-sm">—</span>
+                      )}
+                    </td>
                     {canEditProperty && (
                       <td className="py-4 px-5 text-right">
                         <div className="flex justify-end gap-2">
@@ -321,6 +396,13 @@ export function PropertiesList() {
                           >
                             {patching === p.id ? "…" : p.is_active ? "Desactivar" : "Activar"}
                           </button>
+                          <button
+                            onClick={() => setDeleteModal(p)}
+                            disabled={patching === p.id}
+                            className="px-3 py-1.5 rounded-xl text-[0.75rem] font-semibold transition-all bg-red-500/20 border border-red-400/30 text-red-300 hover:bg-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Eliminar
+                          </button>
                         </div>
                       </td>
                     )}
@@ -331,6 +413,33 @@ export function PropertiesList() {
           </div>
         </GlassCard>
       )}
+
+      <Modal isOpen={!!deleteModal} onOpenChange={(open) => !open && setDeleteModal(null)}>
+        <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
+          <ModalHeader className="text-white font-sora">Eliminar propiedad</ModalHeader>
+          <ModalBody>
+            {deleteModal && (
+              <p className="text-white/70 text-sm">
+                Se eliminará la propiedad <strong className="text-white">{deleteModal.name}</strong> y todas sus habitaciones
+                asociadas. Esta acción no se puede deshacer.
+              </p>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={() => setDeleteModal(null)} className="!text-white/70">
+              Cancelar
+            </Button>
+            <Button
+              color="danger"
+              onPress={() => deleteModal && handleDeleteProperty(deleteModal)}
+              isLoading={deleting}
+              isDisabled={!deleteModal}
+            >
+              Eliminar
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   );
 }

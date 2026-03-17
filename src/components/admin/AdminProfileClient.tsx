@@ -1,8 +1,17 @@
 "use client";
 
+import { useCallback, useEffect, useState, useRef } from "react";
 import { Icon } from "@iconify/react";
+import { useUser } from "@clerk/nextjs";
+import { Input, Button, addToast } from "@heroui/react";
 import { useAdmin } from "@/contexts/AdminContext";
-import type { AdminRole, AdminLoyalty } from "@/lib/admin-api";
+import { rewardsAgreementsApi } from "@/lib/admin-api";
+import { resolveClerkError } from "@/lib/clerk-errors";
+import type { AdminRole, OperatorRewardsData } from "@/lib/admin-api";
+
+const inputDark = "rounded-xl border border-white/[0.12] bg-white/[0.04]";
+const MAX_IMAGE_SIZE_MB = 10;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 const ROLE_LABELS: Record<AdminRole, string> = {
   super_admin: "Super admin",
@@ -64,115 +73,868 @@ function LoyaltyBadge({ level }: { level: string }) {
   );
 }
 
-function InfoField({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-white/[0.05] border border-white/[0.08] px-4 py-3.5">
-      <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.12em] font-semibold mb-1">
-        {label}
-      </p>
-      <p className="font-sora font-semibold text-white text-[0.9375rem] leading-tight">
-        {value}
-      </p>
-    </div>
-  );
+function useOperatorRewards(operatorId: number | null) {
+  const [data, setData] = useState<OperatorRewardsData | null>(null);
+  const load = useCallback(async () => {
+    if (!operatorId) return;
+    try {
+      const res = await rewardsAgreementsApi.getForOperator(operatorId);
+      setData(res);
+    } catch {
+      // silencioso
+    }
+  }, [operatorId]);
+  useEffect(() => { load(); }, [load]);
+  return data;
 }
 
 export function AdminProfileClient() {
-  const { me, role } = useAdmin();
+  const { me, role, refetchMe } = useAdmin();
+  const { user, isLoaded: clerkLoaded } = useUser();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Nombre ──────────────────────────────────────────────
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  // ── Correo ───────────────────────────────────────────────
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [emailStep, setEmailStep] = useState<"idle" | "pending_code" | "done">("idle");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [emailObj, setEmailObj] = useState<any>(null);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [codeError, setCodeError] = useState("");
+
+  // ── Contraseña ───────────────────────────────────────────
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   if (!me) return null;
 
-  const { profile, operator_name, loyalty } = me;
-  const displayName = profile.full_name || `${profile.first_name} ${profile.last_name}`.trim() || profile.email;
+  const { profile, operator_name, loyalty, operator_id } = me;
+  const isOperator = (role?.toLowerCase?.() ?? "") === "operador";
+  const operatorRewards = useOperatorRewards(isOperator ? (operator_id ?? null) : null);
+  // Roles staff que no deben ver badges ni sección Newayzi Rewards (programa de huéspedes)
+  const isStaffNoGuestRewards = ["super_admin", "comercial", "visualizador"].includes(role ?? "");
+
+  // Sincronizar nombre desde Clerk o me
+  useEffect(() => {
+    const fn = user?.firstName ?? profile.first_name ?? "";
+    const ln = user?.lastName ?? profile.last_name ?? "";
+    setFirstName(fn);
+    setLastName(ln);
+  }, [user?.firstName, user?.lastName, profile.first_name, profile.last_name]);
+
+  const handleSaveProfile = useCallback(async () => {
+    if (!user) {
+      addToast({
+        title: "Sesión en carga",
+        description: "Espera un momento e intenta de nuevo. Si el problema persiste, cierra sesión y vuelve a entrar.",
+        color: "warning",
+      });
+      return;
+    }
+    const fn = firstName.trim();
+    const ln = lastName.trim();
+    if (!fn) {
+      addToast({
+        title: "Campo requerido",
+        description: "El nombre es obligatorio.",
+        color: "warning",
+      });
+      return;
+    }
+    setSaving(true);
+    setSuccess(false);
+    try {
+      await user.update({
+        firstName: fn.slice(0, 255),
+        lastName: ln.slice(0, 255),
+      });
+      await refetchMe();
+      setSuccess(true);
+      addToast({
+        title: "Perfil actualizado",
+        description: "Tus datos se guardaron correctamente.",
+        color: "success",
+      });
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (e) {
+      addToast({
+        title: "Error al guardar",
+        description: resolveClerkError(e),
+        color: "danger",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }, [user, firstName, lastName, refetchMe]);
+
+  const handleImageChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !user) {
+        if (!user) {
+          addToast({
+            title: "Sesión en carga",
+            description: "Espera un momento e intenta de nuevo.",
+            color: "warning",
+          });
+        }
+        return;
+      }
+
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+        addToast({
+          title: "Formato no permitido",
+          description: "Usa una imagen JPG, PNG, WebP o GIF.",
+          color: "warning",
+        });
+        e.target.value = "";
+        return;
+      }
+      if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
+        addToast({
+          title: "Imagen demasiado grande",
+          description: `La imagen debe pesar menos de ${MAX_IMAGE_SIZE_MB} MB.`,
+          color: "warning",
+        });
+        e.target.value = "";
+        return;
+      }
+
+      setUploading(true);
+      try {
+        await user.setProfileImage({ file });
+        await refetchMe();
+        addToast({
+          title: "Foto actualizada",
+          description: "Tu foto de perfil se actualizó correctamente.",
+          color: "success",
+        });
+      } catch (err) {
+        addToast({
+          title: "Error al subir foto",
+          description: resolveClerkError(err),
+          color: "danger",
+        });
+      } finally {
+        setUploading(false);
+        e.target.value = "";
+      }
+    },
+    [user, refetchMe]
+  );
+
+  const imageUrl = user?.imageUrl ?? profile.image_url ?? null;
+
+  // ── Handler: cambio de correo ────────────────────────────
+  const handleEmailSend = useCallback(async () => {
+    if (!user) return;
+    const email = newEmail.trim().toLowerCase();
+    if (!email) { setEmailError("Ingresa un correo electrónico."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailError("El formato del correo no es válido."); return; }
+    if (email === (user.primaryEmailAddress?.emailAddress ?? "").toLowerCase()) {
+      setEmailError("Ya es tu correo principal. Ingresa uno diferente.");
+      return;
+    }
+    setEmailError("");
+    setEmailSaving(true);
+    try {
+      const obj = await user.createEmailAddress({ email });
+      await obj.prepareVerification({ strategy: "email_code" });
+      setEmailObj(obj);
+      setEmailStep("pending_code");
+      addToast({ title: "Código enviado", description: `Revisa ${email} e ingresa el código de verificación.`, color: "success" });
+    } catch (e) {
+      setEmailError(resolveClerkError(e));
+    } finally {
+      setEmailSaving(false);
+    }
+  }, [user, newEmail]);
+
+  const handleEmailVerify = useCallback(async () => {
+    if (!user || !emailObj) return;
+    const code = verificationCode.trim();
+    if (!code) { setCodeError("Ingresa el código de verificación."); return; }
+    if (!/^\d{6}$/.test(code)) { setCodeError("El código debe ser de 6 dígitos."); return; }
+    setCodeError("");
+    setEmailSaving(true);
+    try {
+      const verified = await emailObj.attemptVerification({ code });
+      // Promover como correo principal
+      await user.update({ primaryEmailAddressId: verified.id });
+      await refetchMe();
+      setEmailStep("done");
+      addToast({ title: "Correo actualizado", description: "Tu nuevo correo es ahora el principal.", color: "success" });
+      setTimeout(() => {
+        setEmailOpen(false);
+        setEmailStep("idle");
+        setNewEmail("");
+        setVerificationCode("");
+        setEmailObj(null);
+      }, 2000);
+    } catch (e) {
+      setCodeError(resolveClerkError(e));
+    } finally {
+      setEmailSaving(false);
+    }
+  }, [user, emailObj, verificationCode, refetchMe]);
+
+  const handleEmailCancel = useCallback(async () => {
+    // Limpiar el email no verificado si existe
+    if (emailObj) {
+      try { await emailObj.destroy(); } catch { /* silencioso */ }
+    }
+    setEmailStep("idle");
+    setNewEmail("");
+    setVerificationCode("");
+    setEmailObj(null);
+    setEmailError("");
+    setCodeError("");
+    setEmailOpen(false);
+  }, [emailObj]);
+
+  // ── Handler: cambio de contraseña ─────────────────────────
+  const handlePasswordChange = useCallback(async () => {
+    if (!user) return;
+    setPasswordError("");
+
+    if (user.passwordEnabled && !currentPassword) {
+      setPasswordError("Ingresa tu contraseña actual.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError("La nueva contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Las contraseñas no coinciden.");
+      return;
+    }
+    if (user.passwordEnabled && newPassword === currentPassword) {
+      setPasswordError("La nueva contraseña debe ser diferente a la actual.");
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      await user.updatePassword({
+        ...(user.passwordEnabled ? { currentPassword } : {}),
+        newPassword,
+        signOutOfOtherSessions: true,
+      });
+      setPasswordSuccess(true);
+      addToast({ title: "Contraseña actualizada", description: "Tu contraseña se cambió correctamente. Las demás sesiones fueron cerradas.", color: "success" });
+      setTimeout(() => {
+        setPasswordOpen(false);
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setPasswordSuccess(false);
+      }, 2000);
+    } catch (e) {
+      setPasswordError(resolveClerkError(e));
+    } finally {
+      setPasswordSaving(false);
+    }
+  }, [user, currentPassword, newPassword, confirmPassword]);
+
+  const passwordStrength = (() => {
+    const p = newPassword;
+    if (!p) return null;
+    let score = 0;
+    if (p.length >= 8) score++;
+    if (p.length >= 12) score++;
+    if (/[A-Z]/.test(p)) score++;
+    if (/[0-9]/.test(p)) score++;
+    if (/[^a-zA-Z0-9]/.test(p)) score++;
+    if (score <= 1) return { label: "Muy débil", color: "bg-red-500", width: "20%" };
+    if (score === 2) return { label: "Débil", color: "bg-orange-400", width: "40%" };
+    if (score === 3) return { label: "Media", color: "bg-yellow-400", width: "60%" };
+    if (score === 4) return { label: "Fuerte", color: "bg-emerald-400", width: "80%" };
+    return { label: "Muy fuerte", color: "bg-emerald-500", width: "100%" };
+  })();
 
   return (
     <div className="space-y-4 lg:space-y-5">
-      {/* ── Header island (avatar + nombre + rol) ── */}
-      <GlassCard className="flex flex-col sm:flex-row sm:items-center gap-6 py-6">
-        <div className="flex items-center gap-5">
-          {profile.image_url ? (
-            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border border-white/[0.12]">
-              <img
-                src={profile.image_url}
-                alt={displayName}
-                className="h-full w-full object-cover"
-              />
-            </div>
-          ) : (
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-[#5e2cec]/25 border border-[#5e2cec]/30">
-              <Icon icon="solar:user-id-bold-duotone" className="text-[#9b74ff]" width={40} />
-            </div>
-          )}
-          <div className="min-w-0">
-            <h2 className="font-sora text-2xl font-black text-white leading-tight tracking-tight">
-              {displayName}
-            </h2>
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#5e2cec]/20 border border-[#5e2cec]/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#9b74ff]" />
-                <span className="text-[#b89eff] text-[0.65rem] font-semibold uppercase tracking-wider">
-                  {ROLE_LABELS[role ?? "super_admin"]}
-                </span>
-              </span>
-              {loyalty && <LoyaltyBadge level={loyalty.level} />}
-            </div>
-            <p className="mt-2 text-sm text-white/50">{profile.email}</p>
-            {profile.phone && (
-              <p className="text-sm text-white/50">{profile.phone}</p>
-            )}
-            {role === "operador" && operator_name && (
-              <p className="mt-2 text-[0.8125rem] text-white/60">
-                Operador: <span className="font-medium text-white/80">{operator_name}</span>
-              </p>
-            )}
-            {role === "agente" && (
-              <p className="mt-2 text-[0.8125rem] text-white/50">
-                Cuenta de agencia. Acceso a dashboard y disponibilidad.
-              </p>
-            )}
-          </div>
-        </div>
-      </GlassCard>
-
-      {/* ── Información personal ── */}
+      {/* ── Tarjeta única: Perfil editable + datos de cuenta ── */}
       <GlassCard>
-        <div className="flex items-start justify-between gap-4 mb-5 min-w-0">
-          <div>
-            <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Información personal</p>
-            <p className="font-sora font-bold text-white text-base leading-tight mt-1">
-              Datos de tu cuenta
-            </p>
+        <div className="flex flex-col lg:flex-row lg:items-start gap-6 lg:gap-8">
+          {/* Columna izquierda: avatar + edición */}
+          <div className="flex flex-col sm:flex-row sm:items-start gap-6 shrink-0">
+            <div className="flex flex-col items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={handleImageChange}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading || !user}
+                className="relative group rounded-2xl overflow-hidden border border-white/[0.12] focus:outline-none focus:ring-2 focus:ring-[#9b74ff]/50 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {imageUrl ? (
+                  <div className="h-20 w-20 sm:h-24 sm:w-24 shrink-0">
+                    <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="flex h-20 w-20 sm:h-24 sm:w-24 shrink-0 items-center justify-center rounded-2xl bg-[#5e2cec]/25 border border-[#5e2cec]/30">
+                    <Icon icon="solar:user-id-bold-duotone" className="text-[#9b74ff]" width={36} />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  {uploading ? (
+                    <Icon icon="solar:spinner-bold-duotone" className="text-white text-xl animate-spin" />
+                  ) : (
+                    <Icon icon="solar:camera-bold-duotone" className="text-white text-xl" />
+                  )}
+                </div>
+              </button>
+              <span className="text-[0.65rem] text-white/40">Clic para cambiar</span>
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <h2 className="font-sora text-xl sm:text-2xl font-black text-white leading-tight mb-3">
+                Mi perfil
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <Input
+                  label="Nombre"
+                  value={firstName}
+                  onValueChange={setFirstName}
+                  placeholder="Tu nombre"
+                  size="sm"
+                  classNames={{
+                    inputWrapper: inputDark,
+                    input: "!text-white/95 placeholder:!text-white/38",
+                    label: "!text-white/60",
+                  }}
+                />
+                <Input
+                  label="Apellido"
+                  value={lastName}
+                  onValueChange={setLastName}
+                  placeholder="Tu apellido"
+                  size="sm"
+                  classNames={{
+                    inputWrapper: inputDark,
+                    input: "!text-white/95 placeholder:!text-white/38",
+                    label: "!text-white/60",
+                  }}
+                />
+              </div>
+              {!clerkLoaded && (
+                <p className="text-white/50 text-xs flex items-center gap-2 mb-3">
+                  <Icon icon="solar:loading-line-duotone" className="animate-spin" />
+                  Cargando sesión…
+                </p>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  className="btn-newayzi-primary"
+                  onPress={handleSaveProfile}
+                  isLoading={saving}
+                  isDisabled={!firstName.trim() || !user}
+                  startContent={!saving && <Icon icon="solar:check-circle-bold-duotone" width={16} />}
+                >
+                  {success ? "Guardado" : "Guardar"}
+                </Button>
+                {success && (
+                  <span className="text-emerald-400 text-[0.75rem] font-medium flex items-center gap-1">
+                    <Icon icon="solar:check-circle-bold-duotone" width={14} />
+                    Guardado
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
-            <Icon icon="solar:user-circle-bold-duotone" className="text-[#9b74ff] text-base" />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {[
-            { label: "Nombre completo", value: displayName },
-            { label: "Correo", value: profile.email },
-            ...(profile.phone ? [{ label: "Teléfono", value: profile.phone }] : []),
-            { label: "Rol en el admin", value: ROLE_LABELS[role ?? "super_admin"] },
-            ...(profile.created
-              ? [
-                  {
-                    label: "Miembro desde",
-                    value: new Date(profile.created).toLocaleDateString("es", {
+
+          {/* Columna derecha: datos de cuenta (compactos) */}
+          <div className="lg:border-l lg:border-white/[0.08] lg:pl-8 lg:min-w-[200px]">
+            <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.12em] font-semibold mb-3">Datos de cuenta</p>
+            <dl className="space-y-2.5 text-sm">
+              <div>
+                <dt className="text-white/45 text-[0.7rem] uppercase tracking-wide">Correo</dt>
+                <dd className="text-white/90 font-medium mt-0.5">{profile.email}</dd>
+              </div>
+              <div>
+                <dt className="text-white/45 text-[0.7rem] uppercase tracking-wide">Rol</dt>
+                <dd className="flex items-center gap-2 mt-0.5">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#5e2cec]/20 border border-[#5e2cec]/30">
+                    <span className="w-1 h-1 rounded-full bg-[#9b74ff]" />
+                    <span className="text-[#b89eff] text-[0.7rem] font-semibold uppercase">
+                      {ROLE_LABELS[role ?? "super_admin"]}
+                    </span>
+                  </span>
+                  {!isOperator && !isStaffNoGuestRewards && loyalty && <LoyaltyBadge level={loyalty.level} />}
+                </dd>
+              </div>
+              {isOperator && operator_name && (
+                <div>
+                  <dt className="text-white/45 text-[0.7rem] uppercase tracking-wide">Operador</dt>
+                  <dd className="text-white/80 font-medium mt-0.5">{operator_name}</dd>
+                </div>
+              )}
+              {profile.phone && (
+                <div>
+                  <dt className="text-white/45 text-[0.7rem] uppercase tracking-wide">Teléfono</dt>
+                  <dd className="text-white/90 font-medium mt-0.5">{profile.phone}</dd>
+                </div>
+              )}
+              {profile.created && (
+                <div>
+                  <dt className="text-white/45 text-[0.7rem] uppercase tracking-wide">Miembro desde</dt>
+                  <dd className="text-white/80 mt-0.5">
+                    {new Date(profile.created).toLocaleDateString("es", {
                       year: "numeric",
                       month: "long",
                       day: "numeric",
-                    }),
-                  },
-                ]
-              : []),
-          ].map((item) => (
-            <InfoField key={item.label} label={item.label} value={item.value} />
-          ))}
+                    })}
+                  </dd>
+                </div>
+              )}
+              {role === "agente" && (
+                <p className="text-white/50 text-xs italic mt-1">Cuenta de agencia. Acceso a dashboard y disponibilidad.</p>
+              )}
+            </dl>
+          </div>
         </div>
       </GlassCard>
 
-      {/* ── Newayzi Rewards ── */}
-      {loyalty ? (
+      {/* ── Seguridad: correo + contraseña ── */}
+      <GlassCard>
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
+            <Icon icon="solar:shield-keyhole-bold-duotone" className="text-[#9b74ff] text-base" />
+          </div>
+          <div>
+            <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Seguridad</p>
+            <p className="font-sora font-bold text-white text-base leading-tight">Correo y contraseña</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {/* ── Cambio de correo ── */}
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] overflow-hidden">
+            <button
+              type="button"
+              onClick={() => {
+                if (emailOpen) { handleEmailCancel(); } else { setEmailOpen(true); }
+              }}
+              className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.04] transition-colors"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <Icon icon="solar:letter-bold-duotone" className="text-[#9b74ff] text-base shrink-0" />
+                <div className="text-left min-w-0">
+                  <p className="text-white/90 text-sm font-medium">Correo electrónico</p>
+                  <p className="text-white/45 text-[0.75rem] truncate">
+                    {user?.primaryEmailAddress?.emailAddress ?? profile.email}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[0.75rem] text-[#9b74ff] font-semibold">
+                  {emailOpen ? "Cancelar" : "Cambiar"}
+                </span>
+                <Icon
+                  icon={emailOpen ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
+                  className="text-white/40 text-sm"
+                />
+              </div>
+            </button>
+
+            {emailOpen && (
+              <div className="px-4 pb-4 border-t border-white/[0.07] pt-4 space-y-4">
+                {emailStep === "idle" && (
+                  <>
+                    <p className="text-white/55 text-[0.8rem]">
+                      Ingresa el nuevo correo. Te enviaremos un código de verificación a esa dirección.
+                    </p>
+                    <div className="space-y-3">
+                      <Input
+                        label="Nuevo correo electrónico"
+                        placeholder="nuevo@correo.com"
+                        value={newEmail}
+                        onValueChange={(v) => { setNewEmail(v); setEmailError(""); }}
+                        type="email"
+                        autoComplete="email"
+                        isInvalid={!!emailError}
+                        errorMessage={emailError}
+                        classNames={{
+                          inputWrapper: inputDark,
+                          input: "!text-white/95 placeholder:!text-white/38",
+                          label: "!text-white/70",
+                          errorMessage: "!text-red-400",
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        className="btn-newayzi-primary"
+                        onPress={handleEmailSend}
+                        isLoading={emailSaving}
+                        isDisabled={!newEmail.trim() || !user}
+                        startContent={!emailSaving && <Icon icon="solar:letter-send-bold-duotone" width={16} />}
+                      >
+                        Enviar código
+                      </Button>
+                    </div>
+                  </>
+                )}
+
+                {emailStep === "pending_code" && (
+                  <>
+                    <div className="flex items-center gap-2 text-sm text-white/70">
+                      <Icon icon="solar:letter-opened-bold-duotone" className="text-[#9b74ff] text-base" />
+                      <span>Código enviado a <span className="text-white font-semibold">{newEmail}</span></span>
+                    </div>
+                    <p className="text-white/50 text-[0.78rem]">
+                      Revisa tu bandeja de entrada (y spam). El código expira en unos minutos.
+                    </p>
+                    <div className="space-y-3">
+                      <Input
+                        label="Código de verificación (6 dígitos)"
+                        placeholder="123456"
+                        value={verificationCode}
+                        onValueChange={(v) => { setVerificationCode(v.replace(/\D/g, "").slice(0, 6)); setCodeError(""); }}
+                        maxLength={6}
+                        inputMode="numeric"
+                        isInvalid={!!codeError}
+                        errorMessage={codeError}
+                        classNames={{
+                          inputWrapper: inputDark,
+                          input: "!text-white/95 placeholder:!text-white/38 tracking-widest font-mono",
+                          label: "!text-white/70",
+                          errorMessage: "!text-red-400",
+                        }}
+                      />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                          size="sm"
+                          className="btn-newayzi-primary"
+                          onPress={handleEmailVerify}
+                          isLoading={emailSaving}
+                          isDisabled={verificationCode.length !== 6 || !user}
+                          startContent={!emailSaving && <Icon icon="solar:check-circle-bold-duotone" width={16} />}
+                        >
+                          Verificar y actualizar
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => { setEmailStep("idle"); setVerificationCode(""); setCodeError(""); }}
+                          className="text-[0.75rem] text-white/50 hover:text-white/80 transition-colors"
+                        >
+                          Reenviar código
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {emailStep === "done" && (
+                  <div className="flex items-center gap-3 py-2">
+                    <Icon icon="solar:check-circle-bold-duotone" className="text-emerald-400 text-2xl" />
+                    <div>
+                      <p className="text-emerald-400 font-semibold text-sm">¡Correo actualizado!</p>
+                      <p className="text-white/55 text-xs">{newEmail} es ahora tu correo principal.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Cambio de contraseña ── */}
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] overflow-hidden">
+            <button
+              type="button"
+              onClick={() => {
+                if (passwordOpen) {
+                  setPasswordOpen(false);
+                  setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); setPasswordError("");
+                } else {
+                  setPasswordOpen(true);
+                }
+              }}
+              className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.04] transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Icon icon="solar:lock-password-bold-duotone" className="text-[#9b74ff] text-base shrink-0" />
+                <div className="text-left">
+                  <p className="text-white/90 text-sm font-medium">Contraseña</p>
+                  <p className="text-white/45 text-[0.75rem]">
+                    {user?.passwordEnabled ? "Actualizar tu contraseña de acceso" : "Crear una contraseña para tu cuenta"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[0.75rem] text-[#9b74ff] font-semibold">
+                  {passwordOpen ? "Cancelar" : user?.passwordEnabled ? "Cambiar" : "Crear"}
+                </span>
+                <Icon
+                  icon={passwordOpen ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
+                  className="text-white/40 text-sm"
+                />
+              </div>
+            </button>
+
+            {passwordOpen && (
+              <div className="px-4 pb-4 border-t border-white/[0.07] pt-4 space-y-3">
+                {!user?.passwordEnabled && (
+                  <div className="flex items-start gap-2 rounded-xl bg-blue-500/10 border border-blue-400/20 px-3 py-2.5">
+                    <Icon icon="solar:info-circle-bold-duotone" className="text-blue-400 text-base mt-0.5 shrink-0" />
+                    <p className="text-blue-300 text-[0.78rem]">
+                      Tu cuenta no tiene contraseña configurada (acceso vía Google u otro proveedor). Puedes crear una contraseña para acceder directamente con correo y contraseña.
+                    </p>
+                  </div>
+                )}
+
+                {user?.passwordEnabled && (
+                  <div className="relative">
+                    <Input
+                      label="Contraseña actual"
+                      placeholder="Tu contraseña actual"
+                      value={currentPassword}
+                      onValueChange={(v) => { setCurrentPassword(v); setPasswordError(""); }}
+                      type={showCurrent ? "text" : "password"}
+                      autoComplete="current-password"
+                      endContent={
+                        <button type="button" onClick={() => setShowCurrent((p) => !p)} className="text-white/40 hover:text-white/70 transition-colors">
+                          <Icon icon={showCurrent ? "solar:eye-closed-bold" : "solar:eye-bold"} width={18} />
+                        </button>
+                      }
+                      classNames={{
+                        inputWrapper: inputDark,
+                        input: "!text-white/95 placeholder:!text-white/38",
+                        label: "!text-white/70",
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div className="relative">
+                  <Input
+                    label="Nueva contraseña"
+                    placeholder="Mínimo 8 caracteres"
+                    value={newPassword}
+                    onValueChange={(v) => { setNewPassword(v); setPasswordError(""); }}
+                    type={showNew ? "text" : "password"}
+                    autoComplete="new-password"
+                    endContent={
+                      <button type="button" onClick={() => setShowNew((p) => !p)} className="text-white/40 hover:text-white/70 transition-colors">
+                        <Icon icon={showNew ? "solar:eye-closed-bold" : "solar:eye-bold"} width={18} />
+                      </button>
+                    }
+                    classNames={{
+                      inputWrapper: inputDark,
+                      input: "!text-white/95 placeholder:!text-white/38",
+                      label: "!text-white/70",
+                    }}
+                  />
+                </div>
+
+                {newPassword && passwordStrength && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-white/45">Seguridad de la contraseña</span>
+                      <span className={
+                        passwordStrength.label === "Muy débil" || passwordStrength.label === "Débil"
+                          ? "text-red-400"
+                          : passwordStrength.label === "Media"
+                            ? "text-yellow-400"
+                            : "text-emerald-400"
+                      }>{passwordStrength.label}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${passwordStrength.color}`}
+                        style={{ width: passwordStrength.width }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="relative">
+                  <Input
+                    label="Confirmar nueva contraseña"
+                    placeholder="Repite la nueva contraseña"
+                    value={confirmPassword}
+                    onValueChange={(v) => { setConfirmPassword(v); setPasswordError(""); }}
+                    type={showConfirm ? "text" : "password"}
+                    autoComplete="new-password"
+                    isInvalid={!!confirmPassword && confirmPassword !== newPassword}
+                    errorMessage={confirmPassword && confirmPassword !== newPassword ? "Las contraseñas no coinciden." : undefined}
+                    endContent={
+                      <button type="button" onClick={() => setShowConfirm((p) => !p)} className="text-white/40 hover:text-white/70 transition-colors">
+                        <Icon icon={showConfirm ? "solar:eye-closed-bold" : "solar:eye-bold"} width={18} />
+                      </button>
+                    }
+                    classNames={{
+                      inputWrapper: inputDark,
+                      input: "!text-white/95 placeholder:!text-white/38",
+                      label: "!text-white/70",
+                      errorMessage: "!text-red-400",
+                    }}
+                  />
+                </div>
+
+                {passwordError && (
+                  <div className="flex items-start gap-2 rounded-xl bg-red-500/10 border border-red-400/20 px-3 py-2.5">
+                    <Icon icon="solar:danger-circle-bold-duotone" className="text-red-400 text-base mt-0.5 shrink-0" />
+                    <p className="text-red-300 text-[0.78rem]">{passwordError}</p>
+                  </div>
+                )}
+
+                {passwordSuccess && (
+                  <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-400/20 px-3 py-2.5">
+                    <Icon icon="solar:check-circle-bold-duotone" className="text-emerald-400 text-base" />
+                    <p className="text-emerald-300 text-sm font-medium">Contraseña actualizada. Las demás sesiones fueron cerradas.</p>
+                  </div>
+                )}
+
+                <Button
+                  size="sm"
+                  className="btn-newayzi-primary"
+                  onPress={handlePasswordChange}
+                  isLoading={passwordSaving}
+                  isDisabled={
+                    !user ||
+                    !newPassword ||
+                    newPassword.length < 8 ||
+                    newPassword !== confirmPassword ||
+                    (!!user?.passwordEnabled && !currentPassword)
+                  }
+                  startContent={!passwordSaving && <Icon icon="solar:lock-password-bold-duotone" width={16} />}
+                >
+                  {user?.passwordEnabled ? "Actualizar contraseña" : "Crear contraseña"}
+                </Button>
+
+                <p className="text-white/35 text-[0.72rem]">
+                  Al cambiar la contraseña, todas las demás sesiones activas serán cerradas automáticamente por seguridad.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </GlassCard>
+
+      {/* ── OPERADOR: Programa de Socios (rewards de operadores, no de huéspedes) ── */}
+      {isOperator && (
+        <AccentCard>
+          <div className="flex items-start justify-between gap-4 mb-5">
+            <div>
+              <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Programa de Socios</p>
+              <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
+                {operatorRewards?.activeAgreement
+                  ? operatorRewards.activeAgreement.rewardsLabelDisplay
+                  : "Tu participación en Newayzi"}
+              </p>
+            </div>
+            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+              <Icon icon="solar:handshake-bold-duotone" className="text-yellow-300 text-base" />
+            </div>
+          </div>
+
+          {!operatorRewards && (
+            <div className="flex justify-center py-8">
+              <Icon icon="solar:loading-line-duotone" className="text-white/30 text-2xl animate-spin" />
+            </div>
+          )}
+
+          {operatorRewards && !operatorRewards.activeAgreement && (
+            <div className="rounded-2xl bg-white/[0.08] border border-white/[0.12] px-5 py-6 text-center">
+              <Icon icon="solar:hand-shake-bold-duotone" className="text-white/40 text-3xl mb-3" />
+              <p className="text-white/70 text-sm font-medium">Aún no tienes un acuerdo de socio activo.</p>
+              <p className="text-white/45 text-xs mt-1">Contacta al equipo Newayzi para activar tu nivel y ofrecer cashback a tus huéspedes.</p>
+            </div>
+          )}
+
+          {operatorRewards?.activeAgreement && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-4">
+                  <Icon icon="solar:wallet-money-bold-duotone" className="text-yellow-300/90 text-lg mb-1.5" />
+                  <p className="text-white/55 text-[0.62rem] uppercase tracking-wide">Cashback a huéspedes</p>
+                  <p className="font-sora font-black text-white text-xl leading-none mt-1">
+                    {operatorRewards.activeAgreement.cashbackContributionPct}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-4">
+                  <Icon icon="solar:trending-up-bold-duotone" className="text-yellow-300/90 text-lg mb-1.5" />
+                  <p className="text-white/55 text-[0.62rem] uppercase tracking-wide">Visibilidad</p>
+                  <p className="font-sora font-bold text-white text-sm leading-tight mt-1">
+                    {operatorRewards.activeAgreement.visibilityBoostDisplay}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-4">
+                  <Icon icon="solar:wallet-money-bold-duotone" className="text-yellow-300/90 text-lg mb-1.5" />
+                  <p className="text-white/55 text-[0.62rem] uppercase tracking-wide">Aportado al pool</p>
+                  <p className="font-sora font-black text-white text-2xl leading-none mt-1">
+                    ${Math.round(operatorRewards.stats.poolContributions).toLocaleString("es-CO")}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-4">
+                  <Icon icon="solar:bookmark-bold-duotone" className="text-yellow-300/90 text-lg mb-1.5" />
+                  <p className="text-white/55 text-[0.62rem] uppercase tracking-wide">Reservas premiadas</p>
+                  <p className="font-sora font-black text-white text-2xl leading-none mt-1">
+                    {operatorRewards.stats.bookingsRewarded}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-4 text-xs text-white/45">
+                <span>
+                  Vigente desde{" "}
+                  <span className="text-white/70 font-semibold">
+                    {new Date(operatorRewards.activeAgreement.effectiveFrom).toLocaleDateString("es-CO")}
+                  </span>
+                </span>
+                {operatorRewards.activeAgreement.effectiveUntil ? (
+                  <span>
+                    hasta{" "}
+                    <span className="text-white/70 font-semibold">
+                      {new Date(operatorRewards.activeAgreement.effectiveUntil).toLocaleDateString("es-CO")}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-emerald-400 font-semibold">Sin fecha de vencimiento</span>
+                )}
+                {operatorRewards.activeAgreement.autoRenew && (
+                  <span className="text-blue-400 font-semibold">Auto-renovación activa</span>
+                )}
+              </div>
+
+              {operatorRewards.activeAgreement.termsNotes && (
+                <div className="rounded-xl bg-white/[0.06] border border-white/[0.08] px-4 py-3 text-xs text-white/50">
+                  <span className="font-semibold text-white/60">Condiciones: </span>
+                  {operatorRewards.activeAgreement.termsNotes}
+                </div>
+              )}
+            </div>
+          )}
+        </AccentCard>
+      )}
+
+      {/* ── Newayzi Rewards (programa de huéspedes) — oculto para operador y staff (super_admin, comercial, visualizador) ── */}
+      {!isOperator && !isStaffNoGuestRewards && (loyalty ? (
         <AccentCard>
           <div className="flex items-start justify-between gap-4 mb-5 min-w-0">
             <div>
@@ -228,15 +990,16 @@ export function AdminProfileClient() {
           )}
         </AccentCard>
       ) : (
-        <GlassCard className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 flex items-center justify-center mb-4">
-            <Icon icon="solar:gift-bold-duotone" className="text-[#9b74ff] text-2xl" />
-          </div>
-          <p className="font-sora font-bold text-white text-base">Sin programa de loyalty</p>
-          <p className="mt-2 text-sm text-white/50 max-w-md leading-relaxed">
-            Este perfil no tiene datos de Newayzi Rewards. Los perfiles de staff pueden no tener loyalty si no han realizado reservas como huéspedes.
-          </p>
-        </GlassCard>
+          <GlassCard className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 flex items-center justify-center mb-4">
+              <Icon icon="solar:gift-bold-duotone" className="text-[#9b74ff] text-2xl" />
+            </div>
+            <p className="font-sora font-bold text-white text-base">Sin programa de loyalty</p>
+            <p className="mt-2 text-sm text-white/50 max-w-md leading-relaxed">
+              Este perfil no tiene datos de Newayzi Rewards. Los perfiles de staff pueden no tener loyalty si no han realizado reservas como huéspedes.
+            </p>
+          </GlassCard>
+        )
       )}
     </div>
   );
