@@ -228,6 +228,7 @@ export function ConnectionDetailClient() {
       const failed = summary?.failed ?? 0;
       const draft = summary?.draft_mappings_created ?? 0;
       const errorCount = summary?.errors?.length ?? 0;
+      const pricingUnavailable = Boolean(summary?.pricing_unavailable);
 
       if (usedFallback) {
         addToast({
@@ -245,11 +246,14 @@ export function ConnectionDetailClient() {
         });
       } else if (syncResult.status === "partial") {
         const hasOnlyDrafts = synced === 0 && failed === 0 && draft > 0;
+        const partialDesc = pricingUnavailable
+          ? "Se omitió pricing por fallback del PMS. Disponibilidad y mapeos sí se sincronizaron."
+          : `Procesados: ${synced}. Fallidos: ${failed}. Errores: ${errorCount}.`;
         addToast({
           title: hasOnlyDrafts ? "Sincronización completada con pendientes" : "Sincronización parcial",
           description: hasOnlyDrafts
             ? `Se detectaron ${draft} mapeos pendientes por vincular.`
-            : `Procesados: ${synced}. Fallidos: ${failed}. Errores: ${errorCount}.`,
+            : partialDesc,
           color: hasOnlyDrafts ? "warning" : "danger",
         });
       } else {
@@ -615,6 +619,18 @@ export function ConnectionDetailClient() {
                       <p className="text-white/50">Duración: {Math.round(lastSyncResult.summary.duration_seconds)}s</p>
                     )}
                   </div>
+
+                  {lastSyncResult.summary.pricing_unavailable && (
+                    <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-amber-200 text-sm space-y-1">
+                      <p className="font-medium">Pricing omitido por fallback de resiliencia.</p>
+                      <p>
+                        La corrida continuó con disponibilidad y metadatos para evitar timeout del sync.
+                        {(lastSyncResult.summary.pricing_unavailable_properties?.length ?? 0) > 0
+                          ? ` Propiedades afectadas: ${lastSyncResult.summary.pricing_unavailable_properties?.slice(0, 6).join(", ")}`
+                          : ""}
+                      </p>
+                    </div>
+                  )}
 
                   {lastSyncResult.summary.draft_mappings_created > 0 && (
                     <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-amber-200 text-sm">

@@ -236,6 +236,8 @@ export interface ConnectionSyncNowResponse {
     room_types_discovered?: number;
     room_type_base_rates_synced: number;
     dynamic_pricing_rules_synced: number;
+    pricing_unavailable?: boolean;
+    pricing_unavailable_properties?: string[];
     phase_totals?: Record<string, unknown>;
     errors: string[];
   };
