@@ -232,6 +232,8 @@ export interface ConnectionSyncNowResponse {
     synced: number;
     failed: number;
     draft_mappings_created: number;
+    auto_created_properties?: number;
+    auto_created_room_types?: number;
     properties_synced: number;
     properties_discovered?: number;
     room_types_synced: number;

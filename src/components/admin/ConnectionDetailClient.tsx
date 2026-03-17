@@ -55,7 +55,8 @@ function formatSyncEvent(evt: ConnectionSyncStreamEvent): string {
     const room = item.pms_room_type_id ? ` • Hab ${item.pms_room_type_id}` : "";
     const prop = item.pms_property_id ? `Prop ${item.pms_property_id}` : "Elemento";
     const status =
-      evt.status === "draft_mapping" ? "pendiente de mapeo" :
+      evt.status === "auto_created" ? "auto-creado" :
+      evt.status === "draft_mapping" ? "auto-vinculado" :
       evt.status === "failed" ? "falló" :
       evt.status === "skipped" ? "omitido" :
       "sincronizado";
@@ -227,6 +228,8 @@ export function ConnectionDetailClient() {
       const synced = summary?.synced ?? 0;
       const failed = summary?.failed ?? 0;
       const draft = summary?.draft_mappings_created ?? 0;
+      const autoCreatedProperties = summary?.auto_created_properties ?? 0;
+      const autoCreatedRoomTypes = summary?.auto_created_room_types ?? 0;
       const errorCount = summary?.errors?.length ?? 0;
       const pricingUnavailable = Boolean(summary?.pricing_unavailable);
 
@@ -245,16 +248,16 @@ export function ConnectionDetailClient() {
           color: "success",
         });
       } else if (syncResult.status === "partial") {
-        const hasOnlyDrafts = synced === 0 && failed === 0 && draft > 0;
         const partialDesc = pricingUnavailable
           ? "Se omitió pricing por fallback del PMS. Disponibilidad y mapeos sí se sincronizaron."
           : `Procesados: ${synced}. Fallidos: ${failed}. Errores: ${errorCount}.`;
         addToast({
-          title: hasOnlyDrafts ? "Sincronización completada con pendientes" : "Sincronización parcial",
-          description: hasOnlyDrafts
-            ? `Se detectaron ${draft} mapeos pendientes por vincular.`
-            : partialDesc,
-          color: hasOnlyDrafts ? "warning" : "danger",
+          title: "Sincronización parcial",
+          description:
+            autoCreatedProperties > 0 || autoCreatedRoomTypes > 0
+              ? `Autocreados: ${autoCreatedProperties} propiedades y ${autoCreatedRoomTypes} alojamientos. ${partialDesc}`
+              : partialDesc,
+          color: "danger",
         });
       } else {
         addToast({
@@ -577,8 +580,10 @@ export function ConnectionDetailClient() {
                       <p className="text-xl font-semibold text-white">{lastSyncResult.summary.failed}</p>
                     </div>
                     <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
-                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Mapeos draft</p>
-                      <p className="text-xl font-semibold text-white">{lastSyncResult.summary.draft_mappings_created}</p>
+                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Autocreados</p>
+                      <p className="text-xl font-semibold text-white">
+                        {(lastSyncResult.summary.auto_created_properties ?? 0) + (lastSyncResult.summary.auto_created_room_types ?? 0)}
+                      </p>
                     </div>
                     <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
                       <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Tarifas base</p>
@@ -598,6 +603,10 @@ export function ConnectionDetailClient() {
                       <span className="text-white/90 font-medium">{lastSyncResult.summary.properties_synced}</span>
                     </p>
                     <p>
+                      Propiedades auto-creadas:{" "}
+                      <span className="text-white/90 font-medium">{lastSyncResult.summary.auto_created_properties ?? 0}</span>
+                    </p>
+                    <p>
                       Alojamientos descubiertos en PMS:{" "}
                       <span className="text-white/90 font-medium">
                         {lastSyncResult.summary.room_types_discovered ?? lastSyncResult.summary.room_types_synced}
@@ -606,6 +615,10 @@ export function ConnectionDetailClient() {
                     <p>
                       Alojamientos mapeados localmente:{" "}
                       <span className="text-white/90 font-medium">{lastSyncResult.summary.room_types_synced}</span>
+                    </p>
+                    <p>
+                      Alojamientos auto-creados:{" "}
+                      <span className="text-white/90 font-medium">{lastSyncResult.summary.auto_created_room_types ?? 0}</span>
                     </p>
                     {lastSyncResult.window && (
                       <p className="text-white/50">
@@ -634,7 +647,7 @@ export function ConnectionDetailClient() {
 
                   {lastSyncResult.summary.draft_mappings_created > 0 && (
                     <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-amber-200 text-sm">
-                      Se detectaron unidades PMS sin mapeo local. Revisa la pestaña de pendientes para vincularlas.
+                      Se detectaron {lastSyncResult.summary.draft_mappings_created} draft(s) legacy en esta corrida.
                     </div>
                   )}
 
