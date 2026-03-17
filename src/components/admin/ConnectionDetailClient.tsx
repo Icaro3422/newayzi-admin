@@ -12,6 +12,7 @@ import {
   type UnitsSummary,
   type ConnectionSyncNowResponse,
   type ConnectionSyncStreamEvent,
+  type PMSSyncRunStatus,
 } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 import { addToast } from "@heroui/react";
@@ -49,6 +50,7 @@ function formatSyncEvent(evt: ConnectionSyncStreamEvent): string {
   if (evt.event === "phase_summary") return `Fase ${phaseLabel(evt.phase)} completada.`;
   if (evt.event === "sync_started") return "Sincronización iniciada.";
   if (evt.event === "sync_completed") return "Sincronización completada.";
+  if (evt.event === "sync_finished") return "Sincronización finalizada.";
   if (evt.event === "sync_error") return `Error: ${evt.detail || "No se pudo completar."}`;
   if (evt.event === "item_progress") {
     const item = evt.item ?? {};
@@ -65,15 +67,11 @@ function formatSyncEvent(evt: ConnectionSyncStreamEvent): string {
   return String(evt.detail || "Actualización de sincronización.");
 }
 
-function shouldUseSyncFallback(error: unknown): boolean {
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  return (
-    message.includes("stream") ||
-    message.includes("event-stream") ||
-    message.includes("no devolvió stream") ||
-    message.includes("finalizó sin resultado") ||
-    message.includes("failed to fetch")
-  );
+function mapRunStatusToApiStatus(runStatus: PMSSyncRunStatus["status"]): ConnectionSyncNowResponse["status"] {
+  if (runStatus === "success") return "ok";
+  if (runStatus === "partial") return "partial";
+  if (runStatus === "error") return "error";
+  return "queued";
 }
 
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -174,6 +172,9 @@ export function ConnectionDetailClient() {
     if (evt.event === "sync_completed") {
       setSyncCurrentPhase("Sincronización finalizada.");
     }
+    if (evt.event === "sync_finished") {
+      setSyncCurrentPhase("Sincronización finalizada.");
+    }
     if (evt.event === "sync_error") {
       setSyncCurrentPhase("Sincronización finalizada con error.");
     }
@@ -205,22 +206,107 @@ export function ConnectionDetailClient() {
     setSyncProgressModalOpen(true);
     resetSyncRealtimeState();
     try {
-      let usedFallback = false;
-      let syncResult: ConnectionSyncNowResponse;
-      try {
-        syncResult = await adminApi.syncConnectionWithStream(id, registerSyncEvent);
-      } catch (streamError) {
-        if (!shouldUseSyncFallback(streamError)) {
-          throw streamError;
-        }
-        usedFallback = true;
-        setSyncFallbackUsed(true);
-        registerSyncEvent({
-          event: "message",
-          detail: "No fue posible abrir el stream en vivo. Continuamos con sincronización estándar (misma cobertura, sin telemetría en vivo).",
-        });
-        syncResult = await adminApi.syncConnectionNow(id);
+      const started = await adminApi.startSyncRun(id);
+      const runId = started.run_id;
+      const wsToken = started.ws_token;
+      if (!runId) {
+        throw new Error("No se recibió run_id para la sincronización.");
       }
+
+      let lastSeq = 0;
+      let finalRun: PMSSyncRunStatus | null = null;
+      let socket: { close: () => void } | null = null;
+      let wsHealthy = false;
+      let warnedFallback = false;
+      let usedFallback = false;
+
+      const applyIncomingEvent = (evt: ConnectionSyncStreamEvent & { seq?: number }) => {
+        if (typeof evt.seq === "number") {
+          lastSeq = Math.max(lastSeq, evt.seq);
+        }
+        if (evt.event) registerSyncEvent(evt);
+      };
+
+      const openSocket = () => {
+        if (!wsToken) return;
+        try {
+          socket = adminApi.connectSyncSocket(runId, wsToken, {
+            lastSeq,
+            onOpen: () => {
+              wsHealthy = true;
+            },
+            onClose: () => {
+              wsHealthy = false;
+            },
+            onError: () => {
+              wsHealthy = false;
+            },
+            onMessage: (msg) => {
+              if (msg.type === "sync_snapshot" && msg.run) {
+                const run = msg.run as PMSSyncRunStatus;
+                if (run.status === "success" || run.status === "partial" || run.status === "error") {
+                  finalRun = run;
+                }
+                return;
+              }
+              applyIncomingEvent(msg);
+            },
+          }) as unknown as { close: () => void };
+        } catch {
+          wsHealthy = false;
+        }
+      };
+      const closeSocket = () => {
+        const maybeSocket = socket as { close: () => void } | null;
+        if (!maybeSocket) return;
+        try {
+          maybeSocket.close();
+        } catch {
+          // noop
+        }
+      };
+
+      openSocket();
+      let pollAttempts = 0;
+      while (!finalRun && pollAttempts < 240) {
+        const eventsPage = await adminApi.getSyncRunEvents(runId, lastSeq, 200);
+        for (const evt of eventsPage.events ?? []) {
+          applyIncomingEvent(evt);
+        }
+
+        const run = await adminApi.getSyncRun(runId);
+        if (run.status === "success" || run.status === "partial" || run.status === "error") {
+          finalRun = run;
+          break;
+        }
+
+        pollAttempts += 1;
+        if (!wsHealthy && wsToken) {
+          usedFallback = true;
+          setSyncFallbackUsed(true);
+          if (!warnedFallback) {
+            warnedFallback = true;
+            registerSyncEvent({
+              event: "message",
+              detail: "Canal en vivo inestable. Se activa polling de respaldo sin perder el progreso.",
+            });
+          }
+          if (!socket) {
+            openSocket();
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      closeSocket();
+      if (!finalRun) {
+        throw new Error("La sincronización no reportó estado final a tiempo.");
+      }
+
+      const syncResult: ConnectionSyncNowResponse = {
+        status: mapRunStatusToApiStatus(finalRun.status),
+        summary: finalRun.summary,
+        window: finalRun.window,
+      };
 
       setLastSyncResult(syncResult);
 
@@ -235,8 +321,8 @@ export function ConnectionDetailClient() {
 
       if (usedFallback) {
         addToast({
-          title: "Sincronización en modo estándar",
-          description: "La sincronización se ejecutó completa, pero sin eventos en tiempo real.",
+          title: "Sincronización con fallback",
+          description: "Se completó con respaldo por polling para evitar cortes del stream en vivo.",
           color: "warning",
         });
       }

@@ -43,6 +43,18 @@ function getApiBase(): string {
 // En SSR nunca se hacen llamadas a la API (todo está en useEffect/useCallback).
 const API_BASE = getApiBase();
 
+function getWsBase(): string {
+  if (typeof window === "undefined") return "";
+  if (!API_BASE) return "";
+  try {
+    const api = new URL(API_BASE);
+    api.protocol = api.protocol === "https:" ? "wss:" : "ws:";
+    return api.toString().replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+}
+
 export type AdminRole = "super_admin" | "visualizador" | "comercial" | "operador" | "agente";
 
 export interface AdminLoyalty {
@@ -223,7 +235,9 @@ export interface PMSConnectionDetail extends PMSConnectionListItem {
 }
 
 export interface ConnectionSyncNowResponse {
-  status: "ok" | "partial" | "error";
+  status: "queued" | "ok" | "partial" | "error";
+  run_id?: string;
+  ws_token?: string;
   summary?: {
     sync_run_id?: string;
     started_at?: string;
@@ -266,6 +280,7 @@ export interface ConnectionSyncStreamEvent {
     | "item_progress"
     | "phase_summary"
     | "sync_completed"
+    | "sync_finished"
     | "sync_error"
     | "message";
   phase?: "properties" | "room_types" | "availability" | "rates";
@@ -288,6 +303,28 @@ export interface ConnectionSyncStreamEvent {
   window?: ConnectionSyncNowResponse["window"];
   detail?: string;
   [key: string]: unknown;
+}
+
+export interface PMSSyncRunStatus {
+  run_id: string;
+  connection_id: number;
+  status: "queued" | "running" | "success" | "partial" | "error";
+  requested_by?: string | null;
+  window: { start_date: string; end_date: string };
+  started_at?: string | null;
+  completed_at?: string | null;
+  summary?: ConnectionSyncNowResponse["summary"];
+  error?: string;
+  last_event_seq: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PMSSyncRunEventsResponse {
+  run_id: string;
+  status: PMSSyncRunStatus["status"];
+  events: (ConnectionSyncStreamEvent & { seq?: number })[];
+  last_seq: number;
 }
 
 export interface SyncedUnit {
@@ -788,6 +825,62 @@ export const adminApi = {
 
   async syncConnectionNow(id: number): Promise<ConnectionSyncNowResponse> {
     return postJson<ConnectionSyncNowResponse>(`/api/admin/pms/connections/${id}/sync-now/`);
+  },
+
+  async startSyncRun(id: number): Promise<ConnectionSyncNowResponse> {
+    return postJson<ConnectionSyncNowResponse>(`/api/admin/pms/connections/${id}/sync-now/`);
+  },
+
+  async getSyncRun(runId: string): Promise<PMSSyncRunStatus> {
+    const run = await getJson<PMSSyncRunStatus>(`/api/admin/pms/sync-runs/${runId}/`);
+    if (!run) throw new Error("No se encontró la corrida de sincronización.");
+    return run;
+  },
+
+  async getSyncRunEvents(runId: string, afterSeq = 0, limit = 200): Promise<PMSSyncRunEventsResponse> {
+    const q = new URLSearchParams();
+    q.set("after_seq", String(Math.max(0, afterSeq)));
+    q.set("limit", String(Math.max(1, Math.min(1000, limit))));
+    const path = `/api/admin/pms/sync-runs/${runId}/events/?${q.toString()}`;
+    const data = await getJson<PMSSyncRunEventsResponse>(path);
+    if (!data) {
+      return { run_id: runId, status: "queued", events: [], last_seq: afterSeq };
+    }
+    return data;
+  },
+
+  connectSyncSocket(
+    runId: string,
+    wsToken: string,
+    opts: {
+      lastSeq?: number;
+      onMessage?: (evt: ConnectionSyncStreamEvent & { seq?: number; type?: string; run?: PMSSyncRunStatus }) => void;
+      onError?: () => void;
+      onClose?: (ev: CloseEvent) => void;
+      onOpen?: () => void;
+    } = {}
+  ): WebSocket {
+    const wsBase = getWsBase();
+    if (!wsBase) throw new Error("No fue posible resolver la URL websocket.");
+    const lastSeq = Math.max(0, opts.lastSeq ?? 0);
+    const url = `${wsBase}/ws/admin/pms/sync-runs/${runId}/?token=${encodeURIComponent(wsToken)}&last_seq=${lastSeq}`;
+    const socket = new WebSocket(url);
+    socket.onopen = () => opts.onOpen?.();
+    socket.onerror = () => opts.onError?.();
+    socket.onclose = (ev) => opts.onClose?.(ev);
+    socket.onmessage = (raw) => {
+      try {
+        const data = JSON.parse(String(raw.data ?? "{}")) as ConnectionSyncStreamEvent & {
+          seq?: number;
+          type?: string;
+          run?: PMSSyncRunStatus;
+        };
+        opts.onMessage?.(data);
+      } catch {
+        opts.onMessage?.({ event: "message", detail: String(raw.data ?? "") });
+      }
+    };
+    return socket;
   },
 
   async syncConnectionWithStream(
