@@ -55,6 +55,29 @@ function getWsBase(): string {
   }
 }
 
+function getWsBaseCandidates(): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (v: string) => {
+    const key = (v || "").trim().replace(/\/$/, "");
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push(key);
+  };
+
+  push(getWsBase());
+  if (typeof window !== "undefined") {
+    try {
+      const current = new URL(window.location.origin);
+      current.protocol = current.protocol === "https:" ? "wss:" : "ws:";
+      push(current.toString());
+    } catch {
+      // noop
+    }
+  }
+  return out;
+}
+
 export type AdminRole = "super_admin" | "visualizador" | "comercial" | "operador" | "agente";
 
 export interface AdminLoyalty {
@@ -860,8 +883,8 @@ export const adminApi = {
       onOpen?: () => void;
     } = {}
   ): { close: () => void } {
-    const wsBase = getWsBase();
-    if (!wsBase) throw new Error("No fue posible resolver la URL websocket.");
+    const wsBases = getWsBaseCandidates();
+    if (wsBases.length === 0) throw new Error("No fue posible resolver la URL websocket.");
     const lastSeq = Math.max(0, opts.lastSeq ?? 0);
     const wsPaths = [
       `/ws/admin/pms/sync-runs/${runId}/`,
@@ -871,24 +894,25 @@ export const adminApi = {
     let socket: WebSocket | null = null;
     let userClosed = false;
     let openedOnce = false;
-    let wsPathIdx = 0;
+    let targetIdx = 0;
+    const targets = wsBases.flatMap((base) => wsPaths.map((path) => ({ base, path })));
 
-    const bindListeners = (current: WebSocket, pathIdx: number) => {
+    const bindListeners = (current: WebSocket, idx: number) => {
       current.onopen = () => {
         openedOnce = true;
         opts.onOpen?.();
       };
       current.onerror = () => {
-        if (!openedOnce && !userClosed && pathIdx + 1 < wsPaths.length) {
+        if (!openedOnce && !userClosed && idx + 1 < targets.length) {
           return;
         }
         opts.onError?.();
       };
       current.onclose = (ev) => {
         if (socket === current) socket = null;
-        if (!openedOnce && !userClosed && pathIdx + 1 < wsPaths.length) {
-          wsPathIdx = pathIdx + 1;
-          openSocket(wsPathIdx);
+        if (!openedOnce && !userClosed && idx + 1 < targets.length) {
+          targetIdx = idx + 1;
+          openSocket(targetIdx);
           return;
         }
         opts.onClose?.(ev);
@@ -907,14 +931,15 @@ export const adminApi = {
       };
     };
 
-    const openSocket = (pathIdx: number) => {
-      const url = `${wsBase}${wsPaths[pathIdx]}?token=${encodeURIComponent(wsToken)}&last_seq=${lastSeq}`;
+    const openSocket = (idx: number) => {
+      const target = targets[idx];
+      const url = `${target.base}${target.path}?token=${encodeURIComponent(wsToken)}&last_seq=${lastSeq}`;
       const nextSocket = new WebSocket(url);
       socket = nextSocket;
-      bindListeners(nextSocket, pathIdx);
+      bindListeners(nextSocket, idx);
     };
 
-    openSocket(wsPathIdx);
+    openSocket(targetIdx);
     return {
       close: () => {
         userClosed = true;

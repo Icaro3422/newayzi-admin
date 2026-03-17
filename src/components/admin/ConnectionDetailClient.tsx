@@ -221,13 +221,16 @@ export function ConnectionDetailClient() {
       let usedFallback = false;
       const wsStartTs = Date.now();
       const wsFallbackGraceMs = 12000;
+      const staleRealtimeThresholdMs = 12000;
       let wsRetryCount = 0;
       let wsNextRetryAt = 0;
+      let lastRealtimeActivityTs = Date.now();
 
       const applyIncomingEvent = (evt: ConnectionSyncStreamEvent & { seq?: number }) => {
         if (typeof evt.seq === "number") {
           lastSeq = Math.max(lastSeq, evt.seq);
         }
+        lastRealtimeActivityTs = Date.now();
         if (evt.event) registerSyncEvent(evt);
       };
 
@@ -304,14 +307,15 @@ export function ConnectionDetailClient() {
         if (!wsHealthy && wsToken) {
           openSocket();
           const wsGraceElapsed = Date.now() - wsStartTs >= wsFallbackGraceMs;
-          if (wsGraceElapsed) {
+          const realtimeLooksStale = Date.now() - lastRealtimeActivityTs >= staleRealtimeThresholdMs;
+          if (wsGraceElapsed && realtimeLooksStale) {
             usedFallback = true;
             setSyncFallbackUsed(true);
             if (!warnedFallback) {
               warnedFallback = true;
               registerSyncEvent({
                 event: "message",
-                detail: "Canal en vivo inestable. Se activa polling de respaldo sin perder el progreso.",
+                detail: "Canal websocket inestable. Se mantiene progreso en vivo mediante polling de respaldo.",
               });
             }
           }
