@@ -75,6 +75,91 @@ const BG_GRADIENT = "radial-gradient(ellipse 110% 80% at 20% 15%, #1e1060 0%, #0
 const GLOW_1     = "radial-gradient(circle, rgba(94,44,236,0.18) 0%, transparent 70%)";
 const GLOW_2     = "radial-gradient(circle, rgba(66,45,246,0.10) 0%, transparent 70%)";
 
+/* ── Vista de acceso denegado ── */
+function AccessDeniedView({
+  error,
+  isPermissionDenied,
+  onRetry,
+  onSignOut,
+}: {
+  error: string;
+  isPermissionDenied: boolean;
+  onRetry: () => Promise<void>;
+  onSignOut: () => void;
+}) {
+  const [retrying, setRetrying] = useState(false);
+
+  const handleRetry = async () => {
+    setRetrying(true);
+    try {
+      await onRetry();
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  return (
+    <div className="flex h-screen items-center justify-center font-sora px-4" style={{ background: BG_GRADIENT }}>
+      <div className="absolute inset-0 pointer-events-none" aria-hidden>
+        <div style={{ background: GLOW_1 }} className="absolute top-[-8%] left-[15%] w-[50%] h-[50%]" />
+        <div style={{ background: GLOW_2 }} className="absolute bottom-0 right-[5%] w-[35%] h-[45%]" />
+        <img
+          src="/brand/n-patron-black.svg"
+          alt=""
+          className="absolute bottom-0 right-0 w-[48%] h-[60%] object-contain object-right-bottom"
+          style={{ filter: "invert(1)", opacity: 0.022 }}
+        />
+      </div>
+      <div className="relative z-10 w-full max-w-md">
+        <div className="bg-white/[0.06] border border-white/[0.1] rounded-2xl p-8 backdrop-blur-sm text-center">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center mx-auto mb-6">
+            <Icon icon="solar:shield-warning-bold-duotone" className="text-amber-400 text-3xl" />
+          </div>
+          <h1 className="font-sora font-bold text-xl text-white mb-3">
+            {isPermissionDenied ? "Acceso restringido" : "No se pudo verificar tu acceso"}
+          </h1>
+          <p className="text-white/70 text-[0.9375rem] leading-relaxed mb-6">
+            {isPermissionDenied
+              ? "No tienes permisos para acceder al administrador. Si crees que deberías tener acceso, comunícate con el equipo de Newayzi."
+              : "Hubo un problema al cargar tu sesión. Si el problema persiste, contacta al equipo de Newayzi."}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              type="button"
+              onClick={handleRetry}
+              disabled={retrying}
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-xl font-sora font-semibold text-sm text-white bg-white/[0.1] border border-white/[0.15] hover:bg-white/[0.15] transition-colors disabled:opacity-60"
+            >
+              {retrying ? (
+                <Icon icon="svg-spinners:ring-resize" className="text-lg" />
+              ) : (
+                <Icon icon="solar:refresh-bold-duotone" className="text-lg" />
+              )}
+              Reintentar
+            </button>
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-xl font-sora font-semibold text-sm text-white bg-gradient-to-br from-[#3d21c4] to-[#5e2cec] hover:from-[#5e2cec] hover:to-[#422df6] transition-all"
+            >
+              <Icon icon="solar:logout-2-bold-duotone" className="text-lg" />
+              Cerrar sesión
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => { window.location.href = "/admin"; }}
+            className="mt-5 inline-flex items-center gap-2 text-white/50 hover:text-white/80 text-sm font-medium transition-colors"
+          >
+            <Icon icon="solar:home-2-outline" width={16} />
+            Ir al inicio del admin
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Pantalla de cambio de contraseña obligatorio ── */
 function ForcePasswordChange({ onDone }: { onDone: () => void }) {
   const [newPassword, setNewPassword] = useState("");
@@ -194,7 +279,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const router   = useRouter();
   const { signOut } = useClerk();
   const { user } = useUser();
-  const { canAccess, loading, error, mustChangePassword, clearMustChangePassword, role } = useAdmin();
+  const { canAccess, loading, error, mustChangePassword, clearMustChangePassword, role, refetchMe } = useAdmin();
 
   // Aplicar overrides de label según el rol actual
   const roleOverrides = role ? (ROLE_NAV_OVERRIDES[role] ?? {}) : {};
@@ -241,14 +326,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   if (error) {
+    const isPermissionDenied =
+      error.includes("permisos") ||
+      error.includes("No tienes permisos") ||
+      error.includes("403");
     return (
-      <div className="flex h-screen items-center justify-center font-sora" style={{ background: BG_GRADIENT }}>
-        {shellBg}
-        <div className="relative z-10 text-center px-8">
-          <p className="text-red-400 font-medium">{error}</p>
-          <p className="mt-2 text-sm text-white/35">Comprueba NEXT_PUBLIC_API_URL y que el backend exponga GET /api/admin/me/</p>
-        </div>
-      </div>
+      <AccessDeniedView
+        error={error}
+        isPermissionDenied={isPermissionDenied}
+        onRetry={refetchMe}
+        onSignOut={() => signOut({ redirectUrl: "/sign-in" })}
+      />
     );
   }
 

@@ -6,11 +6,74 @@ import { useRouter } from "next/navigation";
 import { Button, Switch, Input, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useParams } from "next/navigation";
-import { adminApi, type PMSConnectionDetail, type UnitsSummary, type ConnectionSyncNowResponse } from "@/lib/admin-api";
+import {
+  adminApi,
+  type PMSConnectionDetail,
+  type UnitsSummary,
+  type ConnectionSyncNowResponse,
+  type ConnectionSyncStreamEvent,
+} from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 import { addToast } from "@heroui/react";
 
 type TabKey = "synced" | "pending" | "disabled" | "available";
+type SyncPhaseKey = "properties" | "room_types" | "availability" | "rates";
+type PhaseCounter = {
+  current: number;
+  total: number;
+  synced: number;
+  failed: number;
+  skipped: number;
+  draft: number;
+};
+
+function emptySyncCounters(): Record<SyncPhaseKey, PhaseCounter> {
+  return {
+    properties: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
+    room_types: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
+    availability: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
+    rates: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
+  };
+}
+
+function phaseLabel(phase?: string): string {
+  if (phase === "properties") return "Propiedades";
+  if (phase === "room_types") return "Tipos de habitación";
+  if (phase === "availability") return "Disponibilidad";
+  if (phase === "rates") return "Tarifas";
+  return "Sincronización";
+}
+
+function formatSyncEvent(evt: ConnectionSyncStreamEvent): string {
+  if (evt.event === "phase_started") return `Iniciando fase: ${phaseLabel(evt.phase)}`;
+  if (evt.event === "phase_summary") return `Fase ${phaseLabel(evt.phase)} completada.`;
+  if (evt.event === "sync_started") return "Sincronización iniciada.";
+  if (evt.event === "sync_completed") return "Sincronización completada.";
+  if (evt.event === "sync_error") return `Error: ${evt.detail || "No se pudo completar."}`;
+  if (evt.event === "item_progress") {
+    const item = evt.item ?? {};
+    const room = item.pms_room_type_id ? ` • Hab ${item.pms_room_type_id}` : "";
+    const prop = item.pms_property_id ? `Prop ${item.pms_property_id}` : "Elemento";
+    const status =
+      evt.status === "draft_mapping" ? "pendiente de mapeo" :
+      evt.status === "failed" ? "falló" :
+      evt.status === "skipped" ? "omitido" :
+      "sincronizado";
+    return `${phaseLabel(evt.phase)}: ${prop}${room} (${status})`;
+  }
+  return String(evt.detail || "Actualización de sincronización.");
+}
+
+function shouldUseSyncFallback(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    message.includes("stream") ||
+    message.includes("event-stream") ||
+    message.includes("no devolvió stream") ||
+    message.includes("finalizó sin resultado") ||
+    message.includes("failed to fetch")
+  );
+}
 
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
@@ -42,6 +105,11 @@ export function ConnectionDetailClient() {
   const [unitsSummary, setUnitsSummary] = useState<UnitsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgressModalOpen, setSyncProgressModalOpen] = useState(false);
+  const [syncEvents, setSyncEvents] = useState<ConnectionSyncStreamEvent[]>([]);
+  const [syncCurrentPhase, setSyncCurrentPhase] = useState<string>("Preparando...");
+  const [syncCounters, setSyncCounters] = useState<Record<SyncPhaseKey, PhaseCounter>>(emptySyncCounters);
+  const [syncFallbackUsed, setSyncFallbackUsed] = useState(false);
   const [syncResultModalOpen, setSyncResultModalOpen] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState<ConnectionSyncNowResponse | null>(null);
   const [patching, setPatching] = useState(false);
@@ -90,11 +158,69 @@ export function ConnectionDetailClient() {
     }
   }, [connection?.id, connection?.config, connection?.pms_type]);
 
+  function resetSyncRealtimeState() {
+    setSyncEvents([]);
+    setSyncCurrentPhase("Preparando...");
+    setSyncCounters(emptySyncCounters());
+    setSyncFallbackUsed(false);
+  }
+
+  function registerSyncEvent(evt: ConnectionSyncStreamEvent) {
+    setSyncEvents((prev) => [evt, ...prev].slice(0, 80));
+    if (evt.event === "phase_started") {
+      setSyncCurrentPhase(`Procesando ${phaseLabel(evt.phase)}...`);
+    }
+    if (evt.event === "sync_completed") {
+      setSyncCurrentPhase("Sincronización finalizada.");
+    }
+    if (evt.event === "sync_error") {
+      setSyncCurrentPhase("Sincronización finalizada con error.");
+    }
+
+    if (!evt.phase) return;
+    const phase = evt.phase as SyncPhaseKey;
+    setSyncCounters((prev) => {
+      const current = prev[phase];
+      const updated: PhaseCounter = {
+        ...current,
+        current: typeof evt.current === "number" ? evt.current : current.current,
+        total: typeof evt.total === "number" ? evt.total : current.total,
+      };
+
+      if (evt.event === "item_progress") {
+        if (evt.status === "failed") updated.failed += 1;
+        else if (evt.status === "draft_mapping") updated.draft += 1;
+        else if (evt.status === "skipped") updated.skipped += 1;
+        else updated.synced += 1;
+      }
+
+      return { ...prev, [phase]: updated };
+    });
+  }
+
   async function handleSyncNow() {
     if (!canSyncConnection) return;
     setSyncing(true);
+    setSyncProgressModalOpen(true);
+    resetSyncRealtimeState();
     try {
-      const syncResult = await adminApi.syncConnectionNow(id);
+      let usedFallback = false;
+      let syncResult: ConnectionSyncNowResponse;
+      try {
+        syncResult = await adminApi.syncConnectionWithStream(id, registerSyncEvent);
+      } catch (streamError) {
+        if (!shouldUseSyncFallback(streamError)) {
+          throw streamError;
+        }
+        usedFallback = true;
+        setSyncFallbackUsed(true);
+        registerSyncEvent({
+          event: "message",
+          detail: "No fue posible abrir el stream en vivo. Continuamos con sincronización estándar (misma cobertura, sin telemetría en vivo).",
+        });
+        syncResult = await adminApi.syncConnectionNow(id);
+      }
+
       setLastSyncResult(syncResult);
 
       const summary = syncResult.summary;
@@ -103,10 +229,18 @@ export function ConnectionDetailClient() {
       const draft = summary?.draft_mappings_created ?? 0;
       const errorCount = summary?.errors?.length ?? 0;
 
+      if (usedFallback) {
+        addToast({
+          title: "Sincronización en modo estándar",
+          description: "La sincronización se ejecutó completa, pero sin eventos en tiempo real.",
+          color: "warning",
+        });
+      }
+
       if (syncResult.status === "ok") {
         addToast({
           title: "Sincronización exitosa",
-          description: `Se procesaron ${synced} registros.`,
+          description: `Sincronizados: ${synced}. Duración: ${Math.round(summary?.duration_seconds ?? 0)}s.`,
           color: "success",
         });
       } else if (syncResult.status === "partial") {
@@ -126,6 +260,7 @@ export function ConnectionDetailClient() {
         });
       }
 
+      setSyncProgressModalOpen(false);
       setSyncResultModalOpen(true);
       const [conn, unitsSummaryData] = await Promise.all([adminApi.getConnection(id), adminApi.getUnitsSummary(id)]);
       setConnection(conn ?? null);
@@ -133,12 +268,15 @@ export function ConnectionDetailClient() {
       router.refresh();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "No se pudo ejecutar la sincronización.";
+      setSyncProgressModalOpen(false);
       addToast({
         title: "Error al sincronizar",
         description: msg,
         color: "danger",
       });
-    } finally { setSyncing(false); }
+    } finally {
+      setSyncing(false);
+    }
   }
 
   async function toggleActive() {
@@ -358,6 +496,64 @@ export function ConnectionDetailClient() {
           </ModalContent>
         </Modal>
 
+        <Modal isOpen={syncProgressModalOpen} onOpenChange={setSyncProgressModalOpen} size="lg" backdrop="blur">
+          <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
+            <ModalHeader className="text-white font-sora flex items-center gap-2">
+              <Icon icon="solar:refresh-bold-duotone" className="text-[#9b74ff]" width={18} />
+              Sincronización en vivo
+            </ModalHeader>
+            <ModalBody>
+              <div className="space-y-4">
+                <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-sm text-white/70">
+                  <p className="text-white/90 font-medium">{syncCurrentPhase}</p>
+                  {syncFallbackUsed && (
+                    <p className="mt-1 text-amber-300">
+                      Modo estándar activo: no se pudo abrir el stream en tiempo real.
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {(Object.keys(syncCounters) as SyncPhaseKey[]).map((phase) => (
+                    <div key={phase} className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">{phaseLabel(phase)}</p>
+                      <p className="text-white/90 text-sm mt-1">
+                        {syncCounters[phase].current}/{syncCounters[phase].total || "?"}
+                      </p>
+                      <p className="text-[0.72rem] text-white/55 mt-1">
+                        OK: {syncCounters[phase].synced} · Fallos: {syncCounters[phase].failed}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                  <p className="text-xs uppercase tracking-wider text-white/40 mb-2">Actividad reciente</p>
+                  <ul className="space-y-1 max-h-52 overflow-y-auto text-xs text-white/75">
+                    {syncEvents.length === 0 ? (
+                      <li>Esperando eventos de sincronización...</li>
+                    ) : (
+                      syncEvents.slice(0, 24).map((evt, idx) => (
+                        <li key={`${evt.event}-${idx}`}>- {formatSyncEvent(evt)}</li>
+                      ))
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                variant="flat"
+                onPress={() => setSyncProgressModalOpen(false)}
+                isDisabled={syncing}
+                className="!text-white/80 bg-white/[0.08] border border-white/[0.12] hover:bg-white/[0.14]"
+              >
+                {syncing ? "Sincronizando..." : "Cerrar"}
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
         <Modal isOpen={syncResultModalOpen} onOpenChange={setSyncResultModalOpen} size="lg" backdrop="blur">
           <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
             <ModalHeader className="text-white font-sora flex items-center gap-2">
@@ -387,12 +583,36 @@ export function ConnectionDetailClient() {
                   </div>
 
                   <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-sm text-white/70 space-y-1">
-                    <p>Propiedades detectadas: <span className="text-white/90 font-medium">{lastSyncResult.summary.properties_synced}</span></p>
-                    <p>Tipos de habitación detectados: <span className="text-white/90 font-medium">{lastSyncResult.summary.room_types_synced}</span></p>
+                    <p>
+                      Propiedades descubiertas en PMS:{" "}
+                      <span className="text-white/90 font-medium">
+                        {lastSyncResult.summary.properties_discovered ?? lastSyncResult.summary.properties_synced}
+                      </span>
+                    </p>
+                    <p>
+                      Propiedades mapeadas localmente:{" "}
+                      <span className="text-white/90 font-medium">{lastSyncResult.summary.properties_synced}</span>
+                    </p>
+                    <p>
+                      Alojamientos descubiertos en PMS:{" "}
+                      <span className="text-white/90 font-medium">
+                        {lastSyncResult.summary.room_types_discovered ?? lastSyncResult.summary.room_types_synced}
+                      </span>
+                    </p>
+                    <p>
+                      Alojamientos mapeados localmente:{" "}
+                      <span className="text-white/90 font-medium">{lastSyncResult.summary.room_types_synced}</span>
+                    </p>
                     {lastSyncResult.window && (
                       <p className="text-white/50">
                         Ventana de sync: {lastSyncResult.window.start_date} a {lastSyncResult.window.end_date}
                       </p>
+                    )}
+                    {lastSyncResult.summary.sync_run_id && (
+                      <p className="text-white/50">Run ID: {lastSyncResult.summary.sync_run_id}</p>
+                    )}
+                    {typeof lastSyncResult.summary.duration_seconds === "number" && (
+                      <p className="text-white/50">Duración: {Math.round(lastSyncResult.summary.duration_seconds)}s</p>
                     )}
                   </div>
 
@@ -564,7 +784,7 @@ export function ConnectionDetailClient() {
                     className="btn-newayzi-primary"
                     onPress={saveKunasConfig}
                     isLoading={savingConfig}
-                    isDisabled={!configToken.trim()}
+                    isDisabled={!configToken.trim() || !configKunasUser.trim()}
                   >
                     Guardar
                   </Button>
@@ -676,13 +896,19 @@ export function ConnectionDetailClient() {
             <thead>
               <tr className="border-b border-white/[0.07] bg-white/[0.03]">
                 <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
-                  Propiedad local
+                  Propiedad local (mapeo)
                 </th>
                 {isRoom && (
                   <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
-                    Tipo habitación
+                    Alojamiento local (mapeo)
                   </th>
                 )}
+                <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
+                  Propiedad PMS
+                </th>
+                <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
+                  Alojamiento PMS
+                </th>
                 <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
                   ID PMS
                 </th>
@@ -695,7 +921,7 @@ export function ConnectionDetailClient() {
               {tableData.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={isRoom ? 4 : 3}
+                    colSpan={isRoom ? 6 : 5}
                     className="py-12 text-center text-white/30 text-sm"
                   >
                     No hay unidades en esta categoría
@@ -704,6 +930,11 @@ export function ConnectionDetailClient() {
               ) : (
                 tableData.map((u, i) => {
                   const st = STATUS_STYLES[u.status] ?? STATUS_STYLES.pending;
+                  const pmsPropertyLabel = u.pms_property_name ?? u.pms_property_id ?? "—";
+                  const pmsRoomLabel = u.pms_room_name ?? u.pms_name ?? u.pms_room_id ?? "—";
+                  const pmsIdLabel = isRoom
+                    ? `${u.pms_property_id ?? "—"} / ${u.pms_room_id ?? "—"}`
+                    : (u.pms_property_id ?? "—");
                   return (
                     <tr
                       key={i}
@@ -717,10 +948,14 @@ export function ConnectionDetailClient() {
                           {u.local_room_name ?? u.local_room_type_id ?? "—"}
                         </td>
                       )}
+                      <td className="px-6 py-3 text-white/80">
+                        {pmsPropertyLabel}
+                      </td>
+                      <td className="px-6 py-3 text-white/80">
+                        {pmsRoomLabel}
+                      </td>
                       <td className="px-6 py-3 font-mono text-[0.78rem] text-white/50">
-                        {isRoom
-                          ? (u.pms_room_id ?? u.pms_property_id ?? "—")
-                          : (u.pms_property_id ?? "—")}
+                        {pmsIdLabel}
                       </td>
                       <td className="px-6 py-3">
                         <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${st.text}`}>
