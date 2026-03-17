@@ -240,6 +240,13 @@ export interface ConnectionSyncNowResponse {
     room_types_discovered?: number;
     room_type_base_rates_synced: number;
     dynamic_pricing_rules_synced: number;
+    property_images_discovered?: number;
+    property_images_saved?: number;
+    property_images_failed?: number;
+    room_type_images_discovered?: number;
+    room_type_images_saved?: number;
+    room_type_images_failed?: number;
+    image_sync_errors?: string[];
     pricing_unavailable?: boolean;
     pricing_unavailable_properties?: string[];
     phase_totals?: Record<string, unknown>;
