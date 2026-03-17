@@ -30,8 +30,10 @@ function getApiBase(): string {
   if (typeof window !== "undefined") {
     const h = window.location.hostname;
     if (h === "portal.newayzi.com") return "https://api.newayzi.com";
+    if (h === "admin.production.newayzi.com") return "https://api.production.newayzi.com";
     if (h === "portal.staging.newayzi.com")
       return "https://api.staging.newayzi.com";
+    if (h === "admin.staging.newayzi.com") return "https://api.staging.newayzi.com";
     if (h === "localhost" || h === "127.0.0.1") return "http://localhost:8000";
   }
   return "";
