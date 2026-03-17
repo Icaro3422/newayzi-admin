@@ -219,6 +219,10 @@ export function ConnectionDetailClient() {
       let wsHealthy = false;
       let warnedFallback = false;
       let usedFallback = false;
+      const wsStartTs = Date.now();
+      const wsFallbackGraceMs = 12000;
+      let wsRetryCount = 0;
+      let wsNextRetryAt = 0;
 
       const applyIncomingEvent = (evt: ConnectionSyncStreamEvent & { seq?: number }) => {
         if (typeof evt.seq === "number") {
@@ -227,19 +231,32 @@ export function ConnectionDetailClient() {
         if (evt.event) registerSyncEvent(evt);
       };
 
+      const scheduleSocketRetry = () => {
+        wsRetryCount += 1;
+        const backoffMs = Math.min(8000, 500 * Math.pow(2, Math.max(0, wsRetryCount - 1)));
+        wsNextRetryAt = Date.now() + backoffMs;
+      };
+
       const openSocket = () => {
-        if (!wsToken) return;
+        if (!wsToken || socket) return;
+        if (Date.now() < wsNextRetryAt) return;
         try {
           socket = adminApi.connectSyncSocket(runId, wsToken, {
             lastSeq,
             onOpen: () => {
               wsHealthy = true;
+              wsRetryCount = 0;
+              wsNextRetryAt = 0;
             },
             onClose: () => {
               wsHealthy = false;
+              socket = null;
+              if (!finalRun) scheduleSocketRetry();
             },
             onError: () => {
               wsHealthy = false;
+              socket = null;
+              if (!finalRun) scheduleSocketRetry();
             },
             onMessage: (msg) => {
               if (msg.type === "sync_snapshot" && msg.run) {
@@ -251,9 +268,11 @@ export function ConnectionDetailClient() {
               }
               applyIncomingEvent(msg);
             },
-          }) as unknown as { close: () => void };
+          });
         } catch {
           wsHealthy = false;
+          socket = null;
+          scheduleSocketRetry();
         }
       };
       const closeSocket = () => {
@@ -264,6 +283,7 @@ export function ConnectionDetailClient() {
         } catch {
           // noop
         }
+        socket = null;
       };
 
       openSocket();
@@ -282,17 +302,18 @@ export function ConnectionDetailClient() {
 
         pollAttempts += 1;
         if (!wsHealthy && wsToken) {
-          usedFallback = true;
-          setSyncFallbackUsed(true);
-          if (!warnedFallback) {
-            warnedFallback = true;
-            registerSyncEvent({
-              event: "message",
-              detail: "Canal en vivo inestable. Se activa polling de respaldo sin perder el progreso.",
-            });
-          }
-          if (!socket) {
-            openSocket();
+          openSocket();
+          const wsGraceElapsed = Date.now() - wsStartTs >= wsFallbackGraceMs;
+          if (wsGraceElapsed) {
+            usedFallback = true;
+            setSyncFallbackUsed(true);
+            if (!warnedFallback) {
+              warnedFallback = true;
+              registerSyncEvent({
+                event: "message",
+                detail: "Canal en vivo inestable. Se activa polling de respaldo sin perder el progreso.",
+              });
+            }
           }
         }
         await new Promise((resolve) => setTimeout(resolve, 2000));

@@ -859,28 +859,74 @@ export const adminApi = {
       onClose?: (ev: CloseEvent) => void;
       onOpen?: () => void;
     } = {}
-  ): WebSocket {
+  ): { close: () => void } {
     const wsBase = getWsBase();
     if (!wsBase) throw new Error("No fue posible resolver la URL websocket.");
     const lastSeq = Math.max(0, opts.lastSeq ?? 0);
-    const url = `${wsBase}/ws/admin/pms/sync-runs/${runId}/?token=${encodeURIComponent(wsToken)}&last_seq=${lastSeq}`;
-    const socket = new WebSocket(url);
-    socket.onopen = () => opts.onOpen?.();
-    socket.onerror = () => opts.onError?.();
-    socket.onclose = (ev) => opts.onClose?.(ev);
-    socket.onmessage = (raw) => {
-      try {
-        const data = JSON.parse(String(raw.data ?? "{}")) as ConnectionSyncStreamEvent & {
-          seq?: number;
-          type?: string;
-          run?: PMSSyncRunStatus;
-        };
-        opts.onMessage?.(data);
-      } catch {
-        opts.onMessage?.({ event: "message", detail: String(raw.data ?? "") });
-      }
+    const wsPaths = [
+      `/ws/admin/pms/sync-runs/${runId}/`,
+      `/api/ws/admin/pms/sync-runs/${runId}/`,
+    ];
+
+    let socket: WebSocket | null = null;
+    let userClosed = false;
+    let openedOnce = false;
+    let wsPathIdx = 0;
+
+    const bindListeners = (current: WebSocket, pathIdx: number) => {
+      current.onopen = () => {
+        openedOnce = true;
+        opts.onOpen?.();
+      };
+      current.onerror = () => {
+        if (!openedOnce && !userClosed && pathIdx + 1 < wsPaths.length) {
+          return;
+        }
+        opts.onError?.();
+      };
+      current.onclose = (ev) => {
+        if (socket === current) socket = null;
+        if (!openedOnce && !userClosed && pathIdx + 1 < wsPaths.length) {
+          wsPathIdx = pathIdx + 1;
+          openSocket(wsPathIdx);
+          return;
+        }
+        opts.onClose?.(ev);
+      };
+      current.onmessage = (raw) => {
+        try {
+          const data = JSON.parse(String(raw.data ?? "{}")) as ConnectionSyncStreamEvent & {
+            seq?: number;
+            type?: string;
+            run?: PMSSyncRunStatus;
+          };
+          opts.onMessage?.(data);
+        } catch {
+          opts.onMessage?.({ event: "message", detail: String(raw.data ?? "") });
+        }
+      };
     };
-    return socket;
+
+    const openSocket = (pathIdx: number) => {
+      const url = `${wsBase}${wsPaths[pathIdx]}?token=${encodeURIComponent(wsToken)}&last_seq=${lastSeq}`;
+      const nextSocket = new WebSocket(url);
+      socket = nextSocket;
+      bindListeners(nextSocket, pathIdx);
+    };
+
+    openSocket(wsPathIdx);
+    return {
+      close: () => {
+        userClosed = true;
+        if (!socket) return;
+        try {
+          socket.close();
+        } catch {
+          // noop
+        }
+        socket = null;
+      },
+    };
   },
 
   async syncConnectionWithStream(
