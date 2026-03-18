@@ -261,6 +261,7 @@ export interface ConnectionSyncNowResponse {
   status: "queued" | "ok" | "partial" | "error";
   run_id?: string;
   ws_token?: string;
+  estimated_seconds?: number;
   summary?: {
     sync_run_id?: string;
     started_at?: string;
@@ -331,7 +332,7 @@ export interface ConnectionSyncStreamEvent {
 export interface PMSSyncRunStatus {
   run_id: string;
   connection_id: number;
-  status: "queued" | "running" | "success" | "partial" | "error";
+  status: "queued" | "running" | "success" | "partial" | "error" | "cancelled";
   requested_by?: string | null;
   window: { start_date: string; end_date: string };
   started_at?: string | null;
@@ -341,6 +342,7 @@ export interface PMSSyncRunStatus {
   last_event_seq: number;
   created_at: string;
   updated_at: string;
+  ws_token?: string;
 }
 
 export interface PMSSyncRunEventsResponse {
@@ -348,6 +350,13 @@ export interface PMSSyncRunEventsResponse {
   status: PMSSyncRunStatus["status"];
   events: (ConnectionSyncStreamEvent & { seq?: number })[];
   last_seq: number;
+}
+
+export interface PMSSyncRunsListResponse {
+  results: PMSSyncRunStatus[];
+  total?: number;
+  limit?: number;
+  offset?: number;
 }
 
 export interface SyncedUnit {
@@ -850,8 +859,37 @@ export const adminApi = {
     return postJson<ConnectionSyncNowResponse>(`/api/admin/pms/connections/${id}/sync-now/`);
   },
 
-  async startSyncRun(id: number): Promise<ConnectionSyncNowResponse> {
-    return postJson<ConnectionSyncNowResponse>(`/api/admin/pms/connections/${id}/sync-now/`);
+  async getActiveSync(connectionId: number): Promise<{ active: boolean; run_id?: string; status?: string }> {
+    const data = await getJson<{ active: boolean; run_id?: string; status?: string }>(
+      `/api/admin/pms/connections/${connectionId}/active-sync/`
+    );
+    return data ?? { active: false };
+  },
+
+  async startSyncRun(id: number, opts?: { cancelPrevious?: boolean; skipProperties?: boolean }): Promise<ConnectionSyncNowResponse> {
+    const q = new URLSearchParams();
+    if (opts?.cancelPrevious) q.set("cancel_previous", "1");
+    if (opts?.skipProperties) q.set("skip_properties", "1");
+    const suffix = q.toString() ? `?${q.toString()}` : "";
+    return postJson<ConnectionSyncNowResponse>(`/api/admin/pms/connections/${id}/sync-now/${suffix}`);
+  },
+
+  async cancelSyncRun(runId: string): Promise<{ status: string; run_id: string }> {
+    return postJson<{ status: string; run_id: string }>(`/api/admin/pms/sync-runs/${runId}/cancel/`);
+  },
+
+  async getSyncRuns(
+    connectionId: number,
+    limit = 10,
+    offset = 0
+  ): Promise<PMSSyncRunsListResponse> {
+    const q = new URLSearchParams();
+    q.set("limit", String(Math.max(1, Math.min(100, limit))));
+    q.set("offset", String(Math.max(0, offset)));
+    const data = await getJson<PMSSyncRunsListResponse>(
+      `/api/admin/pms/connections/${connectionId}/sync-runs/?${q.toString()}`
+    );
+    return data ?? { results: [], total: 0, limit: limit, offset: offset };
   },
 
   async getSyncRun(runId: string): Promise<PMSSyncRunStatus> {
