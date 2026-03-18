@@ -1043,6 +1043,14 @@ export const adminApi = {
     return patchJson<Operator>(`/api/admin/operators/${id}/`, data);
   },
 
+  async deleteOperator(id: number): Promise<void> {
+    const res = await authFetch(`/api/admin/operators/${id}/`, { method: "DELETE" });
+    if (res.status !== 204) {
+      const text = await res.text();
+      throw new Error(text || "Error al eliminar operador");
+    }
+  },
+
   async getAgencies(): Promise<{ results: Agency[] } | null> {
     return getJson<{ results: Agency[] }>("/api/admin/agencies/");
   },

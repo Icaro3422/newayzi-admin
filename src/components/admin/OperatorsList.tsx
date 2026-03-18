@@ -29,6 +29,7 @@ export function OperatorsList({ refreshKey = 0 }: { refreshKey?: number }) {
   const canEdit = canAccess("operators") && !isModuleReadOnly(role, "operators");
   const [list, setList] = useState<Operator[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -38,6 +39,25 @@ export function OperatorsList({ refreshKey = 0 }: { refreshKey?: number }) {
       .catch(() => setList([]))
       .finally(() => setLoading(false));
   }, [refreshKey]);
+
+  async function handleDeleteOperator(op: Operator) {
+    if (!canEdit || deletingId) return;
+    const ok = window.confirm(
+      `¿Eliminar el operador "${op.name}"?\n\nEsta acción no se puede deshacer.`
+    );
+    if (!ok) return;
+
+    try {
+      setDeletingId(op.id);
+      await adminApi.deleteOperator(op.id);
+      setList((prev) => prev.filter((item) => item.id !== op.id));
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "No se pudo eliminar el operador.";
+      window.alert(message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -119,15 +139,32 @@ export function OperatorsList({ refreshKey = 0 }: { refreshKey?: number }) {
                   </span>
                 </td>
                 {canAccess("operators") && (
-                  <td className="py-4 px-5 text-right">
-                    <Button
-                      as={Link}
-                      href={`/admin/operators/${op.id}`}
-                      size="sm"
-                      className="rounded-xl bg-[#5e2cec]/25 border border-[#5e2cec]/40 text-[#b89eff] hover:bg-[#5e2cec]/35 font-semibold"
-                    >
-                      {canEdit ? "Editar" : "Ver"}
-                    </Button>
+                  <td className="py-4 px-5">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        as={Link}
+                        href={`/admin/operators/${op.id}`}
+                        size="sm"
+                        className="rounded-xl bg-[#5e2cec]/25 border border-[#5e2cec]/40 text-[#b89eff] hover:bg-[#5e2cec]/35 font-semibold"
+                      >
+                        {canEdit ? "Editar" : "Ver"}
+                      </Button>
+                      {canEdit && (
+                        <Button
+                          size="sm"
+                          isLoading={deletingId === op.id}
+                          onPress={() => handleDeleteOperator(op)}
+                          className="rounded-xl bg-rose-500/20 border border-rose-400/35 text-rose-200 hover:bg-rose-500/30 font-semibold"
+                          startContent={
+                            deletingId !== op.id ? (
+                              <Icon icon="solar:trash-bin-trash-outline" width={16} />
+                            ) : undefined
+                          }
+                        >
+                          Eliminar
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 )}
               </tr>

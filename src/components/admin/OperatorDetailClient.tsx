@@ -43,6 +43,7 @@ export function OperatorDetailClient() {
   const [contact_phone, setContactPhone] = useState("");
   const [is_active, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (Number.isNaN(id) || id <= 0) {
@@ -74,6 +75,25 @@ export function OperatorDetailClient() {
       setOperator(updated);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!operator || !canEdit || deleting) return;
+    const ok = window.confirm(
+      `¿Eliminar el operador "${operator.name}"?\n\nEsta acción no se puede deshacer.`
+    );
+    if (!ok) return;
+
+    try {
+      setDeleting(true);
+      await adminApi.deleteOperator(id);
+      window.location.href = "/admin/operators";
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "No se pudo eliminar el operador.";
+      window.alert(message);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -154,14 +174,25 @@ export function OperatorDetailClient() {
             </Switch>
           )}
           {canEdit && (
-            <Button
-              className="btn-newayzi-primary rounded-xl"
-              onPress={handleSave}
-              isLoading={saving}
-              startContent={!saving ? <Icon icon="solar:diskette-outline" width={18} /> : undefined}
-            >
-              Guardar cambios
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                className="btn-newayzi-primary rounded-xl"
+                onPress={handleSave}
+                isLoading={saving}
+                startContent={!saving ? <Icon icon="solar:diskette-outline" width={18} /> : undefined}
+              >
+                Guardar cambios
+              </Button>
+              <Button
+                variant="flat"
+                className="rounded-xl bg-rose-500/20 border border-rose-400/35 text-rose-200 hover:bg-rose-500/30 font-semibold"
+                onPress={handleDelete}
+                isLoading={deleting}
+                startContent={!deleting ? <Icon icon="solar:trash-bin-trash-outline" width={18} /> : undefined}
+              >
+                Eliminar operador
+              </Button>
+            </div>
           )}
         </div>
       </GlassCard>
