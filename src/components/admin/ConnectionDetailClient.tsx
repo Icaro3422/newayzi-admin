@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, Switch, Input, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
@@ -12,6 +12,7 @@ import {
   type UnitsSummary,
   type ConnectionSyncNowResponse,
   type ConnectionSyncStreamEvent,
+  type PMSSyncRunStatus,
 } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 import { addToast } from "@heroui/react";
@@ -27,12 +28,14 @@ type PhaseCounter = {
   draft: number;
 };
 
+/** -1 = total desconocido (mostrar "?"). 0+ = total conocido. */
 function emptySyncCounters(): Record<SyncPhaseKey, PhaseCounter> {
+  const init = { current: 0, total: -1, synced: 0, failed: 0, skipped: 0, draft: 0 };
   return {
-    properties: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
-    room_types: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
-    availability: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
-    rates: { current: 0, total: 0, synced: 0, failed: 0, skipped: 0, draft: 0 },
+    properties: { ...init },
+    room_types: { ...init },
+    availability: { ...init },
+    rates: { ...init },
   };
 }
 
@@ -49,13 +52,16 @@ function formatSyncEvent(evt: ConnectionSyncStreamEvent): string {
   if (evt.event === "phase_summary") return `Fase ${phaseLabel(evt.phase)} completada.`;
   if (evt.event === "sync_started") return "Sincronización iniciada.";
   if (evt.event === "sync_completed") return "Sincronización completada.";
+  if (evt.event === "sync_finished") return "Sincronización finalizada.";
   if (evt.event === "sync_error") return `Error: ${evt.detail || "No se pudo completar."}`;
   if (evt.event === "item_progress") {
+    if (evt.status === "init") return `${phaseLabel(evt.phase)}: ${evt.total ?? "?"} elementos a procesar`;
     const item = evt.item ?? {};
     const room = item.pms_room_type_id ? ` • Hab ${item.pms_room_type_id}` : "";
     const prop = item.pms_property_id ? `Prop ${item.pms_property_id}` : "Elemento";
     const status =
-      evt.status === "draft_mapping" ? "pendiente de mapeo" :
+      evt.status === "auto_created" ? "auto-creado" :
+      evt.status === "draft_mapping" ? "auto-vinculado" :
       evt.status === "failed" ? "falló" :
       evt.status === "skipped" ? "omitido" :
       "sincronizado";
@@ -64,15 +70,11 @@ function formatSyncEvent(evt: ConnectionSyncStreamEvent): string {
   return String(evt.detail || "Actualización de sincronización.");
 }
 
-function shouldUseSyncFallback(error: unknown): boolean {
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  return (
-    message.includes("stream") ||
-    message.includes("event-stream") ||
-    message.includes("no devolvió stream") ||
-    message.includes("finalizó sin resultado") ||
-    message.includes("failed to fetch")
-  );
+function mapRunStatusToApiStatus(runStatus: PMSSyncRunStatus["status"]): ConnectionSyncNowResponse["status"] {
+  if (runStatus === "success") return "ok";
+  if (runStatus === "partial") return "partial";
+  if (runStatus === "error") return "error";
+  return "queued";
 }
 
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -112,9 +114,13 @@ export function ConnectionDetailClient() {
   const [syncFallbackUsed, setSyncFallbackUsed] = useState(false);
   const [syncResultModalOpen, setSyncResultModalOpen] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState<ConnectionSyncNowResponse | null>(null);
+  const [cancelPreviousModalOpen, setCancelPreviousModalOpen] = useState(false);
+  const [activeRunIdForCancel, setActiveRunIdForCancel] = useState<string | null>(null);
+  const [syncEstimatedSeconds, setSyncEstimatedSeconds] = useState<number | null>(null);
   const [patching, setPatching] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("synced");
   const [viewType, setViewType] = useState<"properties" | "room_types">("room_types");
+  const [unitsTablePage, setUnitsTablePage] = useState(0);
   const [editingConfig, setEditingConfig] = useState(false);
   const [configBaseUrl, setConfigBaseUrl] = useState("");
   const [configUsername, setConfigUsername] = useState("");
@@ -124,6 +130,20 @@ export function ConnectionDetailClient() {
   const [configToken, setConfigToken] = useState("");
   const [configKunasUser, setConfigKunasUser] = useState("");
   const [configKunasPwd, setConfigKunasPwd] = useState("");
+  const [syncRuns, setSyncRuns] = useState<PMSSyncRunStatus[]>([]);
+  const [loadingSyncRuns, setLoadingSyncRuns] = useState(false);
+  const [runDetailModalOpen, setRunDetailModalOpen] = useState(false);
+  const [allSyncRunsModalOpen, setAllSyncRunsModalOpen] = useState(false);
+  const [allSyncRuns, setAllSyncRuns] = useState<PMSSyncRunStatus[]>([]);
+  const [allSyncRunsTotal, setAllSyncRunsTotal] = useState(0);
+  const [allSyncRunsPage, setAllSyncRunsPage] = useState(0);
+  const [loadingAllSyncRuns, setLoadingAllSyncRuns] = useState(false);
+  const [selectedRun, setSelectedRun] = useState<PMSSyncRunStatus | null>(null);
+  const [runDetailEvents, setRunDetailEvents] = useState<ConnectionSyncStreamEvent[]>([]);
+  const [runDetailCounters, setRunDetailCounters] = useState<Record<SyncPhaseKey, PhaseCounter>>(emptySyncCounters);
+  const [runDetailPhase, setRunDetailPhase] = useState("Preparando...");
+  const [runDetailLastRefresh, setRunDetailLastRefresh] = useState<Date | null>(null);
+  const [runDetailUsingWebSocket, setRunDetailUsingWebSocket] = useState(false);
 
   useEffect(() => {
     if (Number.isNaN(id) || id <= 0) { setLoading(false); return; }
@@ -146,6 +166,36 @@ export function ConnectionDetailClient() {
   }, [id]);
 
   useEffect(() => {
+    if (Number.isNaN(id) || id <= 0) return;
+    let cancelled = false;
+    setLoadingSyncRuns(true);
+    adminApi.getSyncRuns(id, 5)
+      .then((data) => {
+        if (!cancelled) setSyncRuns(data.results ?? []);
+      })
+      .catch(() => { if (!cancelled) setSyncRuns([]); })
+      .finally(() => { if (!cancelled) setLoadingSyncRuns(false); });
+    return () => { cancelled = true; };
+  }, [id, syncing]);
+
+  const SYNC_RUNS_PAGE_SIZE = 15;
+  useEffect(() => {
+    if (!allSyncRunsModalOpen || Number.isNaN(id) || id <= 0) return;
+    let cancelled = false;
+    setLoadingAllSyncRuns(true);
+    adminApi.getSyncRuns(id, SYNC_RUNS_PAGE_SIZE, allSyncRunsPage * SYNC_RUNS_PAGE_SIZE)
+      .then((data) => {
+        if (!cancelled) {
+          setAllSyncRuns(data.results ?? []);
+          setAllSyncRunsTotal(data.total ?? data.results?.length ?? 0);
+        }
+      })
+      .catch(() => { if (!cancelled) setAllSyncRuns([]); })
+      .finally(() => { if (!cancelled) setLoadingAllSyncRuns(false); });
+    return () => { cancelled = true; };
+  }, [id, allSyncRunsModalOpen, allSyncRunsPage]);
+
+  useEffect(() => {
     if (!connection?.config) return;
     const cfg = connection.config as Record<string, string>;
     if (connection.pms_type === "generic") {
@@ -165,12 +215,173 @@ export function ConnectionDetailClient() {
     setSyncFallbackUsed(false);
   }
 
+  function applyRunDetailEvent(evt: ConnectionSyncStreamEvent & { seq?: number; synced?: number; failed?: number; discovered?: number }) {
+    setRunDetailEvents((prev) => [evt, ...prev].slice(0, 80));
+    if (evt.event === "phase_started") {
+      setRunDetailPhase(`Procesando ${phaseLabel(evt.phase)}...`);
+    }
+    if (evt.event === "phase_summary") {
+      setRunDetailPhase(`Fase ${phaseLabel(evt.phase)} completada.`);
+    }
+    if (evt.event === "sync_completed" || evt.event === "sync_finished") {
+      setRunDetailPhase("Sincronización finalizada.");
+    }
+    if (evt.event === "sync_error") {
+      setRunDetailPhase("Sincronización finalizada con error.");
+    }
+    const phase = evt.phase as SyncPhaseKey | undefined;
+    if (phase) {
+      setRunDetailCounters((prev) => {
+        const current = prev[phase];
+        const updated: PhaseCounter = {
+          ...current,
+          current: typeof evt.current === "number" ? evt.current : current.current,
+          total: typeof evt.total === "number" ? evt.total : current.total,
+        };
+        if (evt.event === "item_progress") {
+          if (evt.status === "init") {
+            /* solo actualiza current/total, no incrementa contadores */
+          } else if (evt.status === "failed") updated.failed += 1;
+          else if (evt.status === "draft_mapping") updated.draft += 1;
+          else if (evt.status === "skipped") updated.skipped += 1;
+          else updated.synced += 1;
+        }
+        if (evt.event === "phase_summary") {
+          const synced = typeof evt.synced === "number" ? evt.synced : current.synced;
+          const failed = typeof evt.failed === "number" ? evt.failed : current.failed;
+          const total = typeof evt.discovered === "number" ? evt.discovered : (typeof evt.synced === "number" ? evt.synced + failed : current.total);
+          updated.synced = synced;
+          updated.failed = failed;
+          updated.total = total;
+          updated.current = total;
+        }
+        return { ...prev, [phase]: updated };
+      });
+    }
+  }
+
+  async function openRunDetail(run: PMSSyncRunStatus) {
+    setRunDetailEvents([]);
+    setRunDetailCounters(emptySyncCounters());
+    setRunDetailPhase(run.status === "queued" ? "En cola" : run.status === "running" ? "Ejecutando..." : "Finalizado");
+    setRunDetailLastRefresh(null);
+    runDetailLastSeqRef.current = 0;
+    runDetailPollingRunIdRef.current = null;
+    runDetailWsRef.current?.close();
+    runDetailWsRef.current = null;
+    setRunDetailUsingWebSocket(false);
+    setSelectedRun(run);
+    setRunDetailModalOpen(true);
+    try {
+      const full = await adminApi.getSyncRun(run.run_id);
+      setSelectedRun(full);
+      const isCompleted = full.status === "success" || full.status === "partial" || full.status === "error";
+      if (isCompleted) {
+        const data = await adminApi.getSyncRunEvents(run.run_id, 0, 300);
+        data.events.forEach((evt) => applyRunDetailEvent(evt));
+      }
+    } catch {
+      /* keep run from list */
+    }
+  }
+
+  const runDetailLastSeqRef = useRef(0);
+  const runDetailPollingRunIdRef = useRef<string | null>(null);
+  const runDetailWsRef = useRef<{ close: () => void } | null>(null);
+
+  useEffect(() => {
+    if (!runDetailModalOpen || !selectedRun) return;
+    if (selectedRun.status !== "queued" && selectedRun.status !== "running") return;
+    const runId = selectedRun.run_id;
+    const wsToken = selectedRun.ws_token;
+    if (runDetailPollingRunIdRef.current !== runId) {
+      runDetailLastSeqRef.current = 0;
+      runDetailPollingRunIdRef.current = runId;
+      runDetailWsRef.current?.close();
+      runDetailWsRef.current = null;
+    }
+    let cancelled = false;
+    let usePolling = true;
+
+    const POLL_INTERVAL_MS = 60_000; // fallback: cada 60 s
+
+    if (wsToken) {
+      try {
+        const socket = adminApi.connectSyncSocket(runId, wsToken, {
+          lastSeq: runDetailLastSeqRef.current,
+          onMessage: (msg) => {
+            if (cancelled) return;
+            const evt = msg as ConnectionSyncStreamEvent & { seq?: number };
+            if (typeof evt.seq === "number") runDetailLastSeqRef.current = Math.max(runDetailLastSeqRef.current, evt.seq);
+            if (msg.run) setSelectedRun(msg.run);
+            if (evt.event) applyRunDetailEvent(evt);
+            setRunDetailLastRefresh(new Date());
+          },
+          onOpen: () => {
+            if (!cancelled) setRunDetailUsingWebSocket(true);
+          },
+          onClose: () => {
+            if (!cancelled) {
+              usePolling = true;
+              setRunDetailUsingWebSocket(false);
+              poll();
+            }
+          },
+          onError: () => {
+            if (!cancelled) {
+              usePolling = true;
+              setRunDetailUsingWebSocket(false);
+              poll();
+            }
+          },
+        });
+        runDetailWsRef.current = socket;
+        usePolling = false;
+      } catch {
+        usePolling = true;
+        setRunDetailUsingWebSocket(false);
+      }
+    }
+
+    const poll = async () => {
+      if (cancelled || !usePolling) return;
+      const afterSeq = runDetailLastSeqRef.current;
+      try {
+        const data = await adminApi.getSyncRunEvents(runId, afterSeq, 300);
+        data.events.forEach((evt) => {
+          if (typeof evt.seq === "number") runDetailLastSeqRef.current = Math.max(runDetailLastSeqRef.current, evt.seq);
+          if (!cancelled) applyRunDetailEvent(evt);
+        });
+        runDetailLastSeqRef.current = data.last_seq;
+        const updated = await adminApi.getSyncRun(runId);
+        if (!cancelled) {
+          setSelectedRun(updated);
+          setRunDetailLastRefresh(new Date());
+        }
+        if (updated.status !== "queued" && updated.status !== "running") return;
+        if (!cancelled) setTimeout(poll, POLL_INTERVAL_MS);
+      } catch {
+        if (!cancelled) setTimeout(poll, POLL_INTERVAL_MS);
+      }
+    };
+    if (usePolling) poll();
+    return () => {
+      cancelled = true;
+      runDetailWsRef.current?.close();
+      runDetailWsRef.current = null;
+      if (runDetailPollingRunIdRef.current === runId) runDetailPollingRunIdRef.current = null;
+    };
+  }, [runDetailModalOpen, selectedRun?.run_id, selectedRun?.ws_token]);
+
   function registerSyncEvent(evt: ConnectionSyncStreamEvent) {
     setSyncEvents((prev) => [evt, ...prev].slice(0, 80));
     if (evt.event === "phase_started") {
       setSyncCurrentPhase(`Procesando ${phaseLabel(evt.phase)}...`);
     }
     if (evt.event === "sync_completed") {
+      setSyncCurrentPhase("Sincronización finalizada.");
+    }
+    if (evt.event === "sync_finished") {
       setSyncCurrentPhase("Sincronización finalizada.");
     }
     if (evt.event === "sync_error") {
@@ -188,7 +399,9 @@ export function ConnectionDetailClient() {
       };
 
       if (evt.event === "item_progress") {
-        if (evt.status === "failed") updated.failed += 1;
+        if (evt.status === "init") {
+          /* solo actualiza current/total, no incrementa contadores */
+        } else if (evt.status === "failed") updated.failed += 1;
         else if (evt.status === "draft_mapping") updated.draft += 1;
         else if (evt.status === "skipped") updated.skipped += 1;
         else updated.synced += 1;
@@ -200,26 +413,158 @@ export function ConnectionDetailClient() {
 
   async function handleSyncNow() {
     if (!canSyncConnection) return;
+    try {
+      const active = await adminApi.getActiveSync(id);
+      if (active.active && active.run_id) {
+        setActiveRunIdForCancel(active.run_id);
+        setCancelPreviousModalOpen(true);
+        return;
+      }
+    } catch {
+      /* continue */
+    }
+    doStartSync(false);
+  }
+
+  async function doStartSync(cancelPrevious: boolean) {
+    if (!canSyncConnection) return;
+    setCancelPreviousModalOpen(false);
+    setActiveRunIdForCancel(null);
     setSyncing(true);
     setSyncProgressModalOpen(true);
     resetSyncRealtimeState();
     try {
-      let usedFallback = false;
-      let syncResult: ConnectionSyncNowResponse;
-      try {
-        syncResult = await adminApi.syncConnectionWithStream(id, registerSyncEvent);
-      } catch (streamError) {
-        if (!shouldUseSyncFallback(streamError)) {
-          throw streamError;
-        }
-        usedFallback = true;
-        setSyncFallbackUsed(true);
-        registerSyncEvent({
-          event: "message",
-          detail: "No fue posible abrir el stream en vivo. Continuamos con sincronización estándar (misma cobertura, sin telemetría en vivo).",
-        });
-        syncResult = await adminApi.syncConnectionNow(id);
+      const skipProperties = (unitsSummary?.counts?.properties_pending ?? 0) === 0;
+      const started = await adminApi.startSyncRun(id, {
+        cancelPrevious,
+        skipProperties,
+      });
+      setSyncEstimatedSeconds(started.estimated_seconds ?? null);
+      const runId = started.run_id;
+      const wsToken = started.ws_token;
+      if (!runId) {
+        throw new Error("No se recibió run_id para la sincronización.");
       }
+
+      let lastSeq = 0;
+      let finalRun: PMSSyncRunStatus | null = null;
+      let socket: { close: () => void } | null = null;
+      let wsHealthy = false;
+      let warnedFallback = false;
+      let usedFallback = false;
+      const wsStartTs = Date.now();
+      const wsFallbackGraceMs = 12000;
+      const staleRealtimeThresholdMs = 12000;
+      let wsRetryCount = 0;
+      let wsNextRetryAt = 0;
+      let lastRealtimeActivityTs = Date.now();
+
+      const applyIncomingEvent = (evt: ConnectionSyncStreamEvent & { seq?: number }) => {
+        if (typeof evt.seq === "number") {
+          lastSeq = Math.max(lastSeq, evt.seq);
+        }
+        lastRealtimeActivityTs = Date.now();
+        if (evt.event) registerSyncEvent(evt);
+      };
+
+      const scheduleSocketRetry = () => {
+        wsRetryCount += 1;
+        const backoffMs = Math.min(8000, 500 * Math.pow(2, Math.max(0, wsRetryCount - 1)));
+        wsNextRetryAt = Date.now() + backoffMs;
+      };
+
+      const openSocket = () => {
+        if (!wsToken || socket) return;
+        if (Date.now() < wsNextRetryAt) return;
+        try {
+          socket = adminApi.connectSyncSocket(runId, wsToken, {
+            lastSeq,
+            onOpen: () => {
+              wsHealthy = true;
+              wsRetryCount = 0;
+              wsNextRetryAt = 0;
+            },
+            onClose: () => {
+              wsHealthy = false;
+              socket = null;
+              if (!finalRun) scheduleSocketRetry();
+            },
+            onError: () => {
+              wsHealthy = false;
+              socket = null;
+              if (!finalRun) scheduleSocketRetry();
+            },
+            onMessage: (msg) => {
+              if (msg.type === "sync_snapshot" && msg.run) {
+                const run = msg.run as PMSSyncRunStatus;
+                if (run.status === "success" || run.status === "partial" || run.status === "error") {
+                  finalRun = run;
+                }
+                return;
+              }
+              applyIncomingEvent(msg);
+            },
+          });
+        } catch {
+          wsHealthy = false;
+          socket = null;
+          scheduleSocketRetry();
+        }
+      };
+      const closeSocket = () => {
+        const maybeSocket = socket as { close: () => void } | null;
+        if (!maybeSocket) return;
+        try {
+          maybeSocket.close();
+        } catch {
+          // noop
+        }
+        socket = null;
+      };
+
+      openSocket();
+      let pollAttempts = 0;
+      while (!finalRun && pollAttempts < 240) {
+        const eventsPage = await adminApi.getSyncRunEvents(runId, lastSeq, 200);
+        for (const evt of eventsPage.events ?? []) {
+          applyIncomingEvent(evt);
+        }
+
+        const run = await adminApi.getSyncRun(runId);
+        if (run.status === "success" || run.status === "partial" || run.status === "error") {
+          finalRun = run;
+          break;
+        }
+
+        pollAttempts += 1;
+        if (!wsHealthy && wsToken) {
+          openSocket();
+          const wsGraceElapsed = Date.now() - wsStartTs >= wsFallbackGraceMs;
+          const realtimeLooksStale = Date.now() - lastRealtimeActivityTs >= staleRealtimeThresholdMs;
+          if (wsGraceElapsed && realtimeLooksStale) {
+            usedFallback = true;
+            setSyncFallbackUsed(true);
+            if (!warnedFallback) {
+              warnedFallback = true;
+              registerSyncEvent({
+                event: "message",
+                detail: "Canal websocket inestable. Se mantiene progreso en vivo mediante polling de respaldo.",
+              });
+            }
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      closeSocket();
+      if (!finalRun) {
+        throw new Error("La sincronización no reportó estado final a tiempo.");
+      }
+
+      const syncResult: ConnectionSyncNowResponse = {
+        status: mapRunStatusToApiStatus(finalRun.status),
+        summary: finalRun.summary,
+        window: finalRun.window,
+      };
 
       setLastSyncResult(syncResult);
 
@@ -227,12 +572,15 @@ export function ConnectionDetailClient() {
       const synced = summary?.synced ?? 0;
       const failed = summary?.failed ?? 0;
       const draft = summary?.draft_mappings_created ?? 0;
+      const autoCreatedProperties = summary?.auto_created_properties ?? 0;
+      const autoCreatedRoomTypes = summary?.auto_created_room_types ?? 0;
       const errorCount = summary?.errors?.length ?? 0;
+      const pricingUnavailable = Boolean(summary?.pricing_unavailable);
 
       if (usedFallback) {
         addToast({
-          title: "Sincronización en modo estándar",
-          description: "La sincronización se ejecutó completa, pero sin eventos en tiempo real.",
+          title: "Sincronización con fallback",
+          description: "Se completó con respaldo por polling para evitar cortes del stream en vivo.",
           color: "warning",
         });
       }
@@ -244,13 +592,16 @@ export function ConnectionDetailClient() {
           color: "success",
         });
       } else if (syncResult.status === "partial") {
-        const hasOnlyDrafts = synced === 0 && failed === 0 && draft > 0;
+        const partialDesc = pricingUnavailable
+          ? "Se omitió pricing por fallback del PMS. Disponibilidad y mapeos sí se sincronizaron."
+          : `Procesados: ${synced}. Fallidos: ${failed}. Errores: ${errorCount}.`;
         addToast({
-          title: hasOnlyDrafts ? "Sincronización completada con pendientes" : "Sincronización parcial",
-          description: hasOnlyDrafts
-            ? `Se detectaron ${draft} mapeos pendientes por vincular.`
-            : `Procesados: ${synced}. Fallidos: ${failed}. Errores: ${errorCount}.`,
-          color: hasOnlyDrafts ? "warning" : "danger",
+          title: "Sincronización parcial",
+          description:
+            autoCreatedProperties > 0 || autoCreatedRoomTypes > 0
+              ? `Autocreados: ${autoCreatedProperties} propiedades y ${autoCreatedRoomTypes} alojamientos. ${partialDesc}`
+              : partialDesc,
+          color: "danger",
         });
       } else {
         addToast({
@@ -392,6 +743,14 @@ export function ConnectionDetailClient() {
       : unitsSummary.room_types[activeTab]
     : [];
 
+  const UNITS_PAGE_SIZE = 10;
+  const totalUnits = tableData.length;
+  const paginatedTableData = tableData.slice(
+    unitsTablePage * UNITS_PAGE_SIZE,
+    (unitsTablePage + 1) * UNITS_PAGE_SIZE
+  );
+  const totalPages = Math.ceil(totalUnits / UNITS_PAGE_SIZE) || 1;
+
   const isRoom = viewType === "room_types";
 
   return (
@@ -496,6 +855,35 @@ export function ConnectionDetailClient() {
           </ModalContent>
         </Modal>
 
+        <Modal isOpen={cancelPreviousModalOpen} onOpenChange={setCancelPreviousModalOpen}>
+          <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
+            <ModalHeader className="text-white font-sora flex items-center gap-2">
+              <Icon icon="solar:refresh-bold-duotone" className="text-amber-400" width={20} />
+              Sincronización en progreso
+            </ModalHeader>
+            <ModalBody>
+              <p className="text-white/70 text-sm">
+                Ya hay una sincronización en curso. No se puede iniciar otra sin cancelar la anterior.
+              </p>
+              <p className="text-white/50 text-sm mt-2">
+                ¿Deseas cancelar el proceso actual e iniciar una nueva sincronización?
+              </p>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="flat" onPress={() => setCancelPreviousModalOpen(false)} className="!text-white/70">
+                No, esperar
+              </Button>
+              <Button
+                color="warning"
+                onPress={() => doStartSync(true)}
+                className="!text-white"
+              >
+                Sí, cancelar e iniciar nueva
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
         <Modal isOpen={syncProgressModalOpen} onOpenChange={setSyncProgressModalOpen} size="lg" backdrop="blur">
           <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
             <ModalHeader className="text-white font-sora flex items-center gap-2">
@@ -504,6 +892,13 @@ export function ConnectionDetailClient() {
             </ModalHeader>
             <ModalBody>
               <div className="space-y-4">
+                {syncEstimatedSeconds != null && (
+                  <p className="text-[0.8rem] text-white/50">
+                    Tiempo estimado: ~{syncEstimatedSeconds >= 60
+                      ? `${Math.floor(syncEstimatedSeconds / 60)} min`
+                      : `${syncEstimatedSeconds} s`}
+                  </p>
+                )}
                 <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-sm text-white/70">
                   <p className="text-white/90 font-medium">{syncCurrentPhase}</p>
                   {syncFallbackUsed && (
@@ -518,7 +913,7 @@ export function ConnectionDetailClient() {
                     <div key={phase} className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
                       <p className="text-[0.65rem] uppercase tracking-wider text-white/40">{phaseLabel(phase)}</p>
                       <p className="text-white/90 text-sm mt-1">
-                        {syncCounters[phase].current}/{syncCounters[phase].total || "?"}
+                        {syncCounters[phase].current}/{syncCounters[phase].total >= 0 ? syncCounters[phase].total : "?"}
                       </p>
                       <p className="text-[0.72rem] text-white/55 mt-1">
                         OK: {syncCounters[phase].synced} · Fallos: {syncCounters[phase].failed}
@@ -573,8 +968,10 @@ export function ConnectionDetailClient() {
                       <p className="text-xl font-semibold text-white">{lastSyncResult.summary.failed}</p>
                     </div>
                     <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
-                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Mapeos draft</p>
-                      <p className="text-xl font-semibold text-white">{lastSyncResult.summary.draft_mappings_created}</p>
+                      <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Autocreados</p>
+                      <p className="text-xl font-semibold text-white">
+                        {(lastSyncResult.summary.auto_created_properties ?? 0) + (lastSyncResult.summary.auto_created_room_types ?? 0)}
+                      </p>
                     </div>
                     <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
                       <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Tarifas base</p>
@@ -594,6 +991,10 @@ export function ConnectionDetailClient() {
                       <span className="text-white/90 font-medium">{lastSyncResult.summary.properties_synced}</span>
                     </p>
                     <p>
+                      Propiedades auto-creadas:{" "}
+                      <span className="text-white/90 font-medium">{lastSyncResult.summary.auto_created_properties ?? 0}</span>
+                    </p>
+                    <p>
                       Alojamientos descubiertos en PMS:{" "}
                       <span className="text-white/90 font-medium">
                         {lastSyncResult.summary.room_types_discovered ?? lastSyncResult.summary.room_types_synced}
@@ -602,6 +1003,10 @@ export function ConnectionDetailClient() {
                     <p>
                       Alojamientos mapeados localmente:{" "}
                       <span className="text-white/90 font-medium">{lastSyncResult.summary.room_types_synced}</span>
+                    </p>
+                    <p>
+                      Alojamientos auto-creados:{" "}
+                      <span className="text-white/90 font-medium">{lastSyncResult.summary.auto_created_room_types ?? 0}</span>
                     </p>
                     {lastSyncResult.window && (
                       <p className="text-white/50">
@@ -616,9 +1021,21 @@ export function ConnectionDetailClient() {
                     )}
                   </div>
 
+                  {lastSyncResult.summary.pricing_unavailable && (
+                    <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-amber-200 text-sm space-y-1">
+                      <p className="font-medium">Pricing omitido por fallback de resiliencia.</p>
+                      <p>
+                        La corrida continuó con disponibilidad y metadatos para evitar timeout del sync.
+                        {(lastSyncResult.summary.pricing_unavailable_properties?.length ?? 0) > 0
+                          ? ` Propiedades afectadas: ${lastSyncResult.summary.pricing_unavailable_properties?.slice(0, 6).join(", ")}`
+                          : ""}
+                      </p>
+                    </div>
+                  )}
+
                   {lastSyncResult.summary.draft_mappings_created > 0 && (
                     <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-amber-200 text-sm">
-                      Se detectaron unidades PMS sin mapeo local. Revisa la pestaña de pendientes para vincularlas.
+                      Se detectaron {lastSyncResult.summary.draft_mappings_created} draft(s) legacy en esta corrida.
                     </div>
                   )}
 
@@ -649,6 +1066,314 @@ export function ConnectionDetailClient() {
           </ModalContent>
         </Modal>
 
+        {/* Modal detalle de corrida (bloque de tareas) */}
+        <Modal
+          isOpen={runDetailModalOpen}
+          onOpenChange={(open) => {
+            setRunDetailModalOpen(open);
+            if (!open) {
+              setSelectedRun(null);
+              setRunDetailEvents([]);
+              setRunDetailCounters(emptySyncCounters());
+              setRunDetailUsingWebSocket(false);
+              runDetailPollingRunIdRef.current = null;
+              runDetailWsRef.current?.close();
+              runDetailWsRef.current = null;
+              adminApi.getSyncRuns(id, 5).then((d) => setSyncRuns(d.results ?? []));
+            }
+          }}
+          size="lg"
+          backdrop="blur"
+        >
+          <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
+            <ModalHeader className="text-white font-sora flex items-center gap-2">
+              <Icon icon="solar:layers-minimalistic-bold-duotone" className="text-[#9b74ff]" width={18} />
+              Detalle de sincronización
+              {selectedRun && (
+                <span className="text-[0.65rem] font-mono text-white/50 ml-1">
+                  {selectedRun.run_id.slice(0, 8)}…
+                </span>
+              )}
+            </ModalHeader>
+            <ModalBody>
+              {selectedRun ? (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
+                    <span
+                      className={
+                        selectedRun.status === "success"
+                          ? "text-emerald-400"
+                          : selectedRun.status === "partial"
+                            ? "text-amber-400"
+                            : selectedRun.status === "error"
+                              ? "text-red-400"
+                              : selectedRun.status === "running"
+                                ? "text-blue-400"
+                                : "text-white/50"
+                      }
+                    >
+                      {selectedRun.status === "success"
+                        ? "Completado"
+                        : selectedRun.status === "partial"
+                          ? "Parcial"
+                          : selectedRun.status === "error"
+                            ? "Error"
+                            : selectedRun.status === "running"
+                              ? "En ejecución"
+                              : "En cola"}
+                    </span>
+                    {selectedRun.window?.start_date && selectedRun.window?.end_date && (
+                      <span className="text-white/50">
+                        {selectedRun.window.start_date} → {selectedRun.window.end_date}
+                      </span>
+                    )}
+                    {selectedRun.started_at && (
+                      <span className="text-white/40 text-xs">
+                        Inicio: {new Date(selectedRun.started_at).toLocaleString("es")}
+                      </span>
+                    )}
+                  </div>
+
+                  {(selectedRun.status === "queued" || selectedRun.status === "running") && (
+                    <>
+                      <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-sm text-white/70">
+                        <p className="text-white/90 font-medium">{runDetailPhase}</p>
+                        <p className="mt-1 text-[0.8rem] text-white/50">
+                          {runDetailUsingWebSocket
+                            ? "WebSocket en tiempo real."
+                            : "Actualizando cada 60 s (fallback)."}
+                          {runDetailLastRefresh && (
+                            <span className="ml-2 text-emerald-400/80">
+                              Última actualización: {runDetailLastRefresh.toLocaleTimeString("es")}
+                            </span>
+                          )}
+                        </p>
+                        {selectedRun.status === "queued" && selectedRun.started_at == null && runDetailLastRefresh && (
+                          <p className="mt-2 text-[0.75rem] text-amber-400/80">
+                            Si la corrida permanece en cola, verifica que el worker de Celery esté en ejecución.
+                          </p>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        {(Object.keys(runDetailCounters) as SyncPhaseKey[]).map((phase) => (
+                          <div key={phase} className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                            <p className="text-[0.65rem] uppercase tracking-wider text-white/40">{phaseLabel(phase)}</p>
+                            <p className="text-white/90 text-sm mt-1">
+                              {runDetailCounters[phase].current}/{runDetailCounters[phase].total >= 0 ? runDetailCounters[phase].total : "?"}
+                            </p>
+                            <p className="text-[0.72rem] text-white/55 mt-1">
+                              OK: {runDetailCounters[phase].synced} · Fallos: {runDetailCounters[phase].failed}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {(selectedRun.status === "success" ||
+                    selectedRun.status === "partial" ||
+                    selectedRun.status === "error") &&
+                    selectedRun.summary && (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                            <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Procesados</p>
+                            <p className="text-xl font-semibold text-white">{selectedRun.summary.synced ?? 0}</p>
+                          </div>
+                          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                            <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Fallidos</p>
+                            <p className="text-xl font-semibold text-white">{selectedRun.summary.failed ?? 0}</p>
+                          </div>
+                          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                            <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Propiedades</p>
+                            <p className="text-xl font-semibold text-white">
+                              {selectedRun.summary.properties_synced ?? 0}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                            <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Tipos de habitación</p>
+                            <p className="text-xl font-semibold text-white">
+                              {selectedRun.summary.room_types_synced ?? 0}
+                            </p>
+                          </div>
+                        </div>
+                        {selectedRun.error && (
+                          <div className="rounded-xl border border-red-400/25 bg-red-500/10 p-3 text-red-200 text-sm">
+                            {selectedRun.error}
+                          </div>
+                        )}
+                        {(selectedRun.summary.errors?.length ?? 0) > 0 && (
+                          <div className="rounded-xl border border-red-400/25 bg-red-500/10 p-3">
+                            <p className="text-sm font-medium text-red-200 mb-1">Errores</p>
+                            <ul className="text-xs text-red-100/90 space-y-1 max-h-24 overflow-y-auto">
+                              {selectedRun.summary.errors.slice(0, 5).map((err, idx) => (
+                                <li key={idx}>- {err}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                  <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                    <p className="text-xs uppercase tracking-wider text-white/40 mb-2">Actividad</p>
+                    <ul className="space-y-1 max-h-52 overflow-y-auto text-xs text-white/75">
+                      {runDetailEvents.length === 0 ? (
+                        <li>
+                          {selectedRun.status === "queued"
+                            ? "La corrida está en cola. Los eventos aparecerán cuando comience."
+                            : selectedRun.status === "running"
+                              ? "Obteniendo eventos..."
+                              : "No hay eventos registrados."}
+                        </li>
+                      ) : (
+                        runDetailEvents.slice(0, 24).map((evt, idx) => (
+                          <li key={idx}>- {formatSyncEvent(evt)}</li>
+                        ))
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-center py-8">
+                  <Spinner size="lg" color="secondary" />
+                </div>
+              )}
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                variant="flat"
+                onPress={() => {
+                  setRunDetailModalOpen(false);
+                  setSelectedRun(null);
+                  adminApi.getSyncRuns(id, 5).then((d) => setSyncRuns(d.results ?? []));
+                }}
+                className="!text-white/80 bg-white/[0.08] border border-white/[0.12] hover:bg-white/[0.14]"
+              >
+                Cerrar
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        {/* Modal: Ver todas las corridas */}
+        <Modal
+          isOpen={allSyncRunsModalOpen}
+          onOpenChange={setAllSyncRunsModalOpen}
+          size="lg"
+          backdrop="blur"
+        >
+          <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
+            <ModalHeader className="text-white font-sora flex items-center gap-2">
+              <Icon icon="solar:layers-minimalistic-bold-duotone" className="text-[#9b74ff]" width={18} />
+              Todas las corridas de sincronización
+            </ModalHeader>
+            <ModalBody>
+              {loadingAllSyncRuns ? (
+                <div className="flex justify-center py-12">
+                  <Spinner size="lg" color="secondary" />
+                </div>
+              ) : allSyncRuns.length === 0 ? (
+                <p className="text-white/50 text-sm py-8 text-center">No hay corridas registradas.</p>
+              ) : (
+                <div className="space-y-3">
+                  <ul className="space-y-2 max-h-80 overflow-y-auto">
+                    {allSyncRuns.map((run) => {
+                      const statusStyle =
+                        run.status === "success"
+                          ? "text-emerald-400"
+                          : run.status === "partial"
+                            ? "text-amber-400"
+                            : run.status === "error"
+                              ? "text-red-400"
+                              : run.status === "cancelled"
+                                ? "text-white/40"
+                                : run.status === "running"
+                                  ? "text-blue-400"
+                                  : "text-white/50";
+                      const statusLabel =
+                        run.status === "success"
+                          ? "Completado"
+                          : run.status === "partial"
+                            ? "Parcial"
+                            : run.status === "error"
+                              ? "Error"
+                              : run.status === "cancelled"
+                                ? "Cancelado"
+                                : run.status === "running"
+                                  ? "En ejecución"
+                                  : "En cola";
+                      return (
+                        <li
+                          key={run.run_id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            setAllSyncRunsModalOpen(false);
+                            openRunDetail(run);
+                          }}
+                          onKeyDown={(e) => e.key === "Enter" && (setAllSyncRunsModalOpen(false), openRunDetail(run))}
+                          className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm cursor-pointer hover:bg-white/[0.06] hover:border-white/[0.12] transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`font-medium ${statusStyle}`}>{statusLabel}</span>
+                            <span className="text-white/50 text-xs">
+                              {run.window?.start_date && run.window?.end_date
+                                ? `${run.window.start_date} → ${run.window.end_date}`
+                                : run.created_at
+                                  ? new Date(run.created_at).toLocaleString("es")
+                                  : run.run_id}
+                            </span>
+                          </div>
+                          <span className="text-[0.65rem] uppercase tracking-wider text-white/30 font-mono">
+                            {run.run_id.slice(0, 8)}…
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {allSyncRunsTotal > SYNC_RUNS_PAGE_SIZE && (
+                    <div className="flex items-center justify-between pt-3 border-t border-white/[0.08]">
+                      <span className="text-white/50 text-xs">
+                        {allSyncRunsPage * SYNC_RUNS_PAGE_SIZE + 1}–{Math.min((allSyncRunsPage + 1) * SYNC_RUNS_PAGE_SIZE, allSyncRunsTotal)} de {allSyncRunsTotal}
+                      </span>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          isDisabled={allSyncRunsPage === 0}
+                          onPress={() => setAllSyncRunsPage((p) => Math.max(0, p - 1))}
+                          className="!text-white/70 bg-white/[0.07]"
+                        >
+                          Anterior
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          isDisabled={(allSyncRunsPage + 1) * SYNC_RUNS_PAGE_SIZE >= allSyncRunsTotal}
+                          onPress={() => setAllSyncRunsPage((p) => p + 1)}
+                          className="!text-white/70 bg-white/[0.07]"
+                        >
+                          Siguiente
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                variant="flat"
+                onPress={() => setAllSyncRunsModalOpen(false)}
+                className="!text-white/80 bg-white/[0.08] border border-white/[0.12] hover:bg-white/[0.14]"
+              >
+                Cerrar
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
         {/* Last sync */}
         <div className="mt-5 flex items-center gap-2 text-sm text-white/40">
           <Icon icon="solar:clock-circle-outline" width={15} />
@@ -660,6 +1385,94 @@ export function ConnectionDetailClient() {
                 : "Nunca"}
             </span>
           </span>
+        </div>
+
+        {/* Bloques de tareas (corridas de sync) */}
+        <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Icon icon="solar:layers-minimalistic-bold-duotone" width={17} className="text-[#b89eff]" />
+              <p className="text-sm font-semibold text-white/80">Bloques de tareas (últimas 5)</p>
+            </div>
+            <Button
+              size="sm"
+              variant="flat"
+              onPress={() => {
+                setAllSyncRunsModalOpen(true);
+                setAllSyncRunsPage(0);
+              }}
+              className="!text-[#b89eff] bg-[#5e2cec]/15 border border-[#5e2cec]/25 hover:bg-[#5e2cec]/25"
+            >
+              Ver todas
+            </Button>
+          </div>
+          {loadingSyncRuns ? (
+            <div className="flex items-center gap-2">
+              <Spinner size="sm" color="secondary" />
+              <span className="text-[0.8rem] text-white/50">Cargando corridas...</span>
+            </div>
+          ) : syncRuns.length === 0 ? (
+            <p className="text-[0.8rem] text-white/50">No hay corridas de sincronización registradas.</p>
+          ) : (
+            <ul className="space-y-2">
+              {syncRuns.map((run) => {
+                const statusStyle =
+                  run.status === "success"
+                    ? "text-emerald-400"
+                    : run.status === "partial"
+                      ? "text-amber-400"
+                      : run.status === "error"
+                        ? "text-red-400"
+                        : run.status === "cancelled"
+                          ? "text-white/40"
+                          : run.status === "running"
+                            ? "text-blue-400"
+                            : "text-white/50";
+                const statusLabel =
+                  run.status === "success"
+                    ? "Completado"
+                    : run.status === "partial"
+                      ? "Parcial"
+                      : run.status === "error"
+                        ? "Error"
+                        : run.status === "cancelled"
+                          ? "Cancelado"
+                          : run.status === "running"
+                            ? "En ejecución"
+                            : "En cola";
+                return (
+                  <li
+                    key={run.run_id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openRunDetail(run)}
+                    onKeyDown={(e) => e.key === "Enter" && openRunDetail(run)}
+                    className="flex items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm cursor-pointer hover:bg-white/[0.06] hover:border-white/[0.12] transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`font-medium ${statusStyle}`}>{statusLabel}</span>
+                      <span className="text-white/50 text-xs">
+                        {run.window?.start_date && run.window?.end_date
+                          ? `${run.window.start_date} → ${run.window.end_date}`
+                          : run.created_at
+                            ? new Date(run.created_at).toLocaleString("es")
+                            : run.run_id}
+                      </span>
+                      {run.summary?.synced != null && (
+                        <span className="text-white/40 text-xs">
+                          {run.summary.synced} sincronizados
+                          {run.summary.failed != null && run.summary.failed > 0 ? ` · ${run.summary.failed} fallidos` : ""}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[0.65rem] uppercase tracking-wider text-white/30 font-mono">
+                      {run.run_id.slice(0, 8)}…
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
 
         {/* Generic API credentials */}
@@ -843,7 +1656,10 @@ export function ConnectionDetailClient() {
                 <button
                   key={tab.key}
                   type="button"
-                  onClick={() => setActiveTab(tab.key)}
+                  onClick={() => {
+                    setActiveTab(tab.key);
+                    setUnitsTablePage(0);
+                  }}
                   className={`relative flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-all duration-200 -mb-px ${
                     isActive
                       ? "text-white border-b-2 border-[#7c4dff]"
@@ -878,7 +1694,10 @@ export function ConnectionDetailClient() {
             <button
               key={v}
               type="button"
-              onClick={() => setViewType(v)}
+              onClick={() => {
+                setViewType(v);
+                setUnitsTablePage(0);
+              }}
               className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
                 viewType === v
                   ? "bg-[#5e2cec]/25 text-[#b89eff] border border-[#5e2cec]/30"
@@ -918,7 +1737,7 @@ export function ConnectionDetailClient() {
               </tr>
             </thead>
             <tbody>
-              {tableData.length === 0 ? (
+              {paginatedTableData.length === 0 ? (
                 <tr>
                   <td
                     colSpan={isRoom ? 6 : 5}
@@ -928,16 +1747,19 @@ export function ConnectionDetailClient() {
                   </td>
                 </tr>
               ) : (
-                tableData.map((u, i) => {
+                paginatedTableData.map((u, i) => {
                   const st = STATUS_STYLES[u.status] ?? STATUS_STYLES.pending;
                   const pmsPropertyLabel = u.pms_property_name ?? u.pms_property_id ?? "—";
                   const pmsRoomLabel = u.pms_room_name ?? u.pms_name ?? u.pms_room_id ?? "—";
                   const pmsIdLabel = isRoom
                     ? `${u.pms_property_id ?? "—"} / ${u.pms_room_id ?? "—"}`
                     : (u.pms_property_id ?? "—");
+                  const rowKey = isRoom
+                    ? `${u.pms_property_id ?? ""}-${u.pms_room_id ?? i}`
+                    : `${u.pms_property_id ?? i}`;
                   return (
                     <tr
-                      key={i}
+                      key={rowKey}
                       className="border-b border-white/[0.05] hover:bg-white/[0.03] transition-colors"
                     >
                       <td className="px-6 py-3 text-white/80 font-medium">
@@ -971,10 +1793,35 @@ export function ConnectionDetailClient() {
           </table>
         </div>
 
-        {/* Footer count */}
-        {tableData.length > 0 && (
-          <div className="px-6 py-3 border-t border-white/[0.06] text-[0.65rem] text-white/30 uppercase tracking-widest">
-            {tableData.length} {isRoom ? "tipos de habitación" : "propiedades"}
+        {/* Pagination */}
+        {totalUnits > 0 && (
+          <div className="px-6 py-3 border-t border-white/[0.06] flex items-center justify-between">
+            <span className="text-[0.65rem] text-white/40 uppercase tracking-wider">
+              {unitsTablePage * UNITS_PAGE_SIZE + 1}–{Math.min((unitsTablePage + 1) * UNITS_PAGE_SIZE, totalUnits)} de {totalUnits}{" "}
+              {isRoom ? "tipos de habitación" : "propiedades"}
+            </span>
+            {totalPages > 1 && (
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="flat"
+                  isDisabled={unitsTablePage === 0}
+                  onPress={() => setUnitsTablePage((p) => Math.max(0, p - 1))}
+                  className="!text-white/70 bg-white/[0.07] min-w-0"
+                >
+                  Anterior
+                </Button>
+                <Button
+                  size="sm"
+                  variant="flat"
+                  isDisabled={unitsTablePage >= totalPages - 1}
+                  onPress={() => setUnitsTablePage((p) => Math.min(totalPages - 1, p + 1))}
+                  className="!text-white/70 bg-white/[0.07] min-w-0"
+                >
+                  Siguiente
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </GlassCard>
