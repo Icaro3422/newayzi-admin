@@ -276,12 +276,22 @@ export function PropertiesList() {
                     className="border-b border-white/[0.06] last:border-0 hover:bg-white/[0.03] transition-colors"
                   >
                     <td className="py-4 px-5">
-                      <Link
-                        href={`/admin/properties/${p.id}`}
-                        className="font-sora font-semibold text-[#9b74ff] hover:text-[#b89eff] transition-colors"
-                      >
-                        {p.name}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/admin/properties/${p.id}`}
+                          className="font-sora font-semibold text-[#9b74ff] hover:text-[#b89eff] transition-colors"
+                        >
+                          {p.name}
+                        </Link>
+                        {p.from_pms && (
+                          <span
+                            className="inline-flex items-center rounded-full bg-[#5e2cec]/20 border border-[#5e2cec]/40 px-2 py-0.5 text-[0.65rem] font-semibold text-[#b89eff]"
+                            title="Sincronizada desde PMS"
+                          >
+                            PMS
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-4 px-5 text-white/70 text-sm">{p.city_name ?? "—"}</td>
                     <td className="py-4 px-5 text-white/70 text-sm">{p.property_type}</td>
