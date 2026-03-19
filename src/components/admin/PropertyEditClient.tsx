@@ -111,6 +111,53 @@ export function PropertyEditClient() {
 
   // ── Galería
   const [pictures, setPictures] = useState<PropertyPicture[]>([]);
+  const [aiSuggesting, setAiSuggesting] = useState(false);
+
+  function isDescriptionEmpty(html: string): boolean {
+    const text = html
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return text.length === 0;
+  }
+
+  async function suggestDescriptionWithAi() {
+    if (!property || !canEditProperty || aiSuggesting) return;
+    setAiSuggesting(true);
+    try {
+      const am = Array.isArray(amenities) ? amenities : [];
+      const res = await fetch("/api/suggest-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim() || property.name,
+          cityName: property.city_name ?? "",
+          address: address.trim(),
+          propertyType: property.property_type,
+          amenities: am,
+          locale: "es",
+        }),
+      });
+      const data = (await res.json()) as { description?: string; error?: string };
+      if (!res.ok) {
+        addToast({
+          title: "No se pudo generar",
+          description: data.error || "Intenta de nuevo más tarde",
+          color: "danger",
+        });
+        return;
+      }
+      if (data.description) {
+        setDescription(data.description);
+        addToast({ title: "Descripción generada", description: "Revísala y guarda cuando esté lista.", color: "success" });
+      }
+    } catch {
+      addToast({ title: "Error de red", color: "danger" });
+    } finally {
+      setAiSuggesting(false);
+    }
+  }
 
   useEffect(() => {
     if (Number.isNaN(propertyId) || propertyId <= 0) { setLoading(false); return; }
@@ -302,7 +349,27 @@ export function PropertyEditClient() {
           />
 
           <div>
-            <label className="text-sm font-semibold text-white/75 mb-2 block font-sora">Descripción</label>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <label className="text-sm font-semibold text-white/75 block font-sora">Descripción</label>
+              {!readOnly && isDescriptionEmpty(description) && (
+                <Button
+                  size="sm"
+                  variant="flat"
+                  className="rounded-xl border border-[#5e2cec]/40 bg-[#5e2cec]/20 text-[#d4c4ff] font-medium"
+                  isLoading={aiSuggesting}
+                  startContent={!aiSuggesting ? <Icon icon="solar:magic-stick-3-bold-duotone" width={18} /> : undefined}
+                  onPress={suggestDescriptionWithAi}
+                >
+                  Sugerir con IA
+                </Button>
+              )}
+            </div>
+            {isDescriptionEmpty(description) && (
+              <p className="text-xs text-white/45 mb-2 font-sora">
+                Si la propiedad viene sin texto del PMS, puedes generar un borrador según nombre, ciudad, tipo y amenidades (requiere{" "}
+                <code className="text-white/55">OPENAI_API_KEY</code> en el servidor).
+              </p>
+            )}
             <RichTextEditor
               value={description}
               onChange={readOnly ? () => {} : setDescription}
@@ -318,8 +385,8 @@ export function PropertyEditClient() {
             <label className="text-sm font-semibold text-white/75 mb-2 block font-sora">Amenidades</label>
             <div className="flex flex-wrap gap-2 mb-3">
               {amenities.length === 0 && <span className="text-sm text-white/30 italic">Sin amenidades registradas</span>}
-              {amenities.map((a) => (
-                <span key={a} className="inline-flex items-center gap-1.5 rounded-full bg-[#5e2cec]/25 border border-[#5e2cec]/30 px-3 py-1.5 text-sm font-medium text-[#b89eff]">
+              {amenities.map((a, idx) => (
+                <span key={`amenity-${idx}-${a}`} className="inline-flex items-center gap-1.5 rounded-full bg-[#5e2cec]/25 border border-[#5e2cec]/30 px-3 py-1.5 text-sm font-medium text-[#b89eff]">
                   {a}
                   {!readOnly && (
                     <button type="button" onClick={() => setAmenities(amenities.filter((x) => x !== a))} className="hover:bg-[#5e2cec]/30 rounded-full p-0.5 transition-colors text-white/80">
@@ -562,8 +629,8 @@ export function PropertyEditClient() {
         <GlassCard>
           <SectionHeader icon="solar:bed-bold-duotone" title="Tipos de habitación" iconBg="from-teal-500/20 to-green-600/20" iconColor="text-teal-400" />
           <ul className="space-y-2">
-            {property.room_types.map((rt) => (
-              <li key={rt.id} className="flex items-center gap-2 rounded-xl bg-white/[0.06] border border-white/[0.1] px-4 py-2.5 text-sm text-white/85 font-sora">
+            {property.room_types.map((rt, idx) => (
+              <li key={`rt-${rt.id}-${idx}`} className="flex items-center gap-2 rounded-xl bg-white/[0.06] border border-white/[0.1] px-4 py-2.5 text-sm text-white/85 font-sora">
                 <Icon icon="solar:bed-outline" className="text-teal-400 flex-shrink-0" width={18} />
                 {rt.name}
                 <span className="text-xs text-white/50 font-mono">({rt.code})</span>

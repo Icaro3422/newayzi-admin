@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button, Switch, Input, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
+import { Button, Switch, Input, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Popover, PopoverTrigger, PopoverContent } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useParams } from "next/navigation";
 import {
@@ -13,6 +13,7 @@ import {
   type ConnectionSyncNowResponse,
   type ConnectionSyncStreamEvent,
   type PMSSyncRunStatus,
+  type LastSyncSummaryResponse,
 } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 import { addToast } from "@heroui/react";
@@ -105,6 +106,7 @@ export function ConnectionDetailClient() {
   const [deleting, setDeleting] = useState(false);
   const [connection, setConnection] = useState<PMSConnectionDetail | null>(null);
   const [unitsSummary, setUnitsSummary] = useState<UnitsSummary | null>(null);
+  const [lastSyncSummary, setLastSyncSummary] = useState<LastSyncSummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncProgressModalOpen, setSyncProgressModalOpen] = useState(false);
@@ -144,21 +146,29 @@ export function ConnectionDetailClient() {
   const [runDetailPhase, setRunDetailPhase] = useState("Preparando...");
   const [runDetailLastRefresh, setRunDetailLastRefresh] = useState<Date | null>(null);
   const [runDetailUsingWebSocket, setRunDetailUsingWebSocket] = useState(false);
+  const [syncOnlyImages, setSyncOnlyImages] = useState(false);
+  const [syncThrottleSeconds, setSyncThrottleSeconds] = useState(0);
 
   useEffect(() => {
     if (Number.isNaN(id) || id <= 0) { setLoading(false); return; }
     let cancelled = false;
-    Promise.all([adminApi.getConnection(id), adminApi.getUnitsSummary(id)])
-      .then(([conn, summary]) => {
+    Promise.all([
+      adminApi.getConnection(id),
+      adminApi.getUnitsSummary(id),
+      adminApi.getLastSyncSummary(id),
+    ])
+      .then(([conn, summary, lastSync]) => {
         if (cancelled) return;
         setConnection(conn ?? null);
         setUnitsSummary(summary ?? null);
+        setLastSyncSummary(lastSync ?? null);
         setLoading(false);
       })
       .catch(() => {
         if (!cancelled) {
           setConnection(null);
           setUnitsSummary(null);
+          setLastSyncSummary(null);
           setLoading(false);
         }
       });
@@ -169,11 +179,22 @@ export function ConnectionDetailClient() {
     if (Number.isNaN(id) || id <= 0) return;
     let cancelled = false;
     setLoadingSyncRuns(true);
-    adminApi.getSyncRuns(id, 5)
-      .then((data) => {
-        if (!cancelled) setSyncRuns(data.results ?? []);
+    Promise.all([
+      adminApi.getSyncRuns(id, 5),
+      adminApi.getLastSyncSummary(id),
+    ])
+      .then(([runsData, lastSummary]) => {
+        if (!cancelled) {
+          setSyncRuns(runsData?.results ?? []);
+          setLastSyncSummary(lastSummary ?? null);
+        }
       })
-      .catch(() => { if (!cancelled) setSyncRuns([]); })
+      .catch(() => {
+        if (!cancelled) {
+          setSyncRuns([]);
+          setLastSyncSummary(null);
+        }
+      })
       .finally(() => { if (!cancelled) setLoadingSyncRuns(false); });
     return () => { cancelled = true; };
   }, [id, syncing]);
@@ -426,7 +447,10 @@ export function ConnectionDetailClient() {
     doStartSync(false);
   }
 
-  async function doStartSync(cancelPrevious: boolean) {
+  async function doStartSync(
+    cancelPrevious: boolean,
+    scope?: { pmsPropertyId?: string | null; pmsRoomTypeId?: string | null }
+  ) {
     if (!canSyncConnection) return;
     setCancelPreviousModalOpen(false);
     setActiveRunIdForCancel(null);
@@ -434,10 +458,14 @@ export function ConnectionDetailClient() {
     setSyncProgressModalOpen(true);
     resetSyncRealtimeState();
     try {
-      const skipProperties = (unitsSummary?.counts?.properties_pending ?? 0) === 0;
+      const skipProperties = !scope && (unitsSummary?.counts?.properties_pending ?? 0) === 0;
       const started = await adminApi.startSyncRun(id, {
         cancelPrevious,
         skipProperties,
+        onlyImages: syncOnlyImages,
+        throttleSeconds: syncThrottleSeconds > 0 ? syncThrottleSeconds : undefined,
+        scopePmsPropertyId: scope?.pmsPropertyId ?? undefined,
+        scopePmsRoomTypeId: scope?.pmsRoomTypeId ?? undefined,
       });
       setSyncEstimatedSeconds(started.estimated_seconds ?? null);
       const runId = started.run_id;
@@ -811,15 +839,58 @@ export function ConnectionDetailClient() {
             )}
             {canSyncConnection && (
               <>
-                <Button
-                  className="btn-newayzi-primary"
-                  onPress={handleSyncNow}
-                  isLoading={syncing}
-                  size="sm"
-                  startContent={!syncing ? <Icon icon="solar:refresh-bold" width={16} /> : undefined}
-                >
-                  Sincronizar ahora
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    className="btn-newayzi-primary"
+                    onPress={handleSyncNow}
+                    isLoading={syncing}
+                    size="sm"
+                    startContent={!syncing ? <Icon icon="solar:refresh-bold" width={16} /> : undefined}
+                  >
+                    Sincronizar ahora
+                  </Button>
+                  <Popover placement="bottom-end">
+                    <PopoverTrigger as="div">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}
+                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-white/[0.12] bg-white/[0.05] text-white/60 hover:bg-white/[0.1] hover:text-white/80 transition-colors"
+                        aria-label="Opciones de sincronización"
+                      >
+                        <Icon icon="solar:settings-minimalistic-bold" width={18} />
+                      </div>
+                    </PopoverTrigger>
+                    <PopoverContent className="bg-[#0f1220] border border-white/[0.1] p-3 w-56">
+                      <div className="space-y-3">
+                        <p className="text-[0.65rem] uppercase tracking-wider text-white/45">Opciones de sync</p>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={syncOnlyImages}
+                            onChange={(e) => setSyncOnlyImages(e.target.checked)}
+                            className="rounded border-white/30 bg-white/10 text-[#5e2cec] focus:ring-[#5e2cec]"
+                          />
+                          <span className="text-sm text-white/70">Solo imágenes</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <span className="text-sm text-white/50 shrink-0">Pausa (s)</span>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={60}
+                            step={0.5}
+                            value={String(syncThrottleSeconds)}
+                            onValueChange={(v) => setSyncThrottleSeconds(parseFloat(v) || 0)}
+                            className="w-14 border-white/10 bg-white/5 text-sm text-white"
+                            classNames={{ input: "text-center text-sm" }}
+                            placeholder="0"
+                          />
+                        </label>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
                 <Button
                   color="danger"
                   variant="flat"
@@ -1115,7 +1186,11 @@ export function ConnectionDetailClient() {
                       {selectedRun.status === "success"
                         ? "Completado"
                         : selectedRun.status === "partial"
-                          ? "Parcial"
+                          ? selectedRun.summary?.pricing_unavailable &&
+                              (selectedRun.summary?.failed ?? 0) === 0 &&
+                              (selectedRun.summary?.errors?.length ?? 0) === 0
+                            ? "Parcial (precios PMS)"
+                            : "Parcial"
                           : selectedRun.status === "error"
                             ? "Error"
                             : selectedRun.status === "running"
@@ -1197,6 +1272,30 @@ export function ConnectionDetailClient() {
                             </p>
                           </div>
                         </div>
+                        {Boolean(selectedRun.params?.skip_properties) &&
+                          (selectedRun.summary.properties_synced ?? 0) === 0 && (
+                            <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-white/70 text-sm">
+                              <p className="font-medium text-white/90">Fase de propiedades omitida</p>
+                              <p className="mt-1 text-[0.8rem] text-white/60">
+                                No había propiedades en estado pendiente: la sincronización completa no vuelve a pedir
+                                metadatos de propiedades al PMS (ahorro de tiempo). Tipos de habitación y disponibilidad
+                                sí se procesaron.
+                              </p>
+                            </div>
+                          )}
+                        {selectedRun.summary.pricing_unavailable && (
+                          <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-amber-200 text-sm space-y-1">
+                            <p className="font-medium">Precios Kunas no disponibles en parte de la corrida</p>
+                            <p>
+                              Falló al menos una llamada a <code className="text-amber-100/90">prices/data/prices</code>.
+                              La disponibilidad se sincronizó igual; el estado de la corrida es &quot;Parcial&quot; por esta
+                              advertencia.
+                              {(selectedRun.summary.pricing_unavailable_properties?.length ?? 0) > 0
+                                ? ` IDs PMS afectados: ${selectedRun.summary.pricing_unavailable_properties?.slice(0, 8).join(", ")}`
+                                : ""}
+                            </p>
+                          </div>
+                        )}
                         {selectedRun.error && (
                           <div className="rounded-xl border border-red-400/25 bg-red-500/10 p-3 text-red-200 text-sm">
                             {selectedRun.error}
@@ -1386,6 +1485,52 @@ export function ConnectionDetailClient() {
             </span>
           </span>
         </div>
+
+        {/* Resumen del último sync completado */}
+        {lastSyncSummary?.run_id && (
+          <div className="mt-4 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Icon icon="solar:chart-2-bold-duotone" width={17} className="text-[#b89eff]" />
+              <p className="text-sm font-semibold text-white/80">Resumen del último sync</p>
+              <span className="text-[0.7rem] text-white/40">
+                {lastSyncSummary.completed_at
+                  ? new Date(lastSyncSummary.completed_at).toLocaleString("es")
+                  : ""}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Propiedades</p>
+                <p className="text-white/90 text-sm mt-0.5">
+                  {(lastSyncSummary.summary.properties_synced ?? 0)} sincronizadas
+                  {lastSyncSummary.summary.properties_failed != null && lastSyncSummary.summary.properties_failed > 0 && (
+                    <span className="text-amber-400 ml-1">({lastSyncSummary.summary.properties_failed} fallos)</span>
+                  )}
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Habitaciones</p>
+                <p className="text-white/90 text-sm mt-0.5">
+                  {(lastSyncSummary.summary.room_types_synced ?? 0)} sincronizadas
+                  {lastSyncSummary.summary.room_types_failed != null && lastSyncSummary.summary.room_types_failed > 0 && (
+                    <span className="text-amber-400 ml-1">({lastSyncSummary.summary.room_types_failed} fallos)</span>
+                  )}
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Imágenes propiedades</p>
+                <p className="text-white/90 text-sm mt-0.5">{lastSyncSummary.summary.property_images_saved ?? 0} guardadas</p>
+              </div>
+              <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3">
+                <p className="text-[0.65rem] uppercase tracking-wider text-white/40">Imágenes habitaciones</p>
+                <p className="text-white/90 text-sm mt-0.5">{lastSyncSummary.summary.room_type_images_saved ?? 0} guardadas</p>
+              </div>
+            </div>
+            {lastSyncSummary.error && (
+              <p className="mt-2 text-[0.8rem] text-amber-300">{lastSyncSummary.error}</p>
+            )}
+          </div>
+        )}
 
         {/* Bloques de tareas (corridas de sync) */}
         <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
@@ -1709,9 +1854,9 @@ export function ConnectionDetailClient() {
           ))}
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        {/* Table: scroll horizontal con columna Acciones fija a la derecha */}
+        <div className="overflow-x-auto overflow-y-visible">
+          <table className="w-full text-sm min-w-[32rem]">
             <thead>
               <tr className="border-b border-white/[0.07] bg-white/[0.03]">
                 <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
@@ -1723,10 +1868,7 @@ export function ConnectionDetailClient() {
                   </th>
                 )}
                 <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
-                  Propiedad PMS
-                </th>
-                <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
-                  Alojamiento PMS
+                  {isRoom ? "Alojamiento PMS" : "Nombre en PMS"}
                 </th>
                 <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
                   ID PMS
@@ -1734,13 +1876,18 @@ export function ConnectionDetailClient() {
                 <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40">
                   Estado
                 </th>
+                {canSyncConnection && (
+                  <th className="px-6 py-3 text-left text-[0.6rem] uppercase tracking-[0.12em] font-semibold text-white/40 sticky right-0 z-10 bg-[#0f1220] border-l border-white/[0.07] shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                    Acciones
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
               {paginatedTableData.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={isRoom ? 6 : 5}
+                    colSpan={isRoom ? (canSyncConnection ? 6 : 5) : (canSyncConnection ? 5 : 4)}
                     className="py-12 text-center text-white/30 text-sm"
                   >
                     No hay unidades en esta categoría
@@ -1749,14 +1896,19 @@ export function ConnectionDetailClient() {
               ) : (
                 paginatedTableData.map((u, i) => {
                   const st = STATUS_STYLES[u.status] ?? STATUS_STYLES.pending;
-                  const pmsPropertyLabel = u.pms_property_name ?? u.pms_property_id ?? "—";
-                  const pmsRoomLabel = u.pms_room_name ?? u.pms_name ?? u.pms_room_id ?? "—";
+                  const pmsNameLabel = isRoom
+                    ? (u.pms_room_name ?? u.pms_name ?? u.pms_room_id ?? "—")
+                    : (u.pms_property_name ?? u.pms_property_id ?? "—");
                   const pmsIdLabel = isRoom
                     ? `${u.pms_property_id ?? "—"} / ${u.pms_room_id ?? "—"}`
                     : (u.pms_property_id ?? "—");
                   const rowKey = isRoom
-                    ? `${u.pms_property_id ?? ""}-${u.pms_room_id ?? i}`
-                    : `${u.pms_property_id ?? i}`;
+                    ? `${u.pms_property_id ?? ""}-${u.pms_room_id ?? ""}-${u.local_property_id ?? ""}-${u.local_room_type_id ?? ""}-${i}`
+                    : `${u.pms_property_id ?? ""}-${u.local_property_id ?? ""}-${i}`;
+                  const syncScope = {
+                    pmsPropertyId: u.pms_property_id ?? null,
+                    pmsRoomTypeId: isRoom ? (u.pms_room_id ?? null) : undefined,
+                  };
                   return (
                     <tr
                       key={rowKey}
@@ -1770,13 +1922,10 @@ export function ConnectionDetailClient() {
                           {u.local_room_name ?? u.local_room_type_id ?? "—"}
                         </td>
                       )}
-                      <td className="px-6 py-3 text-white/80">
-                        {pmsPropertyLabel}
+                      <td className="px-6 py-3 text-white/80 max-w-[14rem] truncate" title={pmsNameLabel}>
+                        {pmsNameLabel}
                       </td>
-                      <td className="px-6 py-3 text-white/80">
-                        {pmsRoomLabel}
-                      </td>
-                      <td className="px-6 py-3 font-mono text-[0.78rem] text-white/50">
+                      <td className="px-6 py-3 font-mono text-[0.78rem] text-white/50 whitespace-nowrap">
                         {pmsIdLabel}
                       </td>
                       <td className="px-6 py-3">
@@ -1785,6 +1934,21 @@ export function ConnectionDetailClient() {
                           {st.label}
                         </span>
                       </td>
+                      {canSyncConnection && (
+                        <td className="px-6 py-3 sticky right-0 z-10 bg-[#0f1220] border-l border-white/[0.07] shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            isIconOnly
+                            aria-label="Sincronizar esta unidad"
+                            onPress={() => doStartSync(false, syncScope)}
+                            isDisabled={syncing}
+                            className="!text-white/70 bg-white/[0.07] hover:bg-white/[0.12] min-w-8 w-8"
+                          >
+                            <Icon icon="solar:refresh-bold" width={16} />
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
