@@ -1897,11 +1897,18 @@ export interface OperatorContract {
   /** Tras sign-newayzi / resend-link: si Resend envió el correo con el link */
   signEmailSent?: boolean;
   signEmailWarning?: string;
+  documentSource?: "uploaded" | "platform_template";
+  counterpartyDisplayName?: string;
+  pdfTemplateVersion?: string;
 }
 
 export interface CreateContractPayload {
   title: string;
-  document_pdf: File;
+  /** upload = PDF manual; platform_template = genera contrato estándar Newayzi */
+  creation_mode?: "upload" | "platform_template";
+  document_pdf?: File;
+  /** Parte operadora en el PDF (plantilla); vacío = nombre del operador en sistema */
+  counterparty_display_name?: string;
   valid_from?: string;
   valid_until?: string;
   notes?: string;
@@ -1920,7 +1927,19 @@ export const operatorContracts = {
   async create(operatorId: number, payload: CreateContractPayload): Promise<OperatorContract> {
     const form = new FormData();
     form.append("title", payload.title);
-    form.append("document_pdf", payload.document_pdf);
+    const mode = payload.creation_mode ?? "upload";
+    form.append("creation_mode", mode);
+    if (mode === "platform_template") {
+      if (payload.counterparty_display_name?.trim()) {
+        form.append("counterparty_display_name", payload.counterparty_display_name.trim());
+      }
+    } else {
+      if (!payload.document_pdf) throw new Error("Debes subir un PDF o elegir la plantilla estándar.");
+      form.append("document_pdf", payload.document_pdf);
+      if (payload.counterparty_display_name?.trim()) {
+        form.append("counterparty_display_name", payload.counterparty_display_name.trim());
+      }
+    }
     if (payload.valid_from) form.append("valid_from", payload.valid_from);
     if (payload.valid_until) form.append("valid_until", payload.valid_until);
     if (payload.notes) form.append("notes", payload.notes);
@@ -1936,13 +1955,23 @@ export const operatorContracts = {
   async patch(
     operatorId: number,
     contractId: number,
-    data: Partial<{ title: string; valid_from: string; valid_until: string; notes: string; document_pdf: File }>,
+    data: Partial<{
+      title: string;
+      valid_from: string;
+      valid_until: string;
+      notes: string;
+      counterparty_display_name: string;
+      document_pdf: File;
+    }>,
   ): Promise<OperatorContract> {
     const form = new FormData();
     if (data.title !== undefined) form.append("title", data.title);
     if (data.valid_from !== undefined) form.append("valid_from", data.valid_from);
     if (data.valid_until !== undefined) form.append("valid_until", data.valid_until);
     if (data.notes !== undefined) form.append("notes", data.notes);
+    if (data.counterparty_display_name !== undefined) {
+      form.append("counterparty_display_name", data.counterparty_display_name);
+    }
     if (data.document_pdf) form.append("document_pdf", data.document_pdf);
     const res = await authFetchMultipart(`/api/admin/operators/${operatorId}/contracts/${contractId}/`, "PATCH", form);
     return res.json();

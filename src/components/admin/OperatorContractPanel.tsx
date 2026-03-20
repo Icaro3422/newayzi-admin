@@ -51,41 +51,80 @@ function FieldValue({ children, mono = false }: { children: React.ReactNode; mon
 
 interface ContractFormProps {
   operatorId: number;
+  /** Nombre del operador en sistema (valor por defecto de «parte operadora» en plantilla) */
+  operatorName?: string;
   initial?: OperatorContract | null;
   onSave: (contract: OperatorContract) => void;
   onCancel: () => void;
 }
 
-function ContractForm({ operatorId, initial, onSave, onCancel }: ContractFormProps) {
+type CreationMode = "upload" | "platform_template";
+
+function ContractForm({ operatorId, operatorName = "", initial, onSave, onCancel }: ContractFormProps) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [validFrom, setValidFrom] = useState(initial?.validFrom ?? "");
   const [validUntil, setValidUntil] = useState(initial?.validUntil ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [creationMode, setCreationMode] = useState<CreationMode>(() =>
+    initial?.documentSource === "platform_template" ? "platform_template" : "upload",
+  );
+  const [counterpartyDisplayName, setCounterpartyDisplayName] = useState(
+    () => (initial?.counterpartyDisplayName ?? operatorName).trim(),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Si el nombre del operador llega después de abrir el formulario, rellenar solo mientras el campo siga vacío
+  const lastSyncedOperatorName = useRef("");
+  useEffect(() => {
+    if (initial || !operatorName.trim()) return;
+    if (operatorName === lastSyncedOperatorName.current) return;
+    lastSyncedOperatorName.current = operatorName;
+    setCounterpartyDisplayName((prev) => (prev.trim() === "" ? operatorName.trim() : prev));
+  }, [operatorName, initial]);
+
   const inputCls = "w-full bg-white/[0.06] border border-white/[0.12] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#7c5cfc]/60 focus:ring-1 focus:ring-[#7c5cfc]/30 transition";
+
+  const isTemplateContract = initial?.documentSource === "platform_template";
+  const showCounterpartyField = !initial || isTemplateContract;
 
   async function handleSave() {
     if (!title.trim()) return setError("El título es obligatorio.");
-    if (!initial && !pdfFile) return setError("Debes subir un archivo PDF.");
+    if (!initial && creationMode === "upload" && !pdfFile) return setError("Debes subir un archivo PDF.");
     setSaving(true);
     setError("");
     try {
       let contract: OperatorContract;
       if (initial) {
-        contract = await operatorContracts.patch(
-          operatorId,
-          initial.id,
-          { title, valid_from: validFrom || undefined, valid_until: validUntil || undefined, notes, ...(pdfFile ? { document_pdf: pdfFile } : {}) },
-        );
+        contract = await operatorContracts.patch(operatorId, initial.id, {
+          title,
+          valid_from: validFrom || undefined,
+          valid_until: validUntil || undefined,
+          notes,
+          ...(isTemplateContract ? { counterparty_display_name: counterpartyDisplayName.trim() } : {}),
+          ...(pdfFile ? { document_pdf: pdfFile } : {}),
+        });
+      } else if (creationMode === "platform_template") {
+        contract = await operatorContracts.create(operatorId, {
+          title,
+          creation_mode: "platform_template",
+          counterparty_display_name: counterpartyDisplayName.trim() || undefined,
+          valid_from: validFrom || undefined,
+          valid_until: validUntil || undefined,
+          notes,
+        });
       } else {
-        contract = await operatorContracts.create(
-          operatorId,
-          { title, document_pdf: pdfFile!, valid_from: validFrom || undefined, valid_until: validUntil || undefined, notes },
-        );
+        contract = await operatorContracts.create(operatorId, {
+          title,
+          creation_mode: "upload",
+          document_pdf: pdfFile!,
+          counterparty_display_name: counterpartyDisplayName.trim() || undefined,
+          valid_from: validFrom || undefined,
+          valid_until: validUntil || undefined,
+          notes,
+        });
       }
       onSave(contract);
     } catch (e: unknown) {
@@ -102,6 +141,66 @@ function ContractForm({ operatorId, initial, onSave, onCancel }: ContractFormPro
         <input className={inputCls} value={title} onChange={e => setTitle(e.target.value)} placeholder="Ej. Contrato de Servicio Newayzi 2026" />
       </div>
 
+      {!initial && (
+        <div>
+          <FieldLabel>Origen del documento *</FieldLabel>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setCreationMode("platform_template")}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold border transition ${
+                creationMode === "platform_template"
+                  ? "bg-[#5e2cec] border-[#7c5cfc] text-white"
+                  : "border-white/[0.12] text-white/60 hover:text-white hover:bg-white/[0.06]"
+              }`}
+            >
+              Plantilla estándar Newayzi
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreationMode("upload")}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold border transition ${
+                creationMode === "upload"
+                  ? "bg-[#5e2cec] border-[#7c5cfc] text-white"
+                  : "border-white/[0.12] text-white/60 hover:text-white hover:bg-white/[0.06]"
+              }`}
+            >
+              Subir PDF propio
+            </button>
+          </div>
+          <p className="text-white/40 text-xs mt-2">
+            La plantilla incluye cláusulas de referencia (cancelación, Rewards, políticas) y un recuadro fijo para la firma del operador.
+          </p>
+        </div>
+      )}
+
+      {initial && (
+        <div className="rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2 flex items-center gap-2">
+          <Icon icon="solar:document-text-bold-duotone" className="text-[#9b74ff] text-lg shrink-0" />
+          <span className="text-white/80 text-sm">
+            {isTemplateContract ? "Contrato generado desde plantilla estándar Newayzi (firma del operador incrustada al firmar)." : "Documento PDF subido manualmente (firma como anexo si no es plantilla v1)."}
+          </span>
+        </div>
+      )}
+
+      {showCounterpartyField && (
+        <div>
+          <FieldLabel>Nombre / razón social en el documento</FieldLabel>
+          <input
+            className={inputCls}
+            value={counterpartyDisplayName}
+            onChange={e => setCounterpartyDisplayName(e.target.value)}
+            placeholder={operatorName || "Ej. Hotel Ejemplo S.A.S."}
+          />
+          <p className="text-white/35 text-[0.65rem] mt-1">
+            Si lo dejas vacío, se usará el nombre del operador en la plataforma ({operatorName || "—"}).
+            {initial && isTemplateContract
+              ? " Cambiar este campo no regenera el PDF: crea un nuevo borrador si necesitas otro nombre impreso."
+              : ""}
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <FieldLabel>Vigencia desde</FieldLabel>
@@ -113,23 +212,27 @@ function ContractForm({ operatorId, initial, onSave, onCancel }: ContractFormPro
         </div>
       </div>
 
-      <div>
-        <FieldLabel>Documento PDF *</FieldLabel>
-        <div
-          onClick={() => fileRef.current?.click()}
-          className="w-full border-2 border-dashed border-white/[0.15] rounded-xl px-4 py-5 flex flex-col items-center gap-2 cursor-pointer hover:border-[#7c5cfc]/40 hover:bg-white/[0.03] transition"
-        >
-          <Icon icon="solar:document-add-bold-duotone" className="text-[#9b74ff] text-3xl" />
-          {pdfFile ? (
-            <p className="text-sm text-emerald-300 font-medium">{pdfFile.name}</p>
-          ) : initial?.documentPdfUrl ? (
-            <p className="text-sm text-white/50">Hay un PDF cargado. Haz clic para reemplazarlo.</p>
-          ) : (
-            <p className="text-sm text-white/40">Haz clic para seleccionar el PDF del contrato</p>
-          )}
-          <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={e => setPdfFile(e.target.files?.[0] ?? null)} />
+      {(!initial && creationMode === "upload") || initial ? (
+        <div>
+          <FieldLabel>{initial ? "Reemplazar PDF (opcional)" : "Documento PDF *"}</FieldLabel>
+          <div
+            onClick={() => fileRef.current?.click()}
+            className="w-full border-2 border-dashed border-white/[0.15] rounded-xl px-4 py-5 flex flex-col items-center gap-2 cursor-pointer hover:border-[#7c5cfc]/40 hover:bg-white/[0.03] transition"
+          >
+            <Icon icon="solar:document-add-bold-duotone" className="text-[#9b74ff] text-3xl" />
+            {pdfFile ? (
+              <p className="text-sm text-emerald-300 font-medium">{pdfFile.name}</p>
+            ) : initial?.documentPdfUrl ? (
+              <p className="text-sm text-white/50">
+                {initial ? "Hay un PDF cargado. Haz clic solo si quieres sustituirlo." : "Hay un PDF cargado. Haz clic para reemplazarlo."}
+              </p>
+            ) : (
+              <p className="text-sm text-white/40">Haz clic para seleccionar el PDF del contrato</p>
+            )}
+            <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={e => setPdfFile(e.target.files?.[0] ?? null)} />
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div>
         <FieldLabel>Notas internas</FieldLabel>
@@ -353,6 +456,11 @@ function ContractCard({
           <div className="min-w-0">
             <p className="font-sora font-bold text-white text-sm truncate">{contract.title}</p>
             <p className="text-white/35 text-xs mt-0.5">{contract.contractNumber}</p>
+            {contract.documentSource === "platform_template" && (
+              <span className="inline-flex mt-1.5 px-2 py-0.5 rounded-md text-[0.65rem] font-semibold uppercase tracking-wide bg-[#5e2cec]/25 text-[#c4b5fd] border border-[#7c5cfc]/30">
+                Plantilla Newayzi
+              </span>
+            )}
           </div>
           <StatusBadge status={contract.status} />
         </div>
@@ -369,6 +477,12 @@ function ContractCard({
             <FieldLabel>Firma Newayzi</FieldLabel>
             <FieldValue>{contract.signedByNewayziName || "—"}</FieldValue>
           </div>
+          {contract.documentSource === "platform_template" && (
+            <div className="col-span-2">
+              <FieldLabel>Parte operadora en el PDF</FieldLabel>
+              <FieldValue>{(contract.counterpartyDisplayName || "").trim() || contract.operatorName}</FieldValue>
+            </div>
+          )}
           {contract.signedByOperatorName && (
             <div>
               <FieldLabel>Firma Operador</FieldLabel>
@@ -412,7 +526,9 @@ function ContractCard({
               className="inline-flex items-center gap-2 text-emerald-400/90 text-sm hover:text-emerald-300 transition w-fit font-semibold"
             >
               <Icon icon="solar:document-download-bold-duotone" className="text-base" />
-              Descargar PDF firmado (con anexo)
+              {contract.pdfTemplateVersion === "v1"
+                ? "Descargar PDF firmado (firma en documento)"
+                : "Descargar PDF firmado (con anexo)"}
             </a>
           )}
         </div>
@@ -485,10 +601,11 @@ function ContractCard({
 
 interface OperatorContractPanelProps {
   operatorId: number;
+  operatorName?: string;
   readOnly?: boolean;
 }
 
-export function OperatorContractPanel({ operatorId, readOnly = false }: OperatorContractPanelProps) {
+export function OperatorContractPanel({ operatorId, operatorName = "", readOnly = false }: OperatorContractPanelProps) {
   const [contracts, setContracts] = useState<OperatorContract[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -570,6 +687,7 @@ export function OperatorContractPanel({ operatorId, readOnly = false }: Operator
           </p>
           <ContractForm
             operatorId={operatorId}
+            operatorName={operatorName}
             initial={editingContract}
             onSave={handleSaved}
             onCancel={() => { setShowForm(false); setEditingContract(null); }}
