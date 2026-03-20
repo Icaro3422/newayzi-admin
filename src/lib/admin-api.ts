@@ -1841,6 +1841,9 @@ export interface OperatorContract {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  /** Tras sign-newayzi / resend-link: si Resend envió el correo con el link */
+  signEmailSent?: boolean;
+  signEmailWarning?: string;
 }
 
 export interface CreateContractPayload {

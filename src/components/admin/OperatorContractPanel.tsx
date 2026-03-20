@@ -180,14 +180,22 @@ function SignNewayziModal({
   const [signerName, setSignerName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [emailWarning, setEmailWarning] = useState("");
 
   async function handleSign() {
     if (!signerName.trim()) return setError("El nombre del firmante es obligatorio.");
     setSaving(true);
     setError("");
+    setEmailWarning("");
     try {
       const updated = await operatorContracts.signNewayzi(operatorId, contract.id, signerName);
       onSigned(updated);
+      if (updated.signEmailSent === false) {
+        setEmailWarning(
+          updated.signEmailWarning ??
+            "El contrato quedó en «pendiente firma» pero el correo no se envió. Revisa RESEND y el email del operador.",
+        );
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Error al firmar.");
     } finally {
@@ -225,18 +233,26 @@ function SignNewayziModal({
             {error}
           </p>
         )}
+        {emailWarning && (
+          <div className="rounded-xl bg-amber-500/15 border border-amber-400/30 px-3 py-2 text-amber-200 text-xs flex items-start gap-2">
+            <Icon icon="solar:letter-unread-bold-duotone" className="shrink-0 text-lg mt-0.5" />
+            <span>{emailWarning}</span>
+          </div>
+        )}
         <div className="flex gap-3 justify-end">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/[0.06] transition">
-            Cancelar
+            {emailWarning ? "Cerrar" : "Cancelar"}
           </button>
-          <button
-            onClick={handleSign}
-            disabled={saving || !signerName.trim()}
-            className="px-5 py-2 rounded-xl text-sm font-semibold bg-[#5e2cec] text-white hover:bg-[#7c5cfc] disabled:opacity-50 transition flex items-center gap-2"
-          >
-            {saving && <Icon icon="solar:loading-line-duotone" className="animate-spin" />}
-            {saving ? "Firmando…" : "Firmar y enviar al operador"}
-          </button>
+          {!emailWarning && (
+            <button
+              onClick={handleSign}
+              disabled={saving || !signerName.trim()}
+              className="px-5 py-2 rounded-xl text-sm font-semibold bg-[#5e2cec] text-white hover:bg-[#7c5cfc] disabled:opacity-50 transition flex items-center gap-2"
+            >
+              {saving && <Icon icon="solar:loading-line-duotone" className="animate-spin" />}
+              {saving ? "Firmando…" : "Firmar y enviar al operador"}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -282,6 +298,12 @@ function ContractCard({
     try {
       const updated = await operatorContracts.resendLink(operatorId, contract.id);
       onUpdated(updated);
+      if (updated.signEmailSent === false) {
+        setError(
+          updated.signEmailWarning ??
+            "El token se renovó pero el correo no se envió. Revisa RESEND_API_KEY y el email del operador.",
+        );
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Error al reenviar.");
     } finally {
@@ -295,7 +317,10 @@ function ContractCard({
         <SignNewayziModal
           operatorId={operatorId}
           contract={contract}
-          onSigned={(c) => { onUpdated(c); setShowSignModal(false); }}
+          onSigned={(c) => {
+            onUpdated(c);
+            if (c.signEmailSent !== false) setShowSignModal(false);
+          }}
           onClose={() => setShowSignModal(false)}
         />
       )}
