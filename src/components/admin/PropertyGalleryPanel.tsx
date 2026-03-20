@@ -5,6 +5,7 @@ import { Button, Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { addToast } from "@heroui/react";
 import { adminApi, type PropertyPicture } from "@/lib/admin-api";
+import { normalizeImageUrl } from "@/lib/normalize-image-url";
 
 interface Props {
   propertyId: number;
@@ -145,16 +146,18 @@ export function PropertyGalleryPanel({ propertyId, pictures, readOnly = false, o
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {pics.map((pic) => (
+          {pics.map((pic, idx) => (
             <div
-              key={pic.id}
+              key={`pic-${pic.id}-${idx}`}
               className="group relative rounded-2xl overflow-hidden border border-white/10 bg-white/[0.04] aspect-video"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={pic.url}
+                src={normalizeImageUrl(pic.url)}
                 alt=""
                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
+                decoding="async"
               />
 
               {/* Overlay de acciones */}

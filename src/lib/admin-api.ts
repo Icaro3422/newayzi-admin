@@ -144,6 +144,8 @@ export interface PropertyListItem {
   room_types_count?: number;
   operator_name?: string | null;
   pms_connections?: PropertyPMSConnection[];
+  /** True si la propiedad tiene al menos una conexión PMS (sincronizada desde PMS). */
+  from_pms?: boolean;
   rewards_info?: PropertyRewardsInfo | null;
 }
 
@@ -338,6 +340,14 @@ export interface PMSSyncRunStatus {
   started_at?: string | null;
   completed_at?: string | null;
   summary?: ConnectionSyncNowResponse["summary"];
+  /** Opciones de la corrida (p. ej. skip_properties cuando no hay pendientes). */
+  params?: {
+    skip_properties?: boolean;
+    only_images?: boolean;
+    scope_pms_property_id?: string | null;
+    scope_pms_room_type_id?: string | null;
+    [key: string]: unknown;
+  };
   error?: string;
   last_event_seq: number;
   created_at: string;
@@ -357,6 +367,24 @@ export interface PMSSyncRunsListResponse {
   total?: number;
   limit?: number;
   offset?: number;
+}
+
+/** Resumen del último sync completado (propiedades, habitaciones, imágenes). */
+export interface LastSyncSummaryResponse {
+  run_id: string;
+  status: "success" | "partial" | "error";
+  completed_at: string | null;
+  error: string | null;
+  summary: {
+    properties_synced?: number;
+    room_types_synced?: number;
+    property_images_saved?: number;
+    room_type_images_saved?: number;
+    properties_failed?: number;
+    room_types_failed?: number;
+    duration_seconds?: number;
+    [key: string]: unknown;
+  };
 }
 
 export interface SyncedUnit {
@@ -866,10 +894,33 @@ export const adminApi = {
     return data ?? { active: false };
   },
 
-  async startSyncRun(id: number, opts?: { cancelPrevious?: boolean; skipProperties?: boolean }): Promise<ConnectionSyncNowResponse> {
+  /** Resumen del último sync completado (404 si no hay ninguno). */
+  async getLastSyncSummary(connectionId: number): Promise<LastSyncSummaryResponse | null> {
+    return getJson<LastSyncSummaryResponse>(
+      `/api/admin/pms/connections/${connectionId}/last-sync-summary/`
+    );
+  },
+
+  async startSyncRun(
+    id: number,
+    opts?: {
+      cancelPrevious?: boolean;
+      skipProperties?: boolean;
+      onlyImages?: boolean;
+      throttleSeconds?: number;
+      scopePmsPropertyId?: string | null;
+      scopePmsRoomTypeId?: string | null;
+    }
+  ): Promise<ConnectionSyncNowResponse> {
     const q = new URLSearchParams();
     if (opts?.cancelPrevious) q.set("cancel_previous", "1");
     if (opts?.skipProperties) q.set("skip_properties", "1");
+    if (opts?.onlyImages) q.set("only_images", "1");
+    if (opts?.throttleSeconds != null && opts.throttleSeconds > 0) {
+      q.set("throttle_seconds", String(opts.throttleSeconds));
+    }
+    if (opts?.scopePmsPropertyId) q.set("scope_pms_property_id", opts.scopePmsPropertyId);
+    if (opts?.scopePmsRoomTypeId) q.set("scope_pms_room_type_id", opts.scopePmsRoomTypeId);
     const suffix = q.toString() ? `?${q.toString()}` : "";
     return postJson<ConnectionSyncNowResponse>(`/api/admin/pms/connections/${id}/sync-now/${suffix}`);
   },
