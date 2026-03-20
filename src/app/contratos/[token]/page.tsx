@@ -335,25 +335,26 @@ export default function ContratoSignPage() {
             />
           </div>
 
-          <label className="flex items-start gap-3 cursor-pointer group">
-            <div className="mt-0.5 shrink-0">
-              <input type="checkbox" className="hidden" checked={accepted} onChange={e => setAccepted(e.target.checked)} />
-              <div
-                role="checkbox"
-                aria-checked={accepted}
-                onClick={() => setAccepted(!accepted)}
-                className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition ${
-                  accepted ? "bg-[#5e2cec] border-[#5e2cec]" : "bg-transparent border-white/25 group-hover:border-white/45"
-                }`}
-              >
-                {accepted && <Icon icon="solar:check-bold" className="text-white text-xs" />}
-              </div>
-            </div>
-            <p className="text-white/60 text-sm leading-relaxed">
+          <button
+            type="button"
+            onClick={() => setAccepted((v) => !v)}
+            role="checkbox"
+            aria-checked={accepted}
+            className="flex items-start gap-3 w-full text-left cursor-pointer group rounded-xl p-2 -m-2 hover:bg-white/[0.04] border-0 bg-transparent transition"
+          >
+            <span
+              className={`mt-0.5 shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition pointer-events-none ${
+                accepted ? "bg-[#5e2cec] border-[#5e2cec]" : "bg-transparent border-white/35 group-hover:border-white/55"
+              }`}
+              aria-hidden
+            >
+              {accepted && <Icon icon="solar:check-bold" className="text-white text-xs" />}
+            </span>
+            <span className="text-white/60 text-sm leading-relaxed pointer-events-none">
               He leído íntegramente el contrato, entiendo sus términos y condiciones y acepto firmarlo digitalmente en
               representación de <strong className="text-white/85">{contract.operatorName}</strong>.
-            </p>
-          </label>
+            </span>
+          </button>
 
           {signError && (
             <div className="rounded-xl bg-red-500/15 border border-red-400/25 px-4 py-3 flex items-center gap-2">
