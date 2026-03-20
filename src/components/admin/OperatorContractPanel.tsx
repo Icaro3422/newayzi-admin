@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
+import { addToast } from "@heroui/react";
 import { operatorContracts, type ContractStatus, type OperatorContract } from "@/lib/admin-api";
 
 // ── Status meta ────────────────────────────────────────────────────────────
@@ -273,41 +274,63 @@ function ContractCard({
   onEdit: (c: OperatorContract) => void;
 }) {
   const [showSignModal, setShowSignModal] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [activateLoading, setActivateLoading] = useState(false);
   const [error, setError] = useState("");
 
   const fmtDate = (d: string | null) =>
     d ? new Date(d).toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" }) : "—";
 
   async function handleActivate() {
-    setActionLoading(true);
+    setActivateLoading(true);
     setError("");
     try {
       const updated = await operatorContracts.activate(operatorId, contract.id);
       onUpdated(updated);
+      addToast({
+        title: "Contrato activado",
+        description: `${updated.contractNumber} quedó activo para este operador.`,
+        color: "success",
+      });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Error al activar.");
+      const msg = e instanceof Error ? e.message : "Error al activar.";
+      setError(msg);
+      addToast({ title: "No se pudo activar", description: msg, color: "danger" });
     } finally {
-      setActionLoading(false);
+      setActivateLoading(false);
     }
   }
 
   async function handleResend() {
-    setActionLoading(true);
+    setResendLoading(true);
     setError("");
     try {
       const updated = await operatorContracts.resendLink(operatorId, contract.id);
       onUpdated(updated);
       if (updated.signEmailSent === false) {
-        setError(
+        const desc =
           updated.signEmailWarning ??
-            "El token se renovó pero el correo no se envió. Revisa RESEND_API_KEY y el email del operador.",
-        );
+          "El token se renovó pero el correo no se envió. Revisa RESEND_API_KEY y el email del operador.";
+        setError(desc);
+        addToast({
+          title: "Link renovado; correo no enviado",
+          description: desc,
+          color: "warning",
+        });
+      } else {
+        setError("");
+        addToast({
+          title: "Link de firma reenviado",
+          description: `Se envió un nuevo enlace al operador para ${updated.contractNumber}.`,
+          color: "success",
+        });
       }
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Error al reenviar.");
+      const msg = e instanceof Error ? e.message : "Error al reenviar el link.";
+      setError(msg);
+      addToast({ title: "Error al reenviar", description: msg, color: "danger" });
     } finally {
-      setActionLoading(false);
+      setResendLoading(false);
     }
   }
 
@@ -369,17 +392,30 @@ function ContractCard({
         )}
 
         {/* PDF */}
-        {contract.documentPdfUrl && (
-          <a
-            href={contract.documentPdfUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 text-[#9b74ff] text-sm hover:text-white transition mb-4"
-          >
-            <Icon icon="solar:document-bold-duotone" className="text-base" />
-            Ver documento PDF
-          </a>
-        )}
+        <div className="flex flex-col gap-2 mb-4">
+          {contract.documentPdfUrl && (
+            <a
+              href={contract.documentPdfUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 text-[#9b74ff] text-sm hover:text-white transition w-fit"
+            >
+              <Icon icon="solar:document-bold-duotone" className="text-base" />
+              Ver documento PDF (original)
+            </a>
+          )}
+          {contract.signedDocumentPdfUrl && (
+            <a
+              href={contract.signedDocumentPdfUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 text-emerald-400/90 text-sm hover:text-emerald-300 transition w-fit font-semibold"
+            >
+              <Icon icon="solar:document-download-bold-duotone" className="text-base" />
+              Descargar PDF firmado (con anexo)
+            </a>
+          )}
+        </div>
 
         {/* Error */}
         {error && (
@@ -411,22 +447,32 @@ function ContractCard({
           )}
           {contract.status === "sent_to_operator" && (
             <button
+              type="button"
               onClick={handleResend}
-              disabled={actionLoading}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-amber-400/25 text-amber-300 hover:bg-amber-500/10 transition flex items-center gap-1.5 disabled:opacity-50"
+              disabled={resendLoading}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-amber-400/25 text-amber-300 hover:bg-amber-500/10 transition flex items-center gap-1.5 disabled:opacity-60 min-w-[10rem] justify-center"
             >
-              {actionLoading ? <Icon icon="solar:loading-line-duotone" className="animate-spin" /> : <Icon icon="solar:send-twice-bold-duotone" className="text-sm" />}
-              Reenviar link de firma
+              {resendLoading ? (
+                <Icon icon="solar:loading-line-duotone" className="animate-spin text-base shrink-0" />
+              ) : (
+                <Icon icon="solar:send-twice-bold-duotone" className="text-sm shrink-0" />
+              )}
+              {resendLoading ? "Reenviando…" : "Reenviar link de firma"}
             </button>
           )}
           {contract.status === "signed" && (
             <button
+              type="button"
               onClick={handleActivate}
-              disabled={actionLoading}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600/80 text-white hover:bg-emerald-500 transition flex items-center gap-1.5 disabled:opacity-50"
+              disabled={activateLoading}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600/80 text-white hover:bg-emerald-500 transition flex items-center gap-1.5 disabled:opacity-60 min-w-[10rem] justify-center"
             >
-              {actionLoading ? <Icon icon="solar:loading-line-duotone" className="animate-spin" /> : <Icon icon="solar:check-circle-bold-duotone" className="text-sm" />}
-              Activar contrato
+              {activateLoading ? (
+                <Icon icon="solar:loading-line-duotone" className="animate-spin text-base shrink-0" />
+              ) : (
+                <Icon icon="solar:check-circle-bold-duotone" className="text-sm shrink-0" />
+              )}
+              {activateLoading ? "Activando…" : "Activar contrato"}
             </button>
           )}
         </div>

@@ -1880,6 +1880,8 @@ export interface OperatorContract {
   validFrom: string | null;
   validUntil: string | null;
   documentPdfUrl: string | null;
+  /** PDF original + anexo con firma del operador (tras firmar) */
+  signedDocumentPdfUrl?: string | null;
   signedByNewayziName: string;
   signedByNewayziAt: string | null;
   signedByOperatorName: string;
