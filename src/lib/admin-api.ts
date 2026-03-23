@@ -343,6 +343,7 @@ export interface PMSSyncRunStatus {
   /** Opciones de la corrida (p. ej. skip_properties cuando no hay pendientes). */
   params?: {
     skip_properties?: boolean;
+    pricing_only?: boolean;
     only_images?: boolean;
     scope_pms_property_id?: string | null;
     scope_pms_room_type_id?: string | null;
@@ -906,6 +907,10 @@ export const adminApi = {
     opts?: {
       cancelPrevious?: boolean;
       skipProperties?: boolean;
+      /** Forzar sincronización completa (fase propiedades + redescubrir alojamientos). */
+      forceFullSync?: boolean;
+      /** Solo tarifas y disponibilidad (sin fase catálogo: propiedades + tipos de habitación). */
+      pricingOnly?: boolean;
       onlyImages?: boolean;
       throttleSeconds?: number;
       scopePmsPropertyId?: string | null;
@@ -915,6 +920,8 @@ export const adminApi = {
     const q = new URLSearchParams();
     if (opts?.cancelPrevious) q.set("cancel_previous", "1");
     if (opts?.skipProperties) q.set("skip_properties", "1");
+    if (opts?.forceFullSync) q.set("force_full_sync", "1");
+    if (opts?.pricingOnly) q.set("pricing_only", "1");
     if (opts?.onlyImages) q.set("only_images", "1");
     if (opts?.throttleSeconds != null && opts.throttleSeconds > 0) {
       q.set("throttle_seconds", String(opts.throttleSeconds));
