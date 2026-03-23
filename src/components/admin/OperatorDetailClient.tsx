@@ -244,7 +244,7 @@ export function OperatorDetailClient() {
               </p>
             </div>
           </div>
-          <OperatorContractPanel operatorId={id} readOnly={!canEdit} />
+          <OperatorContractPanel operatorId={id} operatorName={name} readOnly={!canEdit} />
         </div>
       )}
     </div>

@@ -148,6 +148,9 @@ export function ConnectionDetailClient() {
   const [runDetailUsingWebSocket, setRunDetailUsingWebSocket] = useState(false);
   const [syncOnlyImages, setSyncOnlyImages] = useState(false);
   const [syncThrottleSeconds, setSyncThrottleSeconds] = useState(0);
+  const [syncForceFullSync, setSyncForceFullSync] = useState(false);
+  /** Tras mapear catálogo: solo tarifas (Stays: rates) + disponibilidad, sin re-descargar propiedades/alojamientos. */
+  const [syncPricingOnly, setSyncPricingOnly] = useState(false);
 
   useEffect(() => {
     if (Number.isNaN(id) || id <= 0) { setLoading(false); return; }
@@ -458,10 +461,15 @@ export function ConnectionDetailClient() {
     setSyncProgressModalOpen(true);
     resetSyncRealtimeState();
     try {
-      const skipProperties = !scope && (unitsSummary?.counts?.properties_pending ?? 0) === 0;
+      const pricingOnly = syncPricingOnly && !syncOnlyImages;
+      const skipProperties =
+        pricingOnly ||
+        (!syncForceFullSync && !scope && (unitsSummary?.counts?.properties_pending ?? 0) === 0);
       const started = await adminApi.startSyncRun(id, {
         cancelPrevious,
         skipProperties,
+        forceFullSync: syncForceFullSync && !pricingOnly,
+        pricingOnly,
         onlyImages: syncOnlyImages,
         throttleSeconds: syncThrottleSeconds > 0 ? syncThrottleSeconds : undefined,
         scopePmsPropertyId: scope?.pmsPropertyId ?? undefined,
@@ -873,6 +881,33 @@ export function ConnectionDetailClient() {
                           />
                           <span className="text-sm text-white/70">Solo imágenes</span>
                         </label>
+                        <label
+                          className="flex cursor-pointer items-center gap-2"
+                          title="Omite propiedades y tipos de habitación; solo sincroniza tarifas (Stays: API calendario + calculate-price si aplica) y disponibilidad. Usar cuando el catálogo ya está mapeado."
+                        >
+                          <input
+                            type="checkbox"
+                            checked={syncPricingOnly}
+                            disabled={syncOnlyImages}
+                            onChange={(e) => {
+                              const v = e.target.checked;
+                              setSyncPricingOnly(v);
+                              if (v) setSyncForceFullSync(false);
+                            }}
+                            className="rounded border-white/30 bg-white/10 text-[#5e2cec] focus:ring-[#5e2cec] disabled:opacity-40"
+                          />
+                          <span className="text-sm text-white/70">Solo precios y disponibilidad</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2" title="Ejecuta fase de propiedades y redescubre todos los alojamientos del PMS (p. ej. para Stays cuando faltan mapeos).">
+                          <input
+                            type="checkbox"
+                            checked={syncForceFullSync}
+                            disabled={syncPricingOnly || syncOnlyImages}
+                            onChange={(e) => setSyncForceFullSync(e.target.checked)}
+                            className="rounded border-white/30 bg-white/10 text-[#5e2cec] focus:ring-[#5e2cec] disabled:opacity-40"
+                          />
+                          <span className="text-sm text-white/70">Redescubrir propiedades y alojamientos</span>
+                        </label>
                         <label className="flex items-center gap-2">
                           <span className="text-sm text-white/50 shrink-0">Pausa (s)</span>
                           <Input
@@ -1272,7 +1307,17 @@ export function ConnectionDetailClient() {
                             </p>
                           </div>
                         </div>
+                        {Boolean(selectedRun.params?.pricing_only) && (
+                          <div className="rounded-xl border border-[#5e2cec]/30 bg-[#5e2cec]/10 p-3 text-white/80 text-sm">
+                            <p className="font-medium text-white/95">Modo solo precios y disponibilidad</p>
+                            <p className="mt-1 text-[0.8rem] text-white/65">
+                              No se volvieron a sincronizar propiedades ni tipos de habitación; solo tarifas (p. ej. Stays:
+                              calendario y fallback calculate-price) y disponibilidad según la conexión.
+                            </p>
+                          </div>
+                        )}
                         {Boolean(selectedRun.params?.skip_properties) &&
+                          !selectedRun.params?.pricing_only &&
                           (selectedRun.summary.properties_synced ?? 0) === 0 && (
                             <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-3 text-white/70 text-sm">
                               <p className="font-medium text-white/90">Fase de propiedades omitida</p>
