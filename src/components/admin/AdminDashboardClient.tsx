@@ -1,13 +1,49 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { useAdmin } from "@/contexts/AdminContext";
 import { adminApi, ROLE_META } from "@/lib/admin-api";
-import type { PMSConnectionListItem, PropertyListItem, Agency, OperatorRewardsData } from "@/lib/admin-api";
+import type {
+  AdminDashboardStats,
+  Agency,
+  OperatorRewardsData,
+  PMSConnectionListItem,
+  PropertyListItem,
+} from "@/lib/admin-api";
 import { rewardsAgreementsApi } from "@/lib/admin-api";
+import {
+  PARTNER_TIERS,
+  tierKeyFromRewardsLabel,
+  tierIndex,
+  type PartnerTierKey,
+} from "@/lib/operator-partner-program";
 import { RewardPoolStatus } from "./RewardPoolStatus";
+
+const OperatorInfrastructureCharts = dynamic(
+  () => import("./OperatorInfrastructureCharts").then((m) => m.OperatorInfrastructureCharts),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="h-[248px] rounded-2xl bg-white/[0.04] animate-pulse" />
+          <div className="h-[248px] rounded-2xl bg-white/[0.04] animate-pulse" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="h-[280px] rounded-2xl bg-white/[0.04] animate-pulse" />
+          <div className="h-[280px] rounded-2xl bg-white/[0.04] animate-pulse" />
+        </div>
+        <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-4">
+          <div className="h-[240px] rounded-2xl bg-white/[0.04] animate-pulse" />
+          <div className="h-[240px] rounded-2xl bg-white/[0.04] animate-pulse" />
+        </div>
+      </div>
+    ),
+  }
+);
 
 /* ─── Primitivos de UI (estilo imagen) ───────────────── */
 function GlassCard({ children, className = "", style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
@@ -57,15 +93,6 @@ function StatChip({ label, value, icon, loading }: { label: string; value?: numb
   );
 }
 
-function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? (value / max) * 100 : 0;
-  return (
-    <div className="w-5 h-20 rounded-full bg-white/[0.07] overflow-hidden flex flex-col justify-end">
-      <div className="rounded-full transition-all duration-700" style={{ height: `${pct}%`, background: color }} />
-    </div>
-  );
-}
-
 function QuickLink({ href, icon, label, count }: { href: string; icon: string; label: string; count?: number | null }) {
   return (
     <Link
@@ -106,11 +133,7 @@ export function AdminDashboardClient() {
   const [operators, setOperators] = useState<{ results: { id: number }[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [operatorRewards, setOperatorRewards] = useState<OperatorRewardsData | null>(null);
-  const [dashboardStats, setDashboardStats] = useState<{
-    average_price_synced: number | null;
-    currency: string;
-    properties_count: number;
-  } | null>(null);
+  const [dashboardStats, setDashboardStats] = useState<AdminDashboardStats | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -160,7 +183,6 @@ export function AdminDashboardClient() {
   const activeProps = properties.filter((p) => p.is_active).length;
   const publishedProps = properties.filter((p) => p.is_published).length;
   const operatorsCount = operators?.results?.length ?? 0;
-  const maxBar = Math.max(properties.length, connections.length, totalSynced, totalPending, 1);
 
   const loyalty = me?.loyalty;
   const displayName = me?.profile?.full_name || me?.profile?.email || "Admin";
@@ -308,59 +330,15 @@ export function AdminDashboardClient() {
             )}
           </div>
         </div>
-
-        {/* Stats en grid — filtradas por rol */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5 pt-4 border-t border-white/[0.08]">
-          {[
-            canAccess("properties") && { label: role === "operador" ? "Mis propiedades" : "Propiedades", value: properties.length, icon: "solar:buildings-2-bold-duotone", format: "number" },
-            canAccess("connections") && { label: role === "operador" ? "Mis conexiones" : "Conexiones", value: connections.length, icon: "solar:link-circle-bold-duotone", format: "number" },
-            canAccess("connections") && { label: "Sincronizadas", value: totalSynced, icon: "solar:check-circle-bold-duotone", format: "number" },
-            canAccess("connections") && totalPending > 0 && { label: "Pendientes", value: totalPending, icon: "solar:clock-circle-bold-duotone", format: "number" },
-            canAccess("connections") && totalSynced > 0 && {
-              label: "Precio promedio",
-              value: dashboardStats?.average_price_synced ?? null,
-              icon: "solar:tag-price-bold-duotone",
-              format: "currency",
-              currency: dashboardStats?.currency || "COP",
-            },
-            canAccess("operators") && { label: "Operadores", value: operatorsCount, icon: "solar:users-group-rounded-bold-duotone", format: "number" },
-            canAccess("agents") && { label: "Agencias", value: agencies.length, icon: "solar:bag-4-bold-duotone", format: "number" },
-          ]
-            .filter(Boolean)
-            .map((s: any) => (
-              <div
-                key={s.label}
-                className="flex flex-col gap-1.5 rounded-2xl bg-white/[0.04] border border-white/[0.06] px-4 py-3 min-w-0"
-              >
-                <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.1em] font-semibold truncate">{s.label}</p>
-                <div className="flex items-center gap-2">
-                  <Icon icon={s.icon} className="text-[#7c4cff] text-base shrink-0" />
-                  <p className="font-sora font-black text-white text-xl sm:text-2xl leading-none">
-                    {loading || (s.format === "currency" && !dashboardStats) ? (
-                      <span className="inline-block w-10 h-6 rounded-md bg-white/10 animate-pulse" />
-                    ) : s.format === "currency" && s.value != null ? (
-                      `${s.currency === "COP" ? "$" : s.currency + " "}${Number(s.value).toLocaleString("es-CO", { maximumFractionDigits: 0 })}`
-                    ) : s.format === "currency" ? (
-                      "—"
-                    ) : s.value != null ? (
-                      s.value.toLocaleString()
-                    ) : (
-                      <span className="inline-block w-10 h-6 rounded-md bg-white/10 animate-pulse" />
-                    )}
-                  </p>
-                </div>
-              </div>
-            ))}
-        </div>
       </GlassCard>
 
       {/* ── Reward Pool (solo super_admin) ── */}
       {role === "super_admin" && <RewardPoolStatus />}
 
-      {/* ── Fila 2: Infraestructura + Rewards ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
-        {/* Card Infraestructura (estilo imagen) */}
-        <GlassCard className="flex flex-col p-6 gap-6">
+      {/* ── Analíticas a ancho completo; Partner/Rewards + accesos en fila inferior ── */}
+      <div className="space-y-4 lg:space-y-5">
+        {/* Fila 1: Infraestructura / gráficas — 100% ancho */}
+        <GlassCard className="flex w-full flex-col p-6 gap-6">
           <div className="flex items-start justify-between gap-4 min-w-0">
             <div className="min-w-0 flex-1">
               <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Infraestructura</p>
@@ -373,29 +351,55 @@ export function AdminDashboardClient() {
             </div>
           </div>
 
-          {/* Barras en grid 2x3 para evitar solapamiento */}
-          <div className="grid grid-cols-3 gap-x-6 gap-y-6 min-w-0">
+          {/* Gráficas (Apache ECharts) — resumen, cartera y por conexión */}
+          <div className="min-w-0">
             {loading ? (
-              <div className="col-span-3 h-28 rounded-2xl bg-white/[0.04] animate-pulse" />
-            ) : (
-              [
-                { label: "Props.", val: properties.length, color: "linear-gradient(to top, #5e2cec, #9b74ff)" },
-                { label: "Activas", val: activeProps, color: "linear-gradient(to top, #422df6, #7c6bff)" },
-                { label: "Public.", val: publishedProps, color: "linear-gradient(to top, #10b981, #6ee7b7)" },
-                { label: "Conex.", val: connections.length, color: "linear-gradient(to top, #8b5cf6, #c4b5fd)" },
-                { label: "Sync.", val: totalSynced, color: "linear-gradient(to top, #06b6d4, #67e8f9)" },
-                { label: "Pend.", val: totalPending, color: "linear-gradient(to top, #f59e0b, #fcd34d)" },
-              ].map((b) => (
-                <div key={b.label} className="flex flex-col items-center gap-2 min-w-0">
-                  <div className="w-full flex justify-center">
-                    <MiniBar value={b.val} max={maxBar} color={b.color} />
-                  </div>
-                  <p className="text-white/40 text-[0.65rem] text-center leading-tight truncate w-full">
-                    {b.label}
-                  </p>
-                  <p className="font-sora font-bold text-white text-[0.875rem] leading-none">{b.val}</p>
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div className="h-[248px] rounded-2xl bg-white/[0.04] animate-pulse" />
+                  <div className="h-[248px] rounded-2xl bg-white/[0.04] animate-pulse" />
                 </div>
-              ))
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div className="h-[280px] rounded-2xl bg-white/[0.04] animate-pulse" />
+                  <div className="h-[280px] rounded-2xl bg-white/[0.04] animate-pulse" />
+                </div>
+                <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-4">
+                  <div className="h-[240px] rounded-2xl bg-white/[0.04] animate-pulse" />
+                  <div className="h-[240px] rounded-2xl bg-white/[0.04] animate-pulse" />
+                </div>
+              </div>
+            ) : (
+              <OperatorInfrastructureCharts
+                properties={properties}
+                activeProps={activeProps}
+                publishedProps={publishedProps}
+                connections={connections}
+                totalSynced={totalSynced}
+                totalPending={totalPending}
+                agenciesCount={agencies.length}
+                showAgenciesBar={canAccess("agents")}
+                operatorsCount={operatorsCount}
+                showOperatorsBar={canAccess("operators")}
+                averagePriceSynced={dashboardStats?.average_price_synced ?? null}
+                currency={dashboardStats?.currency ?? "COP"}
+                showPriceChart={
+                  dashboardStats != null &&
+                  dashboardStats.average_price_synced != null &&
+                  (role === "super_admin"
+                    ? (dashboardStats.properties_count ?? 0) > 0
+                    : canAccess("connections") && totalSynced > 0)
+                }
+                superAdminPriceSection={
+                  role === "super_admin"
+                    ? {
+                        loading,
+                        details: dashboardStats?.price_details ?? null,
+                        currency: dashboardStats?.currency ?? "COP",
+                        globalAverage: dashboardStats?.average_price_synced ?? null,
+                      }
+                    : null
+                }
+              />
             )}
           </div>
 
@@ -440,111 +444,130 @@ export function AdminDashboardClient() {
           </div>
         </GlassCard>
 
-        {/* Card: Programa de Socios (operador), Newayzi Rewards (agente/visualizador con loyalty), o nada (comercial/super_admin) */}
+        {/* Fila 2: Programa de Socios / Rewards + Accesos rápidos */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-5">
+        {/* Card: Programa de Socios (operador), Newayzi Rewards (agente), o nada (comercial/super_admin) */}
         {role === "operador" ? (() => {
           const ag = operatorRewards?.activeAgreement ?? null;
           const stats = operatorRewards?.stats;
 
-          // Tiers del programa de socios
-          const TIERS = [
-            {
-              key: "partner",
-              name: "Partner",
-              badge: "Socio base",
-              icon: "solar:medal-ribbons-star-bold-duotone",
-              accent: "rgba(180,180,200,0.9)",
-              accentBg: "rgba(160,160,180,0.12)",
-              benefits: ["Cashback básico a huéspedes", "Visibilidad estándar en búsquedas"],
-            },
-            {
-              key: "premium_partner",
-              name: "Premium Partner",
-              badge: "Socio preferente",
-              icon: "solar:crown-bold-duotone",
-              accent: "#9b74ff",
-              accentBg: "rgba(155,116,255,0.15)",
-              benefits: ["Mayor % cashback a huéspedes", "Visibilidad destacada", "Posicionamiento preferente"],
-            },
-            {
-              key: "elite_partner",
-              name: "Elite Partner",
-              badge: "Socio estratégico",
-              icon: "solar:star-bold-duotone",
-              accent: "#fbbf24",
-              accentBg: "rgba(251,191,36,0.12)",
-              benefits: ["Máximo cashback a huéspedes", "Visibilidad premium", "Soporte dedicado Newayzi"],
-            },
-          ];
+          const activeTierKey: PartnerTierKey | null = ag ? tierKeyFromRewardsLabel(ag.rewardsLabel) : null;
+          const activeTier = activeTierKey ? PARTNER_TIERS.find((t) => t.key === activeTierKey) ?? null : null;
+          const idxActive = tierIndex(activeTierKey);
 
-          // Detectar el tier activo por nombre
-          const activeTierKey = ag
-            ? TIERS.find(t =>
-                ag.rewardsLabelDisplay?.toLowerCase().includes(t.name.toLowerCase().split(" ")[0])
-              )?.key ?? null
-            : null;
-          const activeTier = TIERS.find(t => t.key === activeTierKey) ?? null;
+          const nextTier =
+            activeTierKey && activeTierKey !== "elite_partner"
+              ? PARTNER_TIERS[tierIndex(activeTierKey) + 1] ?? null
+              : null;
 
           return (
             <AccentCard className="flex flex-col">
               {/* Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Programa de Socios</p>
-                  <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">
+                      Programa de Socios
+                    </p>
+                    {ag ? (
+                      <span className="text-[0.58rem] font-bold uppercase tracking-wide text-emerald-300 bg-emerald-500/20 border border-emerald-400/25 rounded-full px-2 py-0.5">
+                        Acuerdo activo
+                      </span>
+                    ) : (
+                      <span className="text-[0.58rem] font-bold uppercase tracking-wide text-amber-200/90 bg-amber-500/15 border border-amber-400/20 rounded-full px-2 py-0.5">
+                        Sin acuerdo
+                      </span>
+                    )}
+                  </div>
+                  <p className="font-sora font-bold text-white text-lg leading-tight">
                     {ag ? ag.rewardsLabelDisplay : "Sin nivel activo"}
                   </p>
+                  <p className="text-white/50 text-[0.72rem] mt-1 leading-snug">
+                    {ag
+                      ? activeTier
+                        ? activeTier.benefits[0]
+                        : "Tu propiedad participa en Newayzi Rewards con los beneficios del acuerdo firmado."
+                      : "Activa un nivel para que tus huéspedes reciban cashback en sus reservas y ganes visibilidad en el marketplace."}
+                  </p>
                 </div>
-                <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                <div
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border border-white/20 shadow-lg"
+                  style={{
+                    background: activeTier
+                      ? `linear-gradient(145deg, ${activeTier.accentBg}, rgba(255,255,255,0.08))`
+                      : "rgba(255,255,255,0.12)",
+                  }}
+                >
                   <Icon
-                    icon={activeTier?.icon ?? "solar:handshake-bold-duotone"}
-                    className="text-base"
-                    style={{ color: activeTier?.accent ?? "#fbbf24" }}
+                    icon={activeTier?.icon ?? "mdi:handshake"}
+                    className="text-[1.65rem]"
+                    style={{ color: activeTier?.accent ?? "rgba(255,255,255,0.85)" }}
                   />
                 </div>
               </div>
 
-              {/* Barra de progresión de tiers */}
-              <div className="flex items-center gap-1 mb-4">
-                {TIERS.map((tier, idx) => {
+              {/* Línea de niveles (Partner — Premium — Elite) */}
+              <div className="flex items-center w-full mb-5 px-0.5">
+                {PARTNER_TIERS.map((tier, idx) => {
                   const isActive = tier.key === activeTierKey;
-                  const isPast = activeTierKey
-                    ? TIERS.findIndex(t => t.key === activeTierKey) > idx
-                    : false;
+                  const isReached = idxActive >= 0 && idx <= idxActive;
+                  const dim = !ag && !isReached;
+                  const segmentFilled = ag && idxActive >= idx;
                   return (
-                    <div key={tier.key} className="flex items-center flex-1 gap-1">
-                      <div
-                        className="flex-1 rounded-full transition-all duration-500"
-                        style={{
-                          height: isActive ? "6px" : "3px",
-                          background: isActive
-                            ? tier.accent
-                            : isPast
-                              ? "rgba(155,116,255,0.5)"
-                              : "rgba(255,255,255,0.12)",
-                        }}
-                      />
-                      <div
-                        className="flex flex-col items-center shrink-0"
-                        style={{ minWidth: 0 }}
-                      >
+                    <div key={tier.key} className="contents">
+                      {idx > 0 && (
+                        <div className="flex-1 h-1 min-w-[6px] self-start mt-[22px] rounded-full bg-white/10 overflow-hidden shrink">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-violet-400 to-fuchsia-500 transition-all duration-500"
+                            style={{ width: segmentFilled ? "100%" : "0%" }}
+                          />
+                        </div>
+                      )}
+                      <div className="flex flex-col items-center w-[30%] max-w-[104px] min-w-[76px] shrink-0">
                         <div
-                          className="w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300"
+                          className={`w-11 h-11 rounded-2xl flex items-center justify-center border-2 transition-all duration-300 ${
+                            isActive ? "scale-105 shadow-lg" : ""
+                          }`}
                           style={{
-                            background: isActive ? tier.accent : isPast ? "rgba(155,116,255,0.4)" : "rgba(255,255,255,0.1)",
-                            boxShadow: isActive ? `0 0 10px ${tier.accent}80` : "none",
+                            borderColor: isActive
+                              ? tier.accent
+                              : isReached
+                                ? "rgba(167,139,250,0.55)"
+                                : tier.ringInactive,
+                            background: isActive
+                              ? `linear-gradient(160deg, ${tier.accent}35, rgba(0,0,0,0.15))`
+                              : isReached
+                                ? "rgba(139,92,246,0.2)"
+                                : "rgba(255,255,255,0.06)",
+                            boxShadow: isActive ? `0 0 20px ${String(tier.accent)}40` : undefined,
                           }}
                         >
                           <Icon
                             icon={tier.icon}
-                            className="text-[0.55rem]"
-                            style={{ color: isActive ? "#fff" : isPast ? "#fff" : "rgba(255,255,255,0.3)" }}
+                            width={26}
+                            height={26}
+                            style={{
+                              color: isActive
+                                ? tier.accent
+                                : isReached
+                                  ? "#e9d5ff"
+                                  : dim
+                                    ? "rgba(255,255,255,0.28)"
+                                    : "rgba(255,255,255,0.45)",
+                              opacity: dim ? 0.75 : 1,
+                            }}
                           />
                         </div>
                         <p
-                          className="text-[0.52rem] font-semibold mt-0.5 whitespace-nowrap"
-                          style={{ color: isActive ? tier.accent : "rgba(255,255,255,0.3)" }}
+                          className={`text-[0.62rem] font-bold mt-2 text-center leading-tight px-0.5 ${
+                            isActive ? "" : "text-white/40"
+                          }`}
+                          style={isActive ? { color: tier.accent } : undefined}
                         >
-                          {tier.name.split(" ")[0]}
+                          {tier.shortName}
+                        </p>
+                        <p className="text-[0.52rem] text-white/35 text-center leading-tight mt-0.5 hidden sm:block px-0.5">
+                          {tier.badge}
                         </p>
                       </div>
                     </div>
@@ -555,6 +578,28 @@ export function AdminDashboardClient() {
               {ag ? (
                 /* ── CON ACUERDO ACTIVO ── */
                 <>
+                  {nextTier && (
+                    <div className="rounded-xl bg-white/[0.08] border border-white/[0.12] px-3.5 py-2.5 mb-3 flex items-start gap-2">
+                      <Icon icon="mdi:stairs-up" className="text-violet-300 text-lg shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="text-white/75 text-[0.72rem] font-semibold">Próximo escalón</p>
+                        <p className="text-white/50 text-[0.68rem] leading-snug mt-0.5">
+                          <span className="text-white/80">{nextTier.name}</span> — {nextTier.benefits[0].toLowerCase()}{" "}
+                          Habla con Newayzi para evaluar un upgrade cuando tu operación lo permita.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTierKey === "elite_partner" && (
+                    <div className="rounded-xl bg-amber-500/10 border border-amber-400/20 px-3.5 py-2.5 mb-3 flex items-center gap-2">
+                      <Icon icon="mdi:star-four-points" className="text-amber-300 text-lg shrink-0" />
+                      <p className="text-amber-100/90 text-[0.72rem] leading-snug">
+                        Estás en el nivel máximo del programa. Gracias por ser socio estratégico Newayzi.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Métricas principales */}
                   <div className="rounded-2xl bg-white/[0.10] border border-white/[0.15] px-4 py-3.5 mb-3">
                     <div className="grid grid-cols-2 gap-3">
@@ -592,7 +637,7 @@ export function AdminDashboardClient() {
                   </div>
 
                   {/* Estado y vigencia */}
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
                       <p className="text-white/45 text-[0.62rem]">
@@ -603,7 +648,7 @@ export function AdminDashboardClient() {
                       </p>
                     </div>
                     {ag.autoRenew && (
-                      <span className="text-[0.58rem] text-violet-300 bg-violet-500/15 rounded-full px-2 py-0.5 border border-violet-400/20">
+                      <span className="text-[0.58rem] text-violet-300 bg-violet-500/15 rounded-full px-2 py-0.5 border border-violet-400/20 w-fit">
                         Auto-renueva
                       </span>
                     )}
@@ -612,32 +657,59 @@ export function AdminDashboardClient() {
               ) : (
                 /* ── SIN ACUERDO ACTIVO ── */
                 <>
-                  <div className="rounded-xl bg-white/[0.07] border border-white/[0.1] px-3.5 py-3 mb-3 flex items-start gap-2.5">
-                    <Icon icon="solar:info-circle-bold-duotone" className="text-amber-400 text-base shrink-0 mt-0.5" />
-                    <p className="text-white/65 text-[0.75rem] leading-relaxed">
-                      Aún no tienes un acuerdo de socio activo. Contacta al equipo Newayzi para activar tu nivel y ofrecer cashback a tus huéspedes.
-                    </p>
+                  <div className="rounded-xl bg-amber-500/[0.12] border border-amber-400/25 px-3.5 py-3 mb-3">
+                    <div className="flex items-start gap-2.5">
+                      <Icon icon="mdi:lightbulb-on-outline" className="text-amber-300 text-xl shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-white/90 text-[0.78rem] font-semibold leading-tight">¿Cómo activarlo?</p>
+                        <p className="text-white/60 text-[0.72rem] leading-relaxed mt-1">
+                          Escríbenos desde tu canal habitual con Newayzi. Firmarás un acuerdo de socio, configuramos tu
+                          porcentaje de cashback y tus huéspedes empezarán a ver recompensas en el checkout.
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Beneficios por tier */}
-                  <div className="space-y-2">
-                    {TIERS.map((tier) => (
+                  <p className="text-white/40 text-[0.62rem] uppercase tracking-[0.12em] font-semibold mb-2">
+                    Comparativa de niveles
+                  </p>
+                  <div className="space-y-2.5">
+                    {PARTNER_TIERS.map((tier) => (
                       <div
                         key={tier.key}
-                        className="rounded-xl px-3.5 py-2.5 border flex items-center gap-3"
-                        style={{ background: tier.accentBg, borderColor: `${tier.accent}25` }}
+                        className="rounded-2xl px-3.5 py-3 border flex gap-3 items-start"
+                        style={{
+                          background: tier.accentBg,
+                          borderColor: `${tier.accent}30`,
+                        }}
                       >
-                        <Icon icon={tier.icon} className="text-lg shrink-0" style={{ color: tier.accent }} />
+                        <div
+                          className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border border-white/10"
+                          style={{ background: "rgba(0,0,0,0.2)" }}
+                        >
+                          <Icon icon={tier.icon} width={28} height={28} style={{ color: tier.accent }} />
+                        </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <p className="font-sora font-bold text-white text-[0.78rem] leading-none">{tier.name}</p>
-                            <span className="text-[0.55rem] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: `${tier.accent}25`, color: tier.accent }}>
+                          <div className="flex flex-wrap items-center gap-1.5 gap-y-1">
+                            <p className="font-sora font-bold text-white text-[0.85rem] leading-none">{tier.name}</p>
+                            <span
+                              className="text-[0.55rem] font-bold px-2 py-0.5 rounded-full"
+                              style={{ background: `${tier.accent}28`, color: tier.accent }}
+                            >
                               {tier.badge}
                             </span>
                           </div>
-                          <p className="text-white/45 text-[0.65rem] mt-0.5 truncate">
-                            {tier.benefits[0]}
-                          </p>
+                          <ul className="mt-2 space-y-1">
+                            {tier.benefits.map((line) => (
+                              <li
+                                key={line}
+                                className="text-white/55 text-[0.68rem] leading-snug flex gap-1.5 items-start"
+                              >
+                                <Icon icon="mdi:check-circle-outline" className="text-emerald-400/90 text-sm shrink-0 mt-0.5" />
+                                <span>{line}</span>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       </div>
                     ))}
@@ -747,8 +819,17 @@ export function AdminDashboardClient() {
           </AccentCard>
         ) : null}
 
-        {/* Card Accesos rápidos — filtrados por rol */}
-        <GlassCard className="flex flex-col">
+        {/* Card Accesos rápidos — filtrados por rol (ancho completo si no hay tarjeta central) */}
+        <GlassCard
+          className={`flex flex-col ${
+            !(
+              role === "operador" ||
+              (role != null && !["super_admin", "comercial", "visualizador"].includes(role))
+            )
+              ? "md:col-span-2"
+              : ""
+          }`}
+        >
           <div className="flex items-start justify-between gap-4 mb-5 min-w-0">
             <div className="min-w-0 flex-1">
               <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Accesos rápidos</p>
@@ -781,6 +862,7 @@ export function AdminDashboardClient() {
               ))}
           </div>
         </GlassCard>
+        </div>
       </div>
     </div>
   );
