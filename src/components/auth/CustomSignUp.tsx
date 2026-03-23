@@ -233,14 +233,15 @@ export function CustomSignUp() {
     e.preventDefault();
     if (!signUp) return;
 
-    if (!email.trim()) { setError("Por favor ingresa tu correo electrónico."); return; }
+    const emailNorm = email.trim().toLowerCase();
+    if (!emailNorm) { setError("Por favor ingresa tu correo electrónico."); return; }
     if (!password) { setError("Por favor ingresa una contraseña."); return; }
     if (password.length < 8) { setError("La contraseña debe tener al menos 8 caracteres."); return; }
 
     clearMessages();
     setLoading(true);
     try {
-      const result = await signUp.create({ emailAddress: email.trim(), password });
+      const result = await signUp.create({ emailAddress: emailNorm, password });
       if (result.status === "missing_requirements") {
         await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
         setCode("");

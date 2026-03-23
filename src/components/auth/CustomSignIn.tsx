@@ -239,13 +239,14 @@ export function CustomSignIn() {
     e.preventDefault();
     if (!signIn) return;
 
-    if (!email.trim()) { setError("Por favor ingresa tu correo electrónico."); return; }
+    const emailNorm = email.trim().toLowerCase();
+    if (!emailNorm) { setError("Por favor ingresa tu correo electrónico."); return; }
     if (!password) { setError("Por favor ingresa tu contraseña."); return; }
 
     clearMessages();
     setLoading(true);
     try {
-      const result = await signIn.create({ identifier: email.trim(), password });
+      const result = await signIn.create({ identifier: emailNorm, password });
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         router.push("/admin");
@@ -359,12 +360,13 @@ export function CustomSignIn() {
     e.preventDefault();
     if (!signIn) return;
 
-    if (!email.trim()) { setError("Por favor ingresa tu correo electrónico."); return; }
+    const emailNorm = email.trim().toLowerCase();
+    if (!emailNorm) { setError("Por favor ingresa tu correo electrónico."); return; }
 
     clearMessages();
     setLoading(true);
     try {
-      await signIn.create({ strategy: "reset_password_email_code", identifier: email.trim() });
+      await signIn.create({ strategy: "reset_password_email_code", identifier: emailNorm });
       setSuccess("Te enviamos un código de verificación. Revisa tu correo.");
       setResetCode("");
       setNewPassword("");
