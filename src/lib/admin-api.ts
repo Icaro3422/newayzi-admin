@@ -738,6 +738,29 @@ export interface RewardPoolSummary {
   recentMovements: RewardPoolMovement[];
 }
 
+/** Detalle de precios (solo super_admin) — GET /api/admin/dashboard-stats/ */
+export interface AdminDashboardPriceDetails {
+  min: number;
+  max: number;
+  median: number;
+  p25: number;
+  p75: number;
+  histogram: { label: string; min: number; max: number; count: number }[];
+  by_operator: {
+    operator_id: number;
+    name: string;
+    properties_count: number;
+    average_price: number;
+  }[];
+}
+
+export interface AdminDashboardStats {
+  average_price_synced: number | null;
+  currency: string;
+  properties_count: number;
+  price_details?: AdminDashboardPriceDetails | null;
+}
+
 export const adminApi = {
   async getMe(): Promise<AdminMe | null> {
     return getJson<AdminMe>("/api/admin/me/");
@@ -852,11 +875,7 @@ export const adminApi = {
     return getJson<{ results: PMSConnectionListItem[] }>("/api/admin/pms/connections/");
   },
 
-  async getDashboardStats(): Promise<{
-    average_price_synced: number | null;
-    currency: string;
-    properties_count: number;
-  } | null> {
+  async getDashboardStats(): Promise<AdminDashboardStats | null> {
     return getJson("/api/admin/dashboard-stats/");
   },
 

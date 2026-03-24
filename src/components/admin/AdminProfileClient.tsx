@@ -8,6 +8,7 @@ import { useAdmin } from "@/contexts/AdminContext";
 import { rewardsAgreementsApi } from "@/lib/admin-api";
 import { resolveClerkError } from "@/lib/clerk-errors";
 import type { AdminRole, OperatorRewardsData } from "@/lib/admin-api";
+import { PARTNER_TIERS, tierKeyFromRewardsLabel } from "@/lib/operator-partner-program";
 
 const inputDark = "rounded-xl border border-white/[0.12] bg-white/[0.04]";
 const MAX_IMAGE_SIZE_MB = 10;
@@ -840,17 +841,58 @@ export function AdminProfileClient() {
       {isOperator && (
         <AccentCard>
           <div className="flex items-start justify-between gap-4 mb-5">
-            <div>
-              <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Programa de Socios</p>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">
+                  Programa de Socios
+                </p>
+                {operatorRewards?.activeAgreement ? (
+                  <span className="text-[0.58rem] font-bold uppercase tracking-wide text-emerald-300 bg-emerald-500/20 border border-emerald-400/25 rounded-full px-2 py-0.5">
+                    Activo
+                  </span>
+                ) : operatorRewards ? (
+                  <span className="text-[0.58rem] font-bold uppercase tracking-wide text-amber-200/90 bg-amber-500/15 border border-amber-400/20 rounded-full px-2 py-0.5">
+                    Sin acuerdo
+                  </span>
+                ) : null}
+              </div>
               <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
                 {operatorRewards?.activeAgreement
                   ? operatorRewards.activeAgreement.rewardsLabelDisplay
                   : "Tu participación en Newayzi"}
               </p>
+              {operatorRewards?.activeAgreement && (
+                <p className="text-white/45 text-[0.72rem] mt-1 leading-snug">
+                  {(() => {
+                    const k = tierKeyFromRewardsLabel(operatorRewards.activeAgreement.rewardsLabel);
+                    const t = k ? PARTNER_TIERS.find((x) => x.key === k) : null;
+                    return t?.benefits[0] ?? "Beneficios según tu acuerdo de socio.";
+                  })()}
+                </p>
+              )}
             </div>
-            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-              <Icon icon="solar:handshake-bold-duotone" className="text-yellow-300 text-base" />
-            </div>
+            {(() => {
+              const ag = operatorRewards?.activeAgreement;
+              const k = ag ? tierKeyFromRewardsLabel(ag.rewardsLabel) : null;
+              const t = k ? PARTNER_TIERS.find((x) => x.key === k) : null;
+              return (
+                <div
+                  className="w-11 h-11 rounded-2xl border border-white/20 flex items-center justify-center shrink-0"
+                  style={{
+                    background: t
+                      ? `linear-gradient(145deg, ${t.accentBg}, rgba(255,255,255,0.08))`
+                      : "rgba(255,255,255,0.12)",
+                  }}
+                >
+                  <Icon
+                    icon={t?.icon ?? "mdi:handshake"}
+                    width={26}
+                    height={26}
+                    style={{ color: t?.accent ?? "rgba(255,255,255,0.85)" }}
+                  />
+                </div>
+              );
+            })()}
           </div>
 
           {!operatorRewards && (
@@ -860,10 +902,19 @@ export function AdminProfileClient() {
           )}
 
           {operatorRewards && !operatorRewards.activeAgreement && (
-            <div className="rounded-2xl bg-white/[0.08] border border-white/[0.12] px-5 py-6 text-center">
-              <Icon icon="solar:hand-shake-bold-duotone" className="text-white/40 text-3xl mb-3" />
-              <p className="text-white/70 text-sm font-medium">Aún no tienes un acuerdo de socio activo.</p>
-              <p className="text-white/45 text-xs mt-1">Contacta al equipo Newayzi para activar tu nivel y ofrecer cashback a tus huéspedes.</p>
+            <div className="rounded-2xl bg-white/[0.08] border border-white/[0.12] px-5 py-6">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
+                <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0">
+                  <Icon icon="mdi:handshake-outline" width={36} height={36} className="text-white/50" />
+                </div>
+                <div>
+                  <p className="text-white/80 text-sm font-semibold">Sin acuerdo de socio activo</p>
+                  <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
+                    Cuando Newayzi active tu nivel, aquí verás cashback, visibilidad y vigencia del acuerdo. Mientras
+                    tanto, puedes revisar el resumen del programa en tu <span className="text-white/70">Dashboard</span>.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 

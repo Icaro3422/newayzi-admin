@@ -2,10 +2,21 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
 
+/** Next.js 15+: en middleware las redirecciones deben ser URLs absolutas. */
+function absoluteUrl(path: string, req: Request): string {
+  const envBase =
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
+    process.env.ADMIN_APP_URL?.replace(/\/$/, "");
+  if (envBase) {
+    return `${envBase}${path.startsWith("/") ? path : `/${path}`}`;
+  }
+  return new URL(path, req.url).href;
+}
+
 export default clerkMiddleware(async (auth, req) => {
   if (isAdminRoute(req)) {
     await auth.protect({
-      unauthenticatedUrl: "/sign-in",
+      unauthenticatedUrl: absoluteUrl("/sign-in", req),
     });
   }
 });
