@@ -147,6 +147,8 @@ export interface PropertyListItem {
   /** True si la propiedad tiene al menos una conexión PMS (sincronizada desde PMS). */
   from_pms?: boolean;
   rewards_info?: PropertyRewardsInfo | null;
+  /** URL miniatura (primera imagen) para listado admin; opcional en API antigua. */
+  primary_picture_url?: string | null;
 }
 
 export interface PropertyPicture {
