@@ -5,6 +5,17 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
 import { adminBookings, type AdminBookingListItem, type AdminBookingStats } from "@/lib/admin-api";
 
+function formatBookingCurrency(amount: string, currency: string): string {
+  const num = parseFloat(amount);
+  if (Number.isNaN(num)) return amount;
+  return new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: currency || "COP",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(num);
+}
+
 const STATUS_BADGE: Record<string, string> = {
   confirmed:       "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
   pending_payment: "bg-amber-500/15 text-amber-400 border-amber-500/20",
@@ -27,17 +38,6 @@ const PAYMENT_BADGE: Record<string, string> = {
   cancelled:"bg-gray-500/15 text-gray-400 border-gray-500/20",
   no_payment:"bg-gray-500/15 text-gray-400 border-gray-500/20",
 };
-
-function formatCurrency(amount: string, currency: string): string {
-  const num = parseFloat(amount);
-  if (isNaN(num)) return amount;
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: currency || "COP",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(num);
-}
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return "—";
@@ -145,7 +145,7 @@ export function BookingsList() {
             { label: "Este mes", value: stats.this_month_count, icon: "solar:calendar-bold-duotone", color: "#60a5fa" },
             {
               label: "Revenue mes",
-              value: formatCurrency(stats.this_month_revenue, "COP"),
+              value: formatBookingCurrency(stats.this_month_revenue, "COP"),
               icon: "solar:dollar-bold-duotone",
               color: "#34d399",
             },
@@ -292,7 +292,7 @@ export function BookingsList() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="font-bold text-white">
-                        {formatCurrency(b.total_amount, b.currency)}
+                        {formatBookingCurrency(b.total_amount, b.currency)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -399,7 +399,7 @@ export function BookingsList() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-white/60">Total</span>
-                    <span className="text-white font-bold">{formatCurrency(cancelModal.booking.total_amount, cancelModal.booking.currency)}</span>
+                    <span className="text-white font-bold">{formatBookingCurrency(cancelModal.booking.total_amount, cancelModal.booking.currency)}</span>
                   </div>
                 </div>
                 {/* Razón de cancelación editable */}
