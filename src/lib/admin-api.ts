@@ -707,6 +707,14 @@ async function patchJson<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function deleteVoid(path: string): Promise<void> {
+  const res = await authFetch(path, { method: "DELETE" });
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text();
+    throw new Error(text || res.statusText);
+  }
+}
+
 async function putJson<T>(path: string, body: unknown): Promise<T> {
   const res = await authFetch(path, { method: "PUT", body: JSON.stringify(body) });
   return res.json() as Promise<T>;
@@ -1324,11 +1332,29 @@ export const adminApi = {
     return getJson<AgencyDetail>(`/api/admin/agencies/${id}/`);
   },
 
+  async patchAgency(
+    id: number,
+    body: Partial<{
+      name: string;
+      contact_email: string;
+      contact_phone: string;
+      is_active: boolean;
+      scoped_operator_ids: number[];
+      scoped_property_ids: number[];
+    }>
+  ): Promise<AgencyDetail | null> {
+    return patchJson<AgencyDetail>(`/api/admin/agencies/${id}/`, body);
+  },
+
   async patchAgencyInventoryScope(
     id: number,
     body: { scoped_operator_ids?: number[]; scoped_property_ids?: number[] }
   ): Promise<AgencyDetail | null> {
     return patchJson<AgencyDetail>(`/api/admin/agencies/${id}/`, body);
+  },
+
+  async deleteAgency(id: number): Promise<void> {
+    return deleteVoid(`/api/admin/agencies/${id}/`);
   },
 
   async getAgencyLevels(): Promise<AgencyLevelConfig[] | null> {

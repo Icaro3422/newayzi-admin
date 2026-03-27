@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Spinner,
@@ -15,6 +15,7 @@ import {
   Select,
   SelectItem,
   Chip,
+  Switch,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import {
@@ -397,6 +398,197 @@ function AgencyWalletSection({ agencyId, isSuperAdmin }: { agencyId: number; isS
   );
 }
 
+// ─── Gestionar datos / eliminar (operador dueño o super_admin) ───────────────
+
+function AgencyManageSection({
+  agency,
+  onUpdated,
+  onDeleted,
+}: {
+  agency: AgencyDetail;
+  onUpdated: (a: AgencyDetail) => void;
+  onDeleted: () => void;
+}) {
+  const [name, setName] = useState(agency.name);
+  const [email, setEmail] = useState(agency.contact_email ?? "");
+  const [phone, setPhone] = useState(agency.contact_phone ?? "");
+  const [active, setActive] = useState(agency.is_active);
+  const [saving, setSaving] = useState(false);
+  const [delOpen, setDelOpen] = useState(false);
+  const [delBusy, setDelBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setName(agency.name);
+    setEmail(agency.contact_email ?? "");
+    setPhone(agency.contact_phone ?? "");
+    setActive(agency.is_active);
+  }, [agency.id, agency.updated, agency.name, agency.contact_email, agency.contact_phone, agency.is_active]);
+
+  async function handleSave() {
+    setErr(null);
+    setSaving(true);
+    try {
+      const updated = await adminApi.patchAgency(agency.id, {
+        name: name.trim(),
+        contact_email: email.trim().toLowerCase(),
+        contact_phone: phone.trim(),
+        is_active: active,
+      });
+      if (updated) onUpdated(updated);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error al guardar";
+      setErr(msg.replace(/^API \d+: /, "").replace(/^\{[^}]*"detail"\s*:\s*"([^"]*)".*$/, "$1").slice(0, 280));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    setDelBusy(true);
+    setErr(null);
+    try {
+      await adminApi.deleteAgency(agency.id);
+      setDelOpen(false);
+      onDeleted();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "No se pudo eliminar";
+      setErr(msg.replace(/^API \d+: /, "").slice(0, 280));
+    } finally {
+      setDelBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <GlassCard>
+        <h3 className="font-sora font-bold text-white text-base mb-1 flex items-center gap-2">
+          <Icon icon="solar:pen-new-square-bold-duotone" width={20} className="text-[#b89eff]" />
+          Gestionar agente
+        </h3>
+        <p className="text-xs text-white/45 mb-4">
+          Actualizá datos de contacto o desactivá el acceso. Eliminar quita la agencia, el usuario en Clerk y el perfil
+          en el centro de usuarios (las reservas históricas se conservan sin agencia vinculada).
+        </p>
+        {err && (
+          <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            {err}
+          </div>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="Nombre de la agencia"
+            value={name}
+            onValueChange={setName}
+            classNames={{
+              inputWrapper: "rounded-xl border border-white/15",
+              input: "!text-white/95",
+              label: "!text-white/65",
+            }}
+          />
+          <Input
+            label="Email de contacto"
+            type="email"
+            value={email}
+            onValueChange={setEmail}
+            classNames={{
+              inputWrapper: "rounded-xl border border-white/15",
+              input: "!text-white/95",
+              label: "!text-white/65",
+            }}
+          />
+          <Input
+            label="Teléfono"
+            value={phone}
+            onValueChange={setPhone}
+            classNames={{
+              inputWrapper: "rounded-xl border border-white/15",
+              input: "!text-white/95",
+              label: "!text-white/65",
+            }}
+          />
+          <div className="flex flex-col justify-end gap-2 pb-1">
+            <span className="text-xs text-white/50">Estado</span>
+            <div className="flex items-center gap-3">
+              <Switch
+                isSelected={active}
+                onValueChange={setActive}
+                color="primary"
+                classNames={{ wrapper: "group-data-[selected=true]:bg-[#5e2cec]" }}
+              />
+              <span className="text-sm text-white/80">Agencia activa</span>
+            </div>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <Button
+            className="btn-newayzi-primary"
+            size="sm"
+            isLoading={saving}
+            onPress={handleSave}
+            startContent={!saving && <Icon icon="solar:diskette-bold" width={16} />}
+          >
+            Guardar cambios
+          </Button>
+          <Button
+            size="sm"
+            className="bg-red-500/15 border border-red-500/35 text-red-300 hover:bg-red-500/25"
+            onPress={() => {
+              setErr(null);
+              setDelOpen(true);
+            }}
+            startContent={<Icon icon="solar:trash-bin-trash-bold" width={16} />}
+          >
+            Eliminar agencia
+          </Button>
+        </div>
+      </GlassCard>
+
+      <Modal
+        isOpen={delOpen}
+        onOpenChange={(o) => {
+          setDelOpen(o);
+          if (!o) setErr(null);
+        }}
+        backdrop="blur"
+        classNames={{
+          base: "admin-modal-dark !bg-[#0f1220] rounded-[28px] border border-white/[0.12] backdrop-blur-xl shadow-2xl shadow-black/50",
+          header: "border-b border-white/[0.08] !text-white",
+          body: "!text-white/95",
+          footer: "border-t border-white/[0.08]",
+          closeButton: "!text-white/90 hover:!bg-white/10 rounded-full",
+          backdrop: "!bg-black/70 backdrop-blur-md",
+        }}
+      >
+        <ModalContent>
+          <ModalHeader>¿Eliminar esta agencia?</ModalHeader>
+          <ModalBody className="py-4">
+            <p className="text-sm text-white/70">
+              Se eliminará <strong className="text-white">{agency.name}</strong> y el acceso del usuario al panel
+              (Clerk + perfil CRM). Esta acción no se puede deshacer.
+            </p>
+            {err && (
+              <p className="mt-3 text-sm text-red-300">{err}</p>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" className="text-white/80" onPress={() => setDelOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-red-600 text-white font-semibold"
+              isLoading={delBusy}
+              onPress={handleDelete}
+            >
+              Eliminar definitivamente
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    </>
+  );
+}
+
 // ─── Inventario (solo plataforma, agencia sin operador fijo) ─────────────────
 
 function AgencyInventoryScopeSection({
@@ -587,12 +779,14 @@ function AgencyInventoryScopeSection({
 
 export function AgencyDetailClient() {
   const params = useParams();
+  const router = useRouter();
   const id = Number(params?.id);
   const [agency, setAgency] = useState<AgencyDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const { me } = useAdmin();
   const isSuperAdmin = me?.role === "super_admin";
   const isOperator = me?.role === "operador";
+  const canManageAgency = isSuperAdmin || isOperator;
 
   useEffect(() => {
     if (!id) return;
@@ -731,6 +925,14 @@ export function AgencyDetailClient() {
           </p>
         )}
       </GlassCard>
+
+      {canManageAgency && (
+        <AgencyManageSection
+          agency={agency}
+          onUpdated={(a) => setAgency(a)}
+          onDeleted={() => router.push("/admin/agents")}
+        />
+      )}
 
       {isSuperAdmin && (
         <AgencyInventoryScopeSection
