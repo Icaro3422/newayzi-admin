@@ -1876,8 +1876,9 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
     case "agent-wallets":
       return false; // solo super_admin (ya retornó arriba)
     case "agents":
-    case "payments":
       return role === "operador";
+    case "payments":
+      return false; // solo super_admin (ya cubierto arriba)
     case "bookings":
       return role === "operador" || role === "agente"; // operador: sus propiedades; agente: sus reservas
     case "analytics":
