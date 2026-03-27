@@ -16,7 +16,15 @@ import {
   ModalFooter,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { adminApi, type PropertyDetail, type PropertyPicture, type PropertyFaq } from "@/lib/admin-api";
+import {
+  adminApi,
+  LEVEL_OPTIONS,
+  type LoyaltyDealItem,
+  type LoyaltyLevelValue,
+  type PropertyDetail,
+  type PropertyFaq,
+  type PropertyPicture,
+} from "@/lib/admin-api";
 import { normalizeImageUrl } from "@/lib/normalize-image-url";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useRouter, useParams } from "next/navigation";
@@ -131,6 +139,13 @@ export function PropertyEditClient() {
   // ── Galería
   const [pictures, setPictures] = useState<PropertyPicture[]>([]);
   const [aiSuggesting, setAiSuggesting] = useState(false);
+  const [allProperties, setAllProperties] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedDealLevel, setSelectedDealLevel] = useState<LoyaltyLevelValue>("member");
+  const [levelDeals, setLevelDeals] = useState<LoyaltyDealItem[]>([]);
+  const [newDealPropertyId, setNewDealPropertyId] = useState("");
+  const [newDealDiscount, setNewDealDiscount] = useState("0");
+  const [dealsLoading, setDealsLoading] = useState(false);
+  const [dealsSaving, setDealsSaving] = useState(false);
 
   function isDescriptionEmpty(html: string): boolean {
     const text = html
@@ -228,6 +243,132 @@ export function PropertyEditClient() {
     const q = newFaqQ.trim();
     const a = newFaqA.trim();
     if (q && a) { setFaqs([...faqs, { question: q, answer: a }]); setNewFaqQ(""); setNewFaqA(""); }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    adminApi.getProperties().then((res) => {
+      if (cancelled) return;
+      const rows = (res?.results ?? []).map((p) => ({ id: p.id, name: p.name || `Propiedad ${p.id}` }));
+      setAllProperties(rows);
+    }).catch(() => {
+      if (!cancelled) setAllProperties([]);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDealsLoading(true);
+    adminApi
+      .getPropertyLoyaltyDeals(selectedDealLevel)
+      .then((res) => {
+        if (cancelled) return;
+        setLevelDeals(res?.results ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setLevelDeals([]);
+      })
+      .finally(() => {
+        if (!cancelled) setDealsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDealLevel]);
+
+  function normalizeDealsForSave(deals: LoyaltyDealItem[]) {
+    return deals.map((d, index) => ({
+      property_id: d.property_id,
+      order: index,
+      discount_percent: Number(d.discount_percent) || 0,
+    }));
+  }
+
+  async function saveLoyaltyDeals(nextDeals: LoyaltyDealItem[]) {
+    setDealsSaving(true);
+    try {
+      const payload = normalizeDealsForSave(nextDeals);
+      const res = await adminApi.putPropertyLoyaltyDeals(selectedDealLevel, payload);
+      setLevelDeals(res?.results ?? []);
+      addToast({ title: "Deals loyalty guardados", color: "success" });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "No se pudieron guardar los deals loyalty.";
+      addToast({ title: "Error al guardar deals", description: msg, color: "danger" });
+    } finally {
+      setDealsSaving(false);
+    }
+  }
+
+  function removeDeal(propertyId: number) {
+    const nextDeals = levelDeals.filter((d) => d.property_id !== propertyId);
+    void saveLoyaltyDeals(nextDeals);
+  }
+
+  function moveDeal(propertyId: number, direction: -1 | 1) {
+    const idx = levelDeals.findIndex((d) => d.property_id === propertyId);
+    if (idx < 0) return;
+    const swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= levelDeals.length) return;
+    const nextDeals = [...levelDeals];
+    const temp = nextDeals[idx];
+    nextDeals[idx] = nextDeals[swapIdx];
+    nextDeals[swapIdx] = temp;
+    void saveLoyaltyDeals(nextDeals);
+  }
+
+  function updateDealDiscount(propertyId: number, nextDiscount: string) {
+    const numeric = Number(nextDiscount);
+    if (!Number.isFinite(numeric)) return;
+    const clamped = Math.max(0, Math.min(100, numeric));
+    const nextDeals = levelDeals.map((d) =>
+      d.property_id === propertyId ? { ...d, discount_percent: clamped } : d
+    );
+    setLevelDeals(nextDeals);
+  }
+
+  async function persistDealDiscount(propertyId: number) {
+    const nextDeals = levelDeals.map((d) =>
+      d.property_id === propertyId
+        ? { ...d, discount_percent: Math.max(0, Math.min(100, Number(d.discount_percent) || 0)) }
+        : d
+    );
+    await saveLoyaltyDeals(nextDeals);
+  }
+
+  function addCurrentPropertyDeal() {
+    if (!property) return;
+    if (levelDeals.some((d) => d.property_id === property.id)) return;
+    const nextDiscountNum = Math.max(0, Math.min(100, Number(newDealDiscount) || 0));
+    const nextDeals: LoyaltyDealItem[] = [
+      ...levelDeals,
+      {
+        property_id: property.id,
+        order: levelDeals.length,
+        discount_percent: nextDiscountNum,
+        property_name: property.name,
+        city_name: property.city_name,
+      },
+    ];
+    void saveLoyaltyDeals(nextDeals);
+  }
+
+  function addSelectedPropertyDeal() {
+    const pid = Number(newDealPropertyId);
+    if (!Number.isFinite(pid) || pid <= 0) return;
+    if (levelDeals.some((d) => d.property_id === pid)) return;
+    const selectedProp = allProperties.find((p) => p.id === pid);
+    const nextDiscountNum = Math.max(0, Math.min(100, Number(newDealDiscount) || 0));
+    const nextDeals: LoyaltyDealItem[] = [
+      ...levelDeals,
+      {
+        property_id: pid,
+        order: levelDeals.length,
+        discount_percent: nextDiscountNum,
+        property_name: selectedProp?.name ?? `Propiedad ${pid}`,
+      },
+    ];
+    void saveLoyaltyDeals(nextDeals);
   }
 
   async function handleSave() {
@@ -448,7 +589,142 @@ export function PropertyEditClient() {
         {!readOnly && <div className="mt-5"><SaveButton /></div>}
       </GlassCard>
 
-      {/* ── 3. Contacto y ubicación ── */}
+      {/* ── 3. Loyalty deals por nivel ── */}
+      <GlassCard>
+        <SectionHeader
+          icon="solar:gift-bold-duotone"
+          title="Loyalty deals por nivel"
+          subtitle="Configura orden y descuento por nivel para recomendaciones y ofertas loyalty."
+          iconBg="from-violet-500/20 to-fuchsia-600/20"
+          iconColor="text-fuchsia-300"
+        />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <select
+              className="rounded-xl border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm text-white/90"
+              value={selectedDealLevel}
+              onChange={(e) => setSelectedDealLevel(e.target.value as LoyaltyLevelValue)}
+              disabled={dealsSaving || readOnly}
+            >
+              {LEVEL_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value} className="text-black">
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <Input
+              label="Descuento (%)"
+              type="number"
+              min={0}
+              max={100}
+              value={newDealDiscount}
+              onValueChange={setNewDealDiscount}
+              isDisabled={dealsSaving || readOnly}
+              classNames={{ inputWrapper: inputDark, input: "!text-white/95", label: "!text-white/65" }}
+            />
+            <Button
+              className="btn-newayzi-primary rounded-xl"
+              onPress={addCurrentPropertyDeal}
+              isDisabled={dealsSaving || readOnly || !property}
+              startContent={<Icon icon="solar:add-circle-bold-duotone" width={18} />}
+            >
+              Añadir esta propiedad al nivel
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+            <select
+              className="rounded-xl border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm text-white/90"
+              value={newDealPropertyId}
+              onChange={(e) => setNewDealPropertyId(e.target.value)}
+              disabled={dealsSaving || readOnly}
+            >
+              <option value="" className="text-black">Selecciona otra propiedad…</option>
+              {allProperties.map((p) => (
+                <option key={p.id} value={p.id} className="text-black">
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="flat"
+              className="rounded-xl border border-white/[0.12] bg-white/[0.06] text-white/90"
+              onPress={addSelectedPropertyDeal}
+              isDisabled={dealsSaving || readOnly || !newDealPropertyId}
+            >
+              Agregar seleccionada
+            </Button>
+          </div>
+
+          {dealsLoading ? (
+            <div className="flex items-center gap-2 text-white/60 text-sm">
+              <Spinner size="sm" />
+              Cargando deals loyalty…
+            </div>
+          ) : levelDeals.length === 0 ? (
+            <p className="text-sm text-white/45">No hay deals configurados para este nivel.</p>
+          ) : (
+            <div className="space-y-2">
+              {levelDeals.map((deal, idx) => (
+                <div
+                  key={`${deal.property_id}-${idx}`}
+                  className="rounded-xl border border-white/[0.09] bg-white/[0.04] px-3 py-2 grid grid-cols-1 lg:grid-cols-[1fr_auto_auto_auto] gap-2 items-center"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm text-white/90 font-medium truncate">
+                      #{idx + 1} · {deal.property_name || `Propiedad ${deal.property_id}`}
+                    </p>
+                    <p className="text-xs text-white/45">{deal.city_name || "—"} · ID {deal.property_id}</p>
+                  </div>
+                  <Input
+                    label="Desc. %"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={String(deal.discount_percent ?? 0)}
+                    onValueChange={(v) => updateDealDiscount(deal.property_id, v)}
+                    onBlur={() => void persistDealDiscount(deal.property_id)}
+                    isDisabled={dealsSaving || readOnly}
+                    classNames={{ inputWrapper: inputDark, input: "!text-white/95", label: "!text-white/65" }}
+                  />
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      className="rounded-lg border border-white/[0.12] bg-white/[0.05] text-white/85"
+                      isDisabled={dealsSaving || readOnly || idx === 0}
+                      onPress={() => moveDeal(deal.property_id, -1)}
+                    >
+                      ↑
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      className="rounded-lg border border-white/[0.12] bg-white/[0.05] text-white/85"
+                      isDisabled={dealsSaving || readOnly || idx === levelDeals.length - 1}
+                      onPress={() => moveDeal(deal.property_id, 1)}
+                    >
+                      ↓
+                    </Button>
+                  </div>
+                  <Button
+                    size="sm"
+                    color="danger"
+                    variant="flat"
+                    className="rounded-lg"
+                    isDisabled={dealsSaving || readOnly}
+                    onPress={() => removeDeal(deal.property_id)}
+                  >
+                    Quitar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </GlassCard>
+
+      {/* ── 4. Contacto y ubicación ── */}
       <GlassCard>
         <SectionHeader icon="solar:map-point-bold-duotone" title="Contacto y ubicación" subtitle="Dirección, teléfono, ciudad y zona horaria." iconBg="from-blue-500/20 to-cyan-600/20" iconColor="text-cyan-400" />
 

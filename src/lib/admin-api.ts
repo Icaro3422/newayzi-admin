@@ -151,6 +151,19 @@ export interface PropertyListItem {
   primary_picture_url?: string | null;
 }
 
+export interface LoyaltyDealItem {
+  property_id: number;
+  order: number;
+  discount_percent: number;
+  property_name?: string;
+  city_name?: string | null;
+}
+
+export interface LoyaltyDealsResponse {
+  level: LoyaltyLevelValue;
+  results: LoyaltyDealItem[];
+}
+
 export interface PropertyPicture {
   id: number;
   url: string;
@@ -674,6 +687,11 @@ async function patchJson<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function putJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await authFetch(path, { method: "PUT", body: JSON.stringify(body) });
+  return res.json() as Promise<T>;
+}
+
 async function postJson<T>(path: string, body?: unknown): Promise<T> {
   const res = await authFetch(path, {
     method: "POST",
@@ -864,6 +882,17 @@ export const adminApi = {
 
   async getProperty(id: number): Promise<PropertyDetail | null> {
     return getJson<PropertyDetail>(`/api/admin/properties/${id}/`);
+  },
+
+  async getPropertyLoyaltyDeals(level: LoyaltyLevelValue): Promise<LoyaltyDealsResponse | null> {
+    return getJson<LoyaltyDealsResponse>(`/api/admin/properties/loyalty-deals/${level}/`);
+  },
+
+  async putPropertyLoyaltyDeals(
+    level: LoyaltyLevelValue,
+    deals: Array<{ property_id: number; order?: number; discount_percent: number }>
+  ): Promise<LoyaltyDealsResponse> {
+    return putJson<LoyaltyDealsResponse>(`/api/admin/properties/loyalty-deals/${level}/`, { deals });
   },
 
   async patchProperty(
