@@ -17,6 +17,7 @@ import {
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { adminApi, type PropertyDetail, type PropertyPicture, type PropertyFaq } from "@/lib/admin-api";
+import { normalizeImageUrl } from "@/lib/normalize-image-url";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useRouter, useParams } from "next/navigation";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
@@ -59,6 +60,24 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
 }
 
 const inputDark = "rounded-xl border";
+
+function formatPmsMoney(amount: string | number, currencyCode: string): string {
+  const raw =
+    typeof amount === "number" ? amount : parseFloat(String(amount).replace(",", "."));
+  if (!Number.isFinite(raw)) return `${amount} ${currencyCode}`;
+  const c = (currencyCode || "").toUpperCase().slice(0, 3);
+  if (!/^[A-Z]{3}$/.test(c)) return `${raw} ${currencyCode}`;
+  try {
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: c,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(raw);
+  } catch {
+    return `${raw} ${currencyCode}`;
+  }
+}
 
 /* ─── Componente principal ─────────────────────────────── */
 export function PropertyEditClient() {
@@ -627,18 +646,75 @@ export function PropertyEditClient() {
       {/* ── 8. Tipos de habitación ── */}
       {property.room_types?.length ? (
         <GlassCard>
-          <SectionHeader icon="solar:bed-bold-duotone" title="Tipos de habitación" iconBg="from-teal-500/20 to-green-600/20" iconColor="text-teal-400" />
-          <ul className="space-y-2">
-            {property.room_types.map((rt, idx) => (
-              <li key={`rt-${rt.id}-${idx}`} className="flex items-center gap-2 rounded-xl bg-white/[0.06] border border-white/[0.1] px-4 py-2.5 text-sm text-white/85 font-sora">
-                <Icon icon="solar:bed-outline" className="text-teal-400 flex-shrink-0" width={18} />
-                {rt.name}
-                <span className="text-xs text-white/50 font-mono">({rt.code})</span>
-              </li>
+          <SectionHeader
+            icon="solar:bed-bold-duotone"
+            title="Tipos de habitación"
+            subtitle="Todos los tipos sincronizados; abre cada uno para editar texto, datos y galería."
+            iconBg="from-teal-500/20 to-green-600/20"
+            iconColor="text-teal-400"
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {property.room_types.map((rt) => (
+              <div
+                key={rt.id}
+                className="rounded-2xl border border-white/[0.08] bg-white/[0.04] overflow-hidden flex flex-col"
+              >
+                <div className="aspect-video bg-white/[0.06] relative shrink-0">
+                  {rt.primary_picture_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={normalizeImageUrl(rt.primary_picture_url)}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Icon icon="solar:bed-bold-duotone" className="text-4xl text-white/20" />
+                    </div>
+                  )}
+                  {rt.pms && (
+                    <span className="absolute top-2 left-2 text-[0.65rem] font-semibold px-2 py-0.5 rounded-full bg-[#5e2cec]/85 text-white border border-white/20">
+                      PMS
+                    </span>
+                  )}
+                </div>
+                <div className="p-4 flex-1 flex flex-col gap-2 min-w-0">
+                  <div>
+                    <h3 className="font-sora font-semibold text-white text-sm leading-snug">{rt.name}</h3>
+                    <p className="text-[0.7rem] font-mono text-white/45 truncate">{rt.code}</p>
+                  </div>
+                  {rt.description_preview ? (
+                    <p className="text-xs text-white/50 line-clamp-2">{rt.description_preview}</p>
+                  ) : null}
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[0.7rem] text-white/55">
+                    <span>Hasta {rt.max_occupancy} pers.</span>
+                    {rt.physical_rooms_count != null && rt.physical_rooms_count > 0 && (
+                      <span>{rt.physical_rooms_count} unidad{rt.physical_rooms_count !== 1 ? "es" : ""}</span>
+                    )}
+                    {rt.area_sqm != null && <span>{rt.area_sqm} m²</span>}
+                    {rt.base_rates?.[0] && (
+                      <span className="text-[#b89eff]">
+                        {formatPmsMoney(rt.base_rates[0].price_per_night, rt.base_rates[0].currency)}/noche
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-auto pt-3">
+                    <Button
+                      as={Link}
+                      href={`/admin/properties/${propertyId}/room-types/${rt.id}`}
+                      className="w-full font-semibold bg-[#5e2cec]/30 border border-[#5e2cec]/50 text-[#e8deff]"
+                      size="sm"
+                      startContent={<Icon icon="solar:pen-new-round-bold-duotone" width={18} />}
+                    >
+                      Ver y editar
+                    </Button>
+                  </div>
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
           <p className="mt-4 text-xs text-white/40">
-            Los precios y descuentos por tipo de habitación se gestionan desde el backend.
+            Las tarifas base se muestran como referencia; la sincronización PMS puede actualizarlas.
           </p>
         </GlassCard>
       ) : null}

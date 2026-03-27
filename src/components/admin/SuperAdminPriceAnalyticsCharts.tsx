@@ -12,11 +12,6 @@ const tooltipBase = {
   textStyle: { color: "#e5e5e5", fontSize: 12 },
 } as const;
 
-function fmtMoney(value: number, currency: string) {
-  const sym = currency === "COP" ? "$" : `${currency} `;
-  return `${sym}${Number(value).toLocaleString("es-CO", { maximumFractionDigits: 0 })}`;
-}
-
 function barGradient(top: string, bottom: string) {
   return {
     type: "linear" as const,
@@ -29,6 +24,11 @@ function barGradient(top: string, bottom: string) {
       { offset: 1, color: bottom },
     ],
   };
+}
+
+function fmtMoney(value: number, cur: string) {
+  const sym = cur === "COP" ? "$" : `${cur} `;
+  return `${sym}${Number(value).toLocaleString("es-CO", { maximumFractionDigits: 0 })}`;
 }
 
 export function SuperAdminPriceAnalyticsCharts({

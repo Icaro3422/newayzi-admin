@@ -147,6 +147,8 @@ export interface PropertyListItem {
   /** True si la propiedad tiene al menos una conexión PMS (sincronizada desde PMS). */
   from_pms?: boolean;
   rewards_info?: PropertyRewardsInfo | null;
+  /** URL miniatura (primera imagen) para listado admin; opcional en API antigua. */
+  primary_picture_url?: string | null;
 }
 
 export interface PropertyPicture {
@@ -184,8 +186,64 @@ export interface PropertyDetail extends PropertyListItem {
   amenities: string[] | Record<string, unknown>[];
   important_info?: string[];
   faqs?: PropertyFaq[];
-  room_types: { id: number; name: string; code: string }[];
+  room_types: RoomTypeAdminSummary[];
   pictures?: PropertyPicture[];
+}
+
+export interface RoomTypeBaseRateRow {
+  currency: string;
+  price_per_night: string;
+}
+
+export interface RoomTypePmsSummary {
+  connection_id: number;
+  connection_name: string;
+  pms_room_type_id: string;
+}
+
+export interface RoomTypeAdminSummary {
+  id: number;
+  name: string;
+  code: string;
+  description_preview: string;
+  max_occupancy: number;
+  num_rooms: number | null;
+  num_bathrooms: number | null;
+  area_sqm: number | null;
+  primary_picture_url: string;
+  base_rates: RoomTypeBaseRateRow[];
+  physical_rooms_count: number;
+  pms: RoomTypePmsSummary | null;
+}
+
+export interface RoomTypePicture {
+  id: number;
+  url: string;
+  is_primary: boolean;
+  created: string;
+}
+
+export interface RoomTypePmsMappingRow {
+  connection_id: number;
+  connection_name: string;
+  pms_room_type_id: string;
+}
+
+export interface RoomTypePhysicalRoomRow {
+  id: number;
+  label: string;
+  floor: number | null;
+}
+
+export interface RoomTypeAdminDetail extends Omit<RoomTypeAdminSummary, "description_preview"> {
+  description: string;
+  property_id: number;
+  property_name: string;
+  pictures: RoomTypePicture[];
+  physical_rooms: RoomTypePhysicalRoomRow[];
+  pms_mappings: RoomTypePmsMappingRow[];
+  created: string;
+  updated: string;
 }
 
 export interface PMSConnectionListItem {
@@ -865,6 +923,77 @@ export const adminApi = {
 
   async deletePropertyPicture(propertyId: number, picId: number): Promise<void> {
     await authFetch(`/api/admin/properties/${propertyId}/pictures/${picId}/`, { method: "DELETE" });
+  },
+
+  async getRoomTypeAdmin(propertyId: number, roomTypeId: number): Promise<RoomTypeAdminDetail | null> {
+    return getJson<RoomTypeAdminDetail>(
+      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/`
+    );
+  },
+
+  async patchRoomTypeAdmin(
+    propertyId: number,
+    roomTypeId: number,
+    data: Partial<{
+      name: string;
+      description: string;
+      code: string;
+      max_occupancy: number;
+      num_rooms: number | null;
+      num_bathrooms: number | null;
+      area_sqm: number | string | null;
+    }>
+  ): Promise<RoomTypeAdminDetail> {
+    return patchJson<RoomTypeAdminDetail>(
+      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/`,
+      data
+    );
+  },
+
+  async getRoomTypePictures(propertyId: number, roomTypeId: number): Promise<RoomTypePicture[]> {
+    const r = await getJson<RoomTypePicture[]>(
+      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/`
+    );
+    return r ?? [];
+  },
+
+  async uploadRoomTypePicture(
+    propertyId: number,
+    roomTypeId: number,
+    file: File,
+    isPrimary = false
+  ): Promise<RoomTypePicture> {
+    const fd = new FormData();
+    fd.append("image", file);
+    if (isPrimary) fd.append("is_primary", "true");
+    const res = await authFetchMultipart(
+      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/`,
+      "POST",
+      fd
+    );
+    return res.json() as Promise<RoomTypePicture>;
+  },
+
+  async setRoomTypePicturePrimary(
+    propertyId: number,
+    roomTypeId: number,
+    picId: number
+  ): Promise<RoomTypePicture> {
+    const fd = new FormData();
+    fd.append("is_primary", "true");
+    const res = await authFetchMultipart(
+      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/${picId}/`,
+      "PATCH",
+      fd
+    );
+    return res.json() as Promise<RoomTypePicture>;
+  },
+
+  async deleteRoomTypePicture(propertyId: number, roomTypeId: number, picId: number): Promise<void> {
+    await authFetch(
+      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/${picId}/`,
+      { method: "DELETE" }
+    );
   },
 
   async getConnectionTypes(): Promise<{ results: PMSConnectionType[] } | null> {

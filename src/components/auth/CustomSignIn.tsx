@@ -1,13 +1,71 @@
 "use client";
 
+/**
+ * Operaciones (Clerk Dashboard, misma app que CLERK_SECRET_KEY del admin):
+ * - Desactivar Client Trust y MFA obligatoria si los invitados deben ir directo a cambio de contraseña.
+ * - Si el correo de verificación no llega: dominio/remitente verificado, plantillas, carpeta spam.
+ */
 import { useAuth, useClerk, useSignIn } from "@clerk/nextjs";
 import { Icon } from "@iconify/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { SignInResource } from "@clerk/types";
+import type { SignInResource, SignInSecondFactor } from "@clerk/types";
 
 import { resolveClerkError } from "@/lib/clerk-errors";
+
+type SecondFactorSelection =
+  | { strategy: "email_code"; emailAddressId: string; safeIdentifier: string }
+  | { strategy: "phone_code"; phoneNumberId: string; safeIdentifier: string }
+  | { strategy: "totp" }
+  | { strategy: "backup_code" };
+
+function resolveSecondFactorSelection(
+  supported: SignInSecondFactor[]
+): SecondFactorSelection | null {
+  const email = supported.find((f) => f.strategy === "email_code");
+  if (email?.strategy === "email_code") {
+    return {
+      strategy: "email_code",
+      emailAddressId: email.emailAddressId,
+      safeIdentifier: email.safeIdentifier,
+    };
+  }
+  const phone = supported.find((f) => f.strategy === "phone_code");
+  if (phone?.strategy === "phone_code") {
+    return {
+      strategy: "phone_code",
+      phoneNumberId: phone.phoneNumberId,
+      safeIdentifier: phone.safeIdentifier,
+    };
+  }
+  if (supported.some((f) => f.strategy === "totp")) {
+    return { strategy: "totp" };
+  }
+  if (supported.some((f) => f.strategy === "backup_code")) {
+    return { strategy: "backup_code" };
+  }
+  return null;
+}
+
+async function prepareSignInSecondFactor(
+  resource: SignInResource,
+  sel: SecondFactorSelection
+): Promise<void> {
+  if (sel.strategy === "email_code") {
+    await resource.prepareSecondFactor({
+      strategy: "email_code",
+      emailAddressId: sel.emailAddressId,
+    });
+    return;
+  }
+  if (sel.strategy === "phone_code") {
+    await resource.prepareSecondFactor({
+      strategy: "phone_code",
+      phoneNumberId: sel.phoneNumberId,
+    });
+  }
+}
 
 type Step = "credentials" | "forgot" | "reset_code" | "needs_new_password" | "second_factor";
 
@@ -221,12 +279,31 @@ export function CustomSignIn() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [secondFactorCode, setSecondFactorCode] = useState("");
-  const [secondFactorStrategy, setSecondFactorStrategy] = useState<"totp" | "phone_code">("totp");
+  const [secondFactorSelection, setSecondFactorSelection] =
+    useState<SecondFactorSelection | null>(null);
   const [pendingSignIn, setPendingSignIn] = useState<SignInResource | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [resendCooldown]);
+
+  useEffect(() => {
+    if (step === "second_factor" && !secondFactorSelection) {
+      setPendingSignIn(null);
+      setResendCooldown(0);
+      setSecondFactorCode("");
+      setError("");
+      setSuccess("");
+      setStep("credentials");
+    }
+  }, [step, secondFactorSelection]);
 
   if (!isLoaded) return null;
 
@@ -256,22 +333,39 @@ export function CustomSignIn() {
         setNewPassword("");
         setConfirmPassword("");
         setStep("needs_new_password");
-      } else if (result.status === "needs_second_factor") {
-        // Determinar estrategia disponible: TOTP o código por SMS/email
+      } else if (
+        result.status === "needs_second_factor" ||
+        (result.status as string) === "needs_client_trust"
+      ) {
         const supported = result.supportedSecondFactors ?? [];
-        const hasTOTP = supported.some((f) => f.strategy === "totp");
-        const hasPhone = supported.some((f) => f.strategy === "phone_code");
-        setSecondFactorStrategy(hasTOTP ? "totp" : hasPhone ? "phone_code" : "totp");
+        const sel = resolveSecondFactorSelection(supported);
+        if (!sel) {
+          setError(
+            "No hay un método de verificación compatible. Contacta al equipo de Newayzi."
+          );
+          return;
+        }
+        setSecondFactorSelection(sel);
         setPendingSignIn(result);
         setSecondFactorCode("");
+        setResendCooldown(0);
 
-        // Si el factor es por SMS/email, prepararlo automáticamente
-        if (!hasTOTP && hasPhone) {
-          try {
-            await result.prepareSecondFactor({ strategy: "phone_code" });
-          } catch {
-            // ignorar — el usuario puede reintentar
+        try {
+          if (sel.strategy === "email_code" || sel.strategy === "phone_code") {
+            await prepareSignInSecondFactor(result, sel);
           }
+          if (sel.strategy === "email_code") {
+            setSuccess(
+              "Te enviamos un código de 6 dígitos a tu correo. Revisa también la carpeta de spam."
+            );
+          } else if (sel.strategy === "phone_code") {
+            setSuccess("Te enviamos un código por SMS.");
+          }
+        } catch (prepErr) {
+          setSecondFactorSelection(null);
+          setPendingSignIn(null);
+          setError(resolveClerkError(prepErr));
+          return;
         }
         setStep("second_factor");
       } else {
@@ -310,10 +404,10 @@ export function CustomSignIn() {
     }
   };
 
-  /* ── Verificar segundo factor (TOTP o SMS) ── */
+  /* ── Verificar segundo factor (correo, SMS, TOTP o código de respaldo) ── */
   const handleSecondFactor = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pendingSignIn) return;
+    if (!pendingSignIn || !secondFactorSelection) return;
 
     if (!secondFactorCode.trim()) { setError("Por favor ingresa el código de verificación."); return; }
 
@@ -321,15 +415,44 @@ export function CustomSignIn() {
     setLoading(true);
     try {
       const result = await pendingSignIn.attemptSecondFactor({
-        strategy: secondFactorStrategy,
+        strategy: secondFactorSelection.strategy,
         code: secondFactorCode.trim(),
       });
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         router.push("/admin");
+      } else if (result.status === "needs_new_password") {
+        setPendingSignIn(result);
+        setSecondFactorSelection(null);
+        setNewPassword("");
+        setConfirmPassword("");
+        setStep("needs_new_password");
       } else {
         setError("No se pudo verificar el código. Inténtalo de nuevo.");
       }
+    } catch (err) {
+      setError(resolveClerkError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendSecondFactor = async () => {
+    if (!pendingSignIn || !secondFactorSelection) return;
+    if (secondFactorSelection.strategy !== "email_code" && secondFactorSelection.strategy !== "phone_code")
+      return;
+    if (resendCooldown > 0 || loading) return;
+
+    clearMessages();
+    setLoading(true);
+    try {
+      await prepareSignInSecondFactor(pendingSignIn, secondFactorSelection);
+      setSuccess(
+        secondFactorSelection.strategy === "email_code"
+          ? "Te enviamos un código nuevo a tu correo."
+          : "Te enviamos un código nuevo por SMS."
+      );
+      setResendCooldown(60);
     } catch (err) {
       setError(resolveClerkError(err));
     } finally {
@@ -531,13 +654,43 @@ export function CustomSignIn() {
     );
   }
 
-  /* ── PASO: segundo factor (TOTP / SMS) ── */
-  if (step === "second_factor") {
-    const isTOTP = secondFactorStrategy === "totp";
+  /* ── PASO: segundo factor (correo / SMS / TOTP / respaldo) ── */
+  if (step === "second_factor" && secondFactorSelection) {
+    const sf = secondFactorSelection;
+    const isEmail = sf.strategy === "email_code";
+    const isPhone = sf.strategy === "phone_code";
+    const isTOTP = sf.strategy === "totp";
+    const isBackup = sf.strategy === "backup_code";
+    const canResend = isEmail || isPhone;
+
+    let description: string;
+    let fieldLabel: string;
+    if (isEmail) {
+      description = `Te enviamos un código de 6 dígitos a ${sf.safeIdentifier}. Si no lo ves, revisa spam o promociones.`;
+      fieldLabel = "Código del correo";
+    } else if (isPhone) {
+      description = `Ingresa el código que enviamos por SMS a ${sf.safeIdentifier}.`;
+      fieldLabel = "Código SMS";
+    } else if (isTOTP) {
+      description =
+        "Abre tu aplicación de autenticación (Google Authenticator, Authy, etc.) e ingresa el código de 6 dígitos.";
+      fieldLabel = "Código de autenticador";
+    } else {
+      description = "Ingresa uno de tus códigos de respaldo.";
+      fieldLabel = "Código de respaldo";
+    }
+
     return (
       <div className="flex flex-col gap-5">
         <div>
-          <BackButton onClick={() => { setPendingSignIn(null); goTo("credentials"); }} />
+          <BackButton
+            onClick={() => {
+              setPendingSignIn(null);
+              setSecondFactorSelection(null);
+              setResendCooldown(0);
+              goTo("credentials");
+            }}
+          />
           <div className="w-12 h-12 rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center mb-4">
             <Icon icon="solar:shield-keyhole-bold-duotone" className="text-[#5e2cec] text-2xl" />
           </div>
@@ -545,18 +698,16 @@ export function CustomSignIn() {
             Verificación en dos pasos
           </h1>
           <p className="font-sora text-gray-500 text-[0.9rem] mt-1.5 leading-relaxed">
-            {isTOTP
-              ? "Abre tu aplicación de autenticación (Google Authenticator, Authy, etc.) e ingresa el código de 6 dígitos."
-              : "Ingresa el código que enviamos a tu teléfono registrado."}
+            {description}
           </p>
         </div>
 
         <form onSubmit={handleSecondFactor} className="flex flex-col gap-4" noValidate>
           <div>
-            <Label>{isTOTP ? "Código de autenticador" : "Código SMS"}</Label>
+            <Label>{fieldLabel}</Label>
             <Input
               type="text"
-              placeholder="000000"
+              placeholder={isBackup ? "XXXXXXXX" : "000000"}
               value={secondFactorCode}
               onChange={setSecondFactorCode}
               autoFocus
@@ -564,6 +715,7 @@ export function CustomSignIn() {
           </div>
 
           {error && <ErrorBox message={error} />}
+          {success && <SuccessBox message={success} />}
 
           <PrimaryButton loading={loading}>
             <Icon icon="solar:shield-check-bold-duotone" className="text-lg" />
@@ -571,10 +723,39 @@ export function CustomSignIn() {
           </PrimaryButton>
         </form>
 
+        {canResend && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              disabled={loading || resendCooldown > 0}
+              onClick={() => void handleResendSecondFactor()}
+              className="font-sora text-[0.8125rem] font-medium text-[#5e2cec] hover:text-[#422df6] disabled:opacity-50 disabled:cursor-not-allowed underline underline-offset-2"
+            >
+              {resendCooldown > 0 ? `Reenviar código (${resendCooldown}s)` : "Reenviar código"}
+            </button>
+          </div>
+        )}
+
         <div className="rounded-[10px] bg-amber-50 border border-amber-200 px-3.5 py-3">
           <p className="font-sora text-amber-700 text-[0.8125rem] leading-snug">
-            <span className="font-semibold">¿No configuraste la verificación en dos pasos?</span>{" "}
-            Pide a un administrador que desactive esta opción en tu cuenta o que contacte al equipo de Newayzi.
+            {isEmail ? (
+              <>
+                <span className="font-semibold">¿No llega el correo?</span>{" "}
+                Espera un minuto, revisa spam y usa &quot;Reenviar código&quot;. Si sigue fallando, pide a un
+                administrador que revise el envío de emails en Clerk o contacte al equipo de Newayzi.
+              </>
+            ) : isPhone ? (
+              <>
+                <span className="font-semibold">¿No recibiste el SMS?</span>{" "}
+                Comprueba la señal y usa &quot;Reenviar código&quot;. Si persiste el problema, contacta al equipo de
+                Newayzi.
+              </>
+            ) : (
+              <>
+                <span className="font-semibold">¿Problemas con la verificación?</span>{" "}
+                Pide a un administrador que revise tu cuenta en Clerk o contacte al equipo de Newayzi.
+              </>
+            )}
           </p>
         </div>
       </div>
