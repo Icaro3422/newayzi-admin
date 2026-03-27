@@ -210,6 +210,13 @@ function AgencyWalletSection({ agencyId, isSuperAdmin }: { agencyId: number; isS
         )}
       </div>
 
+      {!isSuperAdmin && (
+        <p className="text-xs text-white/45 mb-4 -mt-1 max-w-2xl">
+          Los agentes que invites empiezan en nivel base (Member) sin puntos extra. Cambios de nivel, bonos y ajustes
+          los aplica solo el equipo Newayzi; coordina con ellos si hace falta.
+        </p>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-5">
         <div className="rounded-2xl bg-[#5e2cec]/15 border border-[#5e2cec]/30 p-4 text-center">
