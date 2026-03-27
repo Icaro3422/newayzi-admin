@@ -93,6 +93,20 @@ export interface AdminLoyalty {
   } | null;
 }
 
+/** Contexto de agencia para rol agente (inventario / invitador). */
+export interface AdminAgencyContext {
+  id: number;
+  name: string;
+  invited_by: "operator" | "platform";
+  parent_operator: { id: number; name: string } | null;
+  scope_mode: "single_operator" | "platform_all" | "platform_scoped";
+  scoped_operator_ids: number[];
+  scoped_property_ids: number[];
+  /** Para filtro de operador en UI cuando el alcance es acotado. */
+  scoped_operators_detail?: { id: number; name: string }[];
+  inventory_hint: string;
+}
+
 export interface AdminMe {
   profile: {
     id: number;
@@ -112,6 +126,7 @@ export interface AdminMe {
   permissions: string[];
   loyalty?: AdminLoyalty | null;
   must_change_password?: boolean;
+  agency?: AdminAgencyContext | null;
 }
 
 export interface PropertyPMSConnection {
@@ -506,6 +521,9 @@ export interface Agency {
 }
 
 export interface AgencyDetail extends Agency {
+  operator_id?: number | null;
+  scoped_operator_ids?: number[];
+  scoped_property_ids?: number[];
   summary: {
     total_sales: string;
     /** Solo plataforma. */
@@ -1304,6 +1322,13 @@ export const adminApi = {
 
   async getAgency(id: number): Promise<AgencyDetail | null> {
     return getJson<AgencyDetail>(`/api/admin/agencies/${id}/`);
+  },
+
+  async patchAgencyInventoryScope(
+    id: number,
+    body: { scoped_operator_ids?: number[]; scoped_property_ids?: number[] }
+  ): Promise<AgencyDetail | null> {
+    return patchJson<AgencyDetail>(`/api/admin/agencies/${id}/`, body);
   },
 
   async getAgencyLevels(): Promise<AgencyLevelConfig[] | null> {

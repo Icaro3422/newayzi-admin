@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Input,
   Button,
@@ -790,10 +790,15 @@ function BlocksPanel({
     const params: Parameters<typeof adminApi.getAvailabilityBlocks>[0] = { status: statusFilter };
     const pid = parseInt(propertyId, 10);
     if (!Number.isNaN(pid) && pid > 0) params.property_id = pid;
-    adminApi.getAvailabilityBlocks(params).then((res) => {
-      setBlocks(res?.results ?? []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    adminApi
+      .getAvailabilityBlocks(params)
+      .then((res) => {
+        setBlocks(res?.results ?? []);
+      })
+      .catch(() => {
+        setBlocks([]);
+      })
+      .finally(() => setLoading(false));
   }, [propertyId, statusFilter, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
@@ -929,8 +934,20 @@ function BlocksPanel({
 export function AvailabilityList() {
   const { role, me } = useAdmin();
   const isOperador = role === "operador";
+  const isAgente = role === "agente";
   const myOperatorId = me?.operator_id ?? null;
+  const agency = me?.agency;
   const canManage = role === "super_admin" || role === "operador";
+
+  const agentOperatorList = useMemo(
+    () =>
+      agency?.scoped_operators_detail?.map((o) => ({ id: o.id, name: o.name } as Operator)) ?? [],
+    [agency?.scoped_operators_detail]
+  );
+  const showOperatorFilter =
+    !isOperador &&
+    (!isAgente ||
+      (agency?.scope_mode === "platform_scoped" && agentOperatorList.length > 1));
 
   const [list, setList] = useState<AvailabilityItem[]>([]);
   const [properties, setProperties] = useState<PropertyListItem[]>([]);
@@ -951,44 +968,108 @@ export function AvailabilityList() {
   const [showCreateBlock, setShowCreateBlock] = useState(false);
   const [blocksRefreshKey, setBlocksRefreshKey] = useState(0);
 
-  function load() {
+  useEffect(() => {
+    if (!agency) return;
+    if (agency.scope_mode === "single_operator" && agency.scoped_operator_ids[0]) {
+      setOperatorId(String(agency.scoped_operator_ids[0]));
+    } else if (
+      agency.scope_mode === "platform_scoped" &&
+      agency.scoped_operators_detail?.length === 1
+    ) {
+      setOperatorId(String(agency.scoped_operators_detail[0].id));
+    }
+  }, [agency]);
+
+  const load = useCallback(() => {
     setLoading(true);
     const params: { date_from?: string; date_to?: string; property_id?: number; operator_id?: number } = {};
     if (dateFrom) params.date_from = dateFrom;
     if (dateTo) params.date_to = dateTo;
     const pid = parseInt(propertyId, 10);
     if (!Number.isNaN(pid)) params.property_id = pid;
-    const effectiveOperatorId = isOperador && myOperatorId
-      ? myOperatorId
-      : parseInt(operatorId, 10);
-    if (!Number.isNaN(effectiveOperatorId) && effectiveOperatorId > 0) {
+
+    let effectiveOperatorId: number | undefined;
+    if (isOperador && myOperatorId) {
+      effectiveOperatorId = myOperatorId;
+    } else if (isAgente && agency) {
+      if (agency.scope_mode === "single_operator" && agency.scoped_operator_ids[0]) {
+        effectiveOperatorId = agency.scoped_operator_ids[0];
+      } else if (
+        agency.scope_mode === "platform_scoped" &&
+        agency.scoped_operators_detail?.length === 1
+      ) {
+        effectiveOperatorId = agency.scoped_operators_detail[0].id;
+      } else if (agency.scope_mode === "platform_scoped" && operatorId) {
+        const n = parseInt(operatorId, 10);
+        if (!Number.isNaN(n) && n > 0) effectiveOperatorId = n;
+      }
+    } else {
+      const n = parseInt(operatorId, 10);
+      if (!Number.isNaN(n) && n > 0) effectiveOperatorId = n;
+    }
+    if (effectiveOperatorId !== undefined && effectiveOperatorId > 0) {
       params.operator_id = effectiveOperatorId;
     }
-    adminApi.getAvailability(params).then((res) => {
-      setList(res?.results ?? []);
-      setLoading(false);
-    });
-  }
+
+    adminApi
+      .getAvailability(params)
+      .then((res) => {
+        setList(res?.results ?? []);
+      })
+      .catch(() => {
+        setList([]);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [
+    dateFrom,
+    dateTo,
+    propertyId,
+    operatorId,
+    isOperador,
+    isAgente,
+    myOperatorId,
+    agency,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
+    const loadPlatformOps = role !== "operador" && !isAgente;
     Promise.all([
       adminApi.getProperties({ is_active: true }),
-      isOperador ? Promise.resolve(null) : adminApi.getOperators(),
-    ]).then(([propsRes, opsRes]) => {
-      if (cancelled) return;
-      const props = propsRes?.results ?? [];
-      const ops = opsRes?.results ?? [];
-      const filteredProps = isOperador && me?.operator_name
-        ? props.filter((p) => !p.operator_name || p.operator_name === me.operator_name)
-        : props;
-      setProperties([...new Map(filteredProps.map((p) => [p.id, p])).values()]);
-      setOperators([...new Map(ops.map((o) => [o.id, o])).values()]);
-    });
-    return () => { cancelled = true; };
-  }, [isOperador, myOperatorId, me?.operator_name]);
+      loadPlatformOps ? adminApi.getOperators() : Promise.resolve({ results: [] as Operator[] }),
+    ])
+      .then(([propsRes, opsRes]) => {
+        if (cancelled) return;
+        const props = propsRes?.results ?? [];
+        let ops: Operator[] = [];
+        if (loadPlatformOps) {
+          ops = opsRes?.results ?? [];
+        } else if (isAgente && agentOperatorList.length > 0) {
+          ops = agentOperatorList;
+        }
+        const filteredProps =
+          isOperador && me?.operator_name
+            ? props.filter((p) => !p.operator_name || p.operator_name === me.operator_name)
+            : props;
+        setProperties([...new Map(filteredProps.map((p) => [p.id, p])).values()]);
+        setOperators([...new Map(ops.map((o) => [o.id, o])).values()]);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProperties([]);
+          setOperators([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [role, isAgente, isOperador, me?.operator_name, agency, agentOperatorList]);
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    load();
+  }, [load]);
 
   /* Computed calendar data */
   const { dates, propertyRows } = useMemo(() => {
@@ -1101,7 +1182,7 @@ export function AvailabilityList() {
           <div>
             <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Filtros</p>
             <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
-              {isOperador ? "Propiedad y fechas" : "Operador, propiedad y fechas"}
+              {showOperatorFilter ? "Operador, propiedad y fechas" : "Propiedad y fechas"}
             </p>
           </div>
           {canManage && (
@@ -1116,7 +1197,7 @@ export function AvailabilityList() {
           )}
         </div>
         <div className="flex flex-wrap items-end gap-4">
-          {!isOperador && (
+          {showOperatorFilter && (
             <Select
               label="Operador"
               placeholder="Todos"
@@ -1124,7 +1205,16 @@ export function AvailabilityList() {
               onSelectionChange={(s) => { const v = Array.from(s)[0] as string; setOperatorId(v === "__all__" ? "" : v); }}
               size="sm"
               className="w-48"
-              items={[{ id: "__all__", name: "Todos los operadores" }, ...operators]}
+              items={[
+                {
+                  id: "__all__",
+                  name:
+                    isAgente && agency?.scope_mode === "platform_scoped"
+                      ? "Todos (en tu alcance)"
+                      : "Todos los operadores",
+                },
+                ...operators,
+              ]}
               classNames={{ trigger: inputDark, label: "!text-white/65", value: "!text-white/92 font-medium", innerWrapper: "!text-white", selectorIcon: "!text-white/50", popoverContent: "bg-[#0f1220] border border-white/[0.1]" }}
             >
               {(item) => <SelectItem key={String(item.id)} className="text-white">{item.name}</SelectItem>}
@@ -1165,6 +1255,12 @@ export function AvailabilityList() {
             Filtrar
           </Button>
         </div>
+        {isAgente && agency?.inventory_hint && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-[#5e2cec]/25 bg-[#5e2cec]/10 px-4 py-3">
+            <Icon icon="solar:info-circle-bold-duotone" className="text-[#b89eff] shrink-0 text-lg" />
+            <p className="text-sm text-white/80 leading-snug">{agency.inventory_hint}</p>
+          </div>
+        )}
       </GlassCard>
 
       {/* Tabs */}

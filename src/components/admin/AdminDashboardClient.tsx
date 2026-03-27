@@ -203,6 +203,16 @@ export function AdminDashboardClient() {
             <p className="mt-1 text-[0.8125rem] text-white/60">
               {roleMeta?.description} — Accedé a la disponibilidad desde el menú lateral.
             </p>
+            {me?.agency?.inventory_hint && (
+              <div className="mt-3 flex items-start gap-2.5 rounded-2xl border border-[#5e2cec]/30 bg-[#5e2cec]/12 px-3.5 py-2.5">
+                <Icon
+                  icon="solar:buildings-2-bold-duotone"
+                  className="text-[#b89eff] shrink-0 mt-0.5"
+                  width={18}
+                />
+                <p className="text-[0.8125rem] text-white/75 leading-relaxed">{me.agency.inventory_hint}</p>
+              </div>
+            )}
           </div>
         </GlassCard>
 

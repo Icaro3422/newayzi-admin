@@ -21,6 +21,8 @@ import {
   adminApi,
   type AgencyDetail,
   type AgentWallet,
+  type Operator,
+  type PropertyListItem,
   LEVEL_OPTIONS,
   WALLET_REASON_OPTIONS,
   type WalletMovementReason,
@@ -395,6 +397,192 @@ function AgencyWalletSection({ agencyId, isSuperAdmin }: { agencyId: number; isS
   );
 }
 
+// ─── Inventario (solo plataforma, agencia sin operador fijo) ─────────────────
+
+function AgencyInventoryScopeSection({
+  agency,
+  onSaved,
+}: {
+  agency: AgencyDetail;
+  onSaved: (a: AgencyDetail) => void;
+}) {
+  const lockedToOperator = agency.operator_id != null;
+  const [operators, setOperators] = useState<Operator[]>([]);
+  const [properties, setProperties] = useState<PropertyListItem[]>([]);
+  const [listsLoading, setListsLoading] = useState(true);
+  const [opSelected, setOpSelected] = useState<Set<number>>(() => new Set(agency.scoped_operator_ids ?? []));
+  const [propSelected, setPropSelected] = useState<Set<number>>(() => new Set(agency.scoped_property_ids ?? []));
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOpSelected(new Set(agency.scoped_operator_ids ?? []));
+    setPropSelected(new Set(agency.scoped_property_ids ?? []));
+  }, [
+    agency.id,
+    agency.updated,
+    agency.scoped_operator_ids,
+    agency.scoped_property_ids,
+  ]);
+
+  useEffect(() => {
+    if (lockedToOperator) return;
+    let cancelled = false;
+    setListsLoading(true);
+    Promise.all([adminApi.getOperators(), adminApi.getProperties({ is_active: true })])
+      .then(([opsRes, propsRes]) => {
+        if (cancelled) return;
+        setOperators(opsRes?.results ?? []);
+        setProperties(propsRes?.results ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOperators([]);
+          setProperties([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setListsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lockedToOperator, agency.id]);
+
+  function toggleOp(id: number) {
+    setOpSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleProp(id: number) {
+    setPropSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleSave() {
+    setSaveError(null);
+    setSaving(true);
+    try {
+      const updated = await adminApi.patchAgencyInventoryScope(agency.id, {
+        scoped_operator_ids: Array.from(opSelected),
+        scoped_property_ids: Array.from(propSelected),
+      });
+      if (updated) onSaved(updated);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "No se pudo guardar";
+      setSaveError(msg.replace(/^API \d+: /, "").slice(0, 240));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (lockedToOperator) return null;
+
+  return (
+    <GlassCard>
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+          <h3 className="font-sora font-bold text-white text-base flex items-center gap-2">
+            <Icon icon="solar:map-point-wave-bold-duotone" width={20} className="text-[#b89eff]" />
+            Alcance de inventario
+          </h3>
+          <p className="mt-1 text-xs text-white/50 max-w-xl">
+            Agencia creada por Newayzi: podés limitar qué operadores y propiedades ven los agentes. Si dejás ambas listas
+            vacías, el inventario es el catálogo completo (comportamiento por defecto). La unión de operadores y propiedades
+            define el alcance.
+          </p>
+        </div>
+      </div>
+      {saveError && (
+        <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+          {saveError}
+        </div>
+      )}
+      {listsLoading ? (
+        <div className="flex justify-center py-8">
+          <Spinner size="md" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">Operadores</p>
+            <div className="max-h-56 overflow-y-auto rounded-xl border border-white/[0.08] bg-white/[0.03] p-2 space-y-1">
+              {operators.length === 0 ? (
+                <p className="text-sm text-white/40 py-2 px-2">No hay operadores.</p>
+              ) : (
+                operators.map((o) => (
+                  <label
+                    key={o.id}
+                    className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-white/[0.05] cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      className="rounded border-white/20 bg-white/5 text-[#5e2cec] focus:ring-[#5e2cec]/40"
+                      checked={opSelected.has(o.id)}
+                      onChange={() => toggleOp(o.id)}
+                    />
+                    <span className="text-sm text-white/85">{o.name}</span>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">Propiedades</p>
+            <div className="max-h-56 overflow-y-auto rounded-xl border border-white/[0.08] bg-white/[0.03] p-2 space-y-1">
+              {properties.length === 0 ? (
+                <p className="text-sm text-white/40 py-2 px-2">No hay propiedades activas.</p>
+              ) : (
+                properties.map((p) => (
+                  <label
+                    key={p.id}
+                    className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-white/[0.05] cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      className="rounded border-white/20 bg-white/5 text-[#5e2cec] focus:ring-[#5e2cec]/40"
+                      checked={propSelected.has(p.id)}
+                      onChange={() => toggleProp(p.id)}
+                    />
+                    <span className="text-sm text-white/85 truncate" title={p.name}>
+                      {p.name}
+                    </span>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <Button
+          className="btn-newayzi-primary"
+          size="sm"
+          isLoading={saving}
+          isDisabled={listsLoading}
+          onPress={handleSave}
+          startContent={!saving && <Icon icon="solar:diskette-bold" width={16} />}
+        >
+          Guardar alcance
+        </Button>
+        <p className="text-[11px] text-white/35">
+          {opSelected.size + propSelected.size === 0
+            ? "Sin selección: inventario completo."
+            : `${opSelected.size} operador(es), ${propSelected.size} propiedad(es).`}
+        </p>
+      </div>
+    </GlassCard>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function AgencyDetailClient() {
@@ -408,10 +596,13 @@ export function AgencyDetailClient() {
 
   useEffect(() => {
     if (!id) return;
-    adminApi.getAgency(id).then((data) => {
-      setAgency(data ?? null);
-      setLoading(false);
-    });
+    adminApi
+      .getAgency(id)
+      .then((data) => {
+        setAgency(data ?? null);
+      })
+      .catch(() => setAgency(null))
+      .finally(() => setLoading(false));
   }, [id]);
 
   if (loading) {
@@ -540,6 +731,13 @@ export function AgencyDetailClient() {
           </p>
         )}
       </GlassCard>
+
+      {isSuperAdmin && (
+        <AgencyInventoryScopeSection
+          agency={agency}
+          onSaved={(a) => setAgency(a)}
+        />
+      )}
 
       {/* Wallet Rewards: solo plataforma; operador no llama al API ni ve movimientos */}
       {!isOperator && <AgencyWalletSection agencyId={id} isSuperAdmin={isSuperAdmin} />}
