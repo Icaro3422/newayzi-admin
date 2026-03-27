@@ -498,19 +498,21 @@ export interface Agency {
   contact_email?: string;
   contact_phone?: string;
   is_active: boolean;
+  /** Solo plataforma; el operador no recibe estos campos en el listado. */
   level_name?: string | null;
   total_sales: string;
-  total_commission: string;
+  total_commission?: string;
   bookings_count: number;
 }
 
 export interface AgencyDetail extends Agency {
   summary: {
     total_sales: string;
-    total_commission: string;
+    /** Solo plataforma. */
+    total_commission?: string;
     bookings_count: number;
-    level_id: number | null;
-    level_name: string | null;
+    level_id?: number | null;
+    level_name?: string | null;
     updated_at: string | null;
   };
   created: string;

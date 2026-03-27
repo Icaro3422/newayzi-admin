@@ -44,7 +44,8 @@ function GlassCard({
   );
 }
 
-function formatCurrency(value: string | number): string {
+function formatCurrency(value: string | number | undefined): string {
+  if (value === undefined || value === "") return "—";
   const n = typeof value === "string" ? parseFloat(value) : value;
   if (Number.isNaN(n)) return "—";
   return new Intl.NumberFormat("es-CO", {
@@ -209,13 +210,6 @@ function AgencyWalletSection({ agencyId, isSuperAdmin }: { agencyId: number; isS
           </div>
         )}
       </div>
-
-      {!isSuperAdmin && (
-        <p className="text-xs text-white/45 mb-4 -mt-1 max-w-2xl">
-          Los agentes que invites empiezan en nivel base (Member) sin puntos extra. Cambios de nivel, bonos y ajustes
-          los aplica solo el equipo Newayzi; coordina con ellos si hace falta.
-        </p>
-      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-5">
@@ -410,6 +404,7 @@ export function AgencyDetailClient() {
   const [loading, setLoading] = useState(true);
   const { me } = useAdmin();
   const isSuperAdmin = me?.role === "super_admin";
+  const isOperator = me?.role === "operador";
 
   useEffect(() => {
     if (!id) return;
@@ -476,38 +471,57 @@ export function AgencyDetailClient() {
         </Chip>
       </div>
 
-      {/* KPIs */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <GlassCard className="p-5">
-          <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Nivel</span>
-          <p className="mt-2 text-xl font-semibold text-white">{agency.level_name ?? "—"}</p>
-        </GlassCard>
+      {/* KPIs: operador solo rendimiento comercial; super_admin ve también nivel de socio y comisiones */}
+      <div
+        className={`grid gap-4 md:grid-cols-2 ${isOperator ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}
+      >
+        {!isOperator && (
+          <GlassCard className="p-5">
+            <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Nivel de socio</span>
+            <p className="mt-2 text-xl font-semibold text-white">{agency.level_name ?? "—"}</p>
+            <p className="mt-1 text-[11px] text-white/40">Según ventas acumuladas del programa de agencias</p>
+          </GlassCard>
+        )}
         <GlassCard className="p-5">
           <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Ventas totales</span>
           <p className="mt-2 text-xl font-semibold text-white">{formatCurrency(s.total_sales)}</p>
         </GlassCard>
-        <GlassCard className="p-5">
-          <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Comisión generada</span>
-          <p className="mt-2 text-xl font-semibold text-[#b89eff]">{formatCurrency(s.total_commission)}</p>
-        </GlassCard>
+        {!isOperator && (
+          <GlassCard className="p-5">
+            <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Comisión generada</span>
+            <p className="mt-2 text-xl font-semibold text-[#b89eff]">{formatCurrency(s.total_commission)}</p>
+          </GlassCard>
+        )}
         <GlassCard className="p-5">
           <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Reservas</span>
           <p className="mt-2 text-xl font-semibold text-white">{s.bookings_count}</p>
         </GlassCard>
+        {isOperator && (
+          <GlassCard className="p-5">
+            <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Última actividad</span>
+            <p className="mt-2 text-lg font-semibold text-white">
+              {s.updated_at ? new Date(s.updated_at).toLocaleString("es-CO") : "—"}
+            </p>
+          </GlassCard>
+        )}
       </div>
 
       {/* Business summary */}
       <GlassCard>
-        <h3 className="font-sora font-bold text-white text-base mb-4">Resumen de negocio</h3>
+        <h3 className="font-sora font-bold text-white text-base mb-4">
+          {isOperator ? "Actividad del agente" : "Resumen de negocio"}
+        </h3>
         <dl className="grid gap-4 sm:grid-cols-2">
           <div>
             <dt className="text-sm text-white/50">Ventas totales (reservas confirmadas)</dt>
             <dd className="font-medium text-white mt-1">{formatCurrency(s.total_sales)}</dd>
           </div>
-          <div>
-            <dt className="text-sm text-white/50">Comisión acumulada</dt>
-            <dd className="font-medium text-white mt-1">{formatCurrency(s.total_commission)}</dd>
-          </div>
+          {!isOperator && (
+            <div>
+              <dt className="text-sm text-white/50">Comisión acumulada</dt>
+              <dd className="font-medium text-white mt-1">{formatCurrency(s.total_commission)}</dd>
+            </div>
+          )}
           <div>
             <dt className="text-sm text-white/50">Número de reservas</dt>
             <dd className="font-medium text-white mt-1">{s.bookings_count}</dd>
@@ -519,10 +533,16 @@ export function AgencyDetailClient() {
             </dd>
           </div>
         </dl>
+        {isOperator && (
+          <p className="mt-4 text-xs text-white/40 border-t border-white/[0.08] pt-4">
+            Nivel de socio, comisiones del programa y Newayzi Rewards (puntos, bonos) los gestiona Newayzi. Si necesitas
+            un ajuste para tu agente, coordina con el equipo.
+          </p>
+        )}
       </GlassCard>
 
-      {/* Wallet Rewards */}
-      <AgencyWalletSection agencyId={id} isSuperAdmin={isSuperAdmin} />
+      {/* Wallet Rewards: solo plataforma; operador no llama al API ni ve movimientos */}
+      {!isOperator && <AgencyWalletSection agencyId={id} isSuperAdmin={isSuperAdmin} />}
     </div>
   );
 }

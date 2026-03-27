@@ -23,8 +23,8 @@ function GlassCard({
   );
 }
 
-function formatCurrency(value: string): string {
-  const n = parseFloat(value);
+function formatCurrency(value: string | undefined): string {
+  const n = parseFloat(value ?? "");
   if (Number.isNaN(n)) return "—";
   return new Intl.NumberFormat("es-CO", {
     style: "currency",
@@ -34,7 +34,8 @@ function formatCurrency(value: string): string {
 }
 
 export function AgenciesList({ refreshKey = 0 }: { refreshKey?: number }) {
-  const { canAccess } = useAdmin();
+  const { me } = useAdmin();
+  const isOperator = me?.role === "operador";
   const [list, setList] = useState<Agency[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -84,15 +85,19 @@ export function AgenciesList({ refreshKey = 0 }: { refreshKey?: number }) {
               <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
                 Contacto
               </th>
-              <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
-                Nivel
-              </th>
+              {!isOperator && (
+                <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
+                  Nivel
+                </th>
+              )}
               <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
                 Ventas
               </th>
-              <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
-                Comisión
-              </th>
+              {!isOperator && (
+                <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
+                  Comisión
+                </th>
+              )}
               <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
                 Reservas
               </th>
@@ -121,11 +126,15 @@ export function AgenciesList({ refreshKey = 0 }: { refreshKey?: number }) {
                 <td className="py-4 px-5 text-white/70 text-sm">
                   {a.contact_email || a.contact_phone || "—"}
                 </td>
-                <td className="py-4 px-5 text-white/70 text-sm">{a.level_name ?? "—"}</td>
+                {!isOperator && (
+                  <td className="py-4 px-5 text-white/70 text-sm">{a.level_name ?? "—"}</td>
+                )}
                 <td className="py-4 px-5 text-white/70 text-sm">{formatCurrency(a.total_sales)}</td>
-                <td className="py-4 px-5 text-white/70 text-sm">
-                  {formatCurrency(a.total_commission)}
-                </td>
+                {!isOperator && (
+                  <td className="py-4 px-5 text-white/70 text-sm">
+                    {formatCurrency(a.total_commission)}
+                  </td>
+                )}
                 <td className="py-4 px-5 text-white/70 text-sm">{a.bookings_count}</td>
                 <td className="py-4 px-5">
                   <span
