@@ -40,6 +40,186 @@ function gaugeMax(price: number) {
   return Math.ceil(raw / pow10) * pow10;
 }
 
+type BarSeriesPoint = {
+  value: number;
+  itemStyle: { color: ReturnType<typeof barGradient> };
+};
+
+function buildBarOption(categories: string[], data: BarSeriesPoint[]) {
+  const barCount = categories.length;
+  const rotate = barCount > 6 ? 32 : barCount > 5 ? 22 : 0;
+  const bottomPct = barCount > 6 ? "18%" : barCount > 5 ? "14%" : "4%";
+  const barMaxW = barCount > 7 ? 28 : barCount > 6 ? 30 : 36;
+
+  return {
+    backgroundColor: "transparent",
+    tooltip: {
+      ...tooltipBase,
+      trigger: "axis" as const,
+      axisPointer: { type: "shadow" as const },
+    },
+    grid: { left: "2%", right: "2%", bottom: bottomPct, top: "10%", containLabel: true },
+    xAxis: {
+      type: "category" as const,
+      data: categories,
+      axisLine: { lineStyle: { color: "rgba(255,255,255,0.12)" } },
+      axisTick: { show: false },
+      axisLabel: {
+        color: "rgba(255,255,255,0.5)",
+        fontSize: barCount > 6 ? 9 : 10,
+        interval: 0,
+        rotate,
+        hideOverlap: true,
+      },
+    },
+    yAxis: {
+      type: "value" as const,
+      splitLine: { lineStyle: { color: "rgba(255,255,255,0.06)" } },
+      axisLabel: { color: "rgba(255,255,255,0.35)", fontSize: 10 },
+    },
+    series: [
+      {
+        type: "bar" as const,
+        barMaxWidth: barMaxW,
+        data,
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 12,
+            shadowColor: "rgba(94, 44, 236, 0.45)",
+          },
+        },
+      },
+    ],
+  };
+}
+
+function buildLineAreaOption(
+  categories: string[],
+  data: BarSeriesPoint[],
+  lineColor: string,
+  itemBorder: string,
+  areaTop: string,
+  areaMid: string,
+  areaBot: string
+) {
+  const barCount = categories.length;
+  const values = data.map((d) => d.value);
+  const rotate = barCount > 6 ? 32 : barCount > 5 ? 22 : 0;
+  const bottomPct = barCount > 6 ? "18%" : barCount > 5 ? "14%" : "8%";
+
+  return {
+    backgroundColor: "transparent",
+    tooltip: {
+      ...tooltipBase,
+      trigger: "axis" as const,
+      axisPointer: { type: "line" as const, lineStyle: { color: "rgba(155,116,255,0.4)", width: 1 } },
+    },
+    grid: { left: "2%", right: "2%", bottom: bottomPct, top: "12%", containLabel: true },
+    xAxis: {
+      type: "category" as const,
+      data: categories,
+      boundaryGap: false,
+      axisLine: { lineStyle: { color: "rgba(255,255,255,0.12)" } },
+      axisTick: { show: false },
+      axisLabel: {
+        color: "rgba(255,255,255,0.5)",
+        fontSize: barCount > 6 ? 9 : 10,
+        interval: 0,
+        rotate,
+        hideOverlap: true,
+      },
+    },
+    yAxis: {
+      type: "value" as const,
+      splitLine: { lineStyle: { color: "rgba(255,255,255,0.06)" } },
+      axisLabel: { color: "rgba(255,255,255,0.35)", fontSize: 10 },
+    },
+    series: [
+      {
+        type: "line" as const,
+        smooth: true,
+        symbol: "circle",
+        symbolSize: 7,
+        lineStyle: { width: 2.5, color: lineColor },
+        itemStyle: { color: lineColor, borderColor: itemBorder, borderWidth: 2 },
+        areaStyle: {
+          color: {
+            type: "linear" as const,
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: areaTop },
+              { offset: 0.55, color: areaMid },
+              { offset: 1, color: areaBot },
+            ],
+          },
+        },
+        data: values,
+      },
+    ],
+  };
+}
+
+function buildRadarOption(
+  categories: string[],
+  rawValues: number[],
+  seriesName: string,
+  lineColor: string,
+  areaRgba: string,
+  itemBorderColor: string
+) {
+  const maxVal = Math.max(...rawValues, 1);
+  const normalized = rawValues.map((v) => Math.round((v / maxVal) * 100));
+
+  return {
+    backgroundColor: "transparent",
+    tooltip: {
+      ...tooltipBase,
+      trigger: "item" as const,
+      formatter: (params: { name?: string; data?: { value?: number[] } }) => {
+        const vals = params.data?.value ?? normalized;
+        const lines = categories.map(
+          (c, i) =>
+            `${c}: <strong>${rawValues[i]}</strong> <span style="opacity:0.65">(${vals[i]}% del máximo local)</span>`
+        );
+        return `<div style="font-weight:600;margin-bottom:6px">${params.name ?? "Balance"}</div>${lines.join("<br/>")}`;
+      },
+    },
+    radar: {
+      indicator: categories.map((name) => ({ name, max: 100 })),
+      radius: "66%",
+      center: ["50%", "54%"],
+      splitNumber: 4,
+      axisName: {
+        color: "rgba(255,255,255,0.5)",
+        fontSize: 10,
+        lineHeight: 14,
+      },
+      splitLine: { lineStyle: { color: "rgba(255,255,255,0.08)" } },
+      splitArea: {
+        show: true,
+        areaStyle: {
+          color: ["rgba(255,255,255,0.03)", "rgba(139,92,246,0.06)"],
+        },
+      },
+      axisLine: { lineStyle: { color: "rgba(255,255,255,0.12)" } },
+    },
+    series: [
+      {
+        type: "radar" as const,
+        symbol: "circle",
+        symbolSize: 5,
+        lineStyle: { width: 2, color: lineColor },
+        areaStyle: { color: areaRgba },
+        itemStyle: { color: lineColor, borderColor: itemBorderColor, borderWidth: 1 },
+        data: [{ value: normalized, name: seriesName }],
+      },
+    ],
+  };
+}
+
 export function OperatorInfrastructureCharts({
   properties,
   activeProps,
@@ -78,24 +258,14 @@ export function OperatorInfrastructureCharts({
     globalAverage: number | null;
   } | null;
 }) {
-  const barCategoriesAndData = useMemo(() => {
-    const categories: string[] = [
-      "Propiedades",
-      "Activas",
-      "Publicadas",
-      "Conexiones",
-      "Sync",
-      "Pendientes",
-    ];
-    const data: { value: number; itemStyle: { color: ReturnType<typeof barGradient> } }[] = [
+  const portfolioBarCategoriesAndData = useMemo(() => {
+    const categories: string[] = ["Propiedades", "Activas", "Publicadas", "Conexiones"];
+    const data: BarSeriesPoint[] = [
       { value: properties.length, itemStyle: { color: barGradient("#9b74ff", "#5e2cec") } },
       { value: activeProps, itemStyle: { color: barGradient("#7c6bff", "#422df6") } },
       { value: publishedProps, itemStyle: { color: barGradient("#6ee7b7", "#10b981") } },
       { value: connections.length, itemStyle: { color: barGradient("#c4b5fd", "#8b5cf6") } },
-      { value: totalSynced, itemStyle: { color: barGradient("#67e8f9", "#06b6d4") } },
-      { value: totalPending, itemStyle: { color: barGradient("#fcd34d", "#f59e0b") } },
     ];
-
     if (showAgenciesBar) {
       categories.push("Agencias");
       data.push({
@@ -110,132 +280,69 @@ export function OperatorInfrastructureCharts({
         itemStyle: { color: barGradient("#93c5fd", "#2563eb") },
       });
     }
-
     return { categories, data, barCount: categories.length };
   }, [
     properties.length,
     connections.length,
     activeProps,
     publishedProps,
-    totalSynced,
-    totalPending,
     agenciesCount,
     showAgenciesBar,
     operatorsCount,
     showOperatorsBar,
   ]);
 
-  const barOption = useMemo(() => {
-    const { categories, data, barCount } = barCategoriesAndData;
-    const rotate = barCount > 6 ? 32 : barCount > 5 ? 22 : 0;
-    const bottomPct = barCount > 6 ? "18%" : barCount > 5 ? "14%" : "4%";
-    const barMaxW = barCount > 7 ? 28 : barCount > 6 ? 30 : 36;
+  const pmsUnitsBarCategoriesAndData = useMemo(() => {
+    const totalUnits = totalSynced + totalPending;
+    const categories = ["Sincronizadas", "Pendientes", "Total unidades"];
+    const data: BarSeriesPoint[] = [
+      { value: totalSynced, itemStyle: { color: barGradient("#67e8f9", "#06b6d4") } },
+      { value: totalPending, itemStyle: { color: barGradient("#fcd34d", "#f59e0b") } },
+      { value: totalUnits, itemStyle: { color: barGradient("#a5b4fc", "#6366f1") } },
+    ];
+    return { categories, data, barCount: categories.length };
+  }, [totalSynced, totalPending]);
 
-    return {
-      backgroundColor: "transparent",
-      tooltip: {
-        ...tooltipBase,
-        trigger: "axis" as const,
-        axisPointer: { type: "shadow" as const },
-      },
-      grid: { left: "2%", right: "2%", bottom: bottomPct, top: "10%", containLabel: true },
-      xAxis: {
-        type: "category" as const,
-        data: categories,
-        axisLine: { lineStyle: { color: "rgba(255,255,255,0.12)" } },
-        axisTick: { show: false },
-        axisLabel: {
-          color: "rgba(255,255,255,0.5)",
-          fontSize: barCount > 6 ? 9 : 10,
-          interval: 0,
-          rotate,
-          hideOverlap: true,
-        },
-      },
-      yAxis: {
-        type: "value" as const,
-        splitLine: { lineStyle: { color: "rgba(255,255,255,0.06)" } },
-        axisLabel: { color: "rgba(255,255,255,0.35)", fontSize: 10 },
-      },
-      series: [
-        {
-          type: "bar" as const,
-          barMaxWidth: barMaxW,
-          data,
-          emphasis: {
-            itemStyle: {
-              shadowBlur: 12,
-              shadowColor: "rgba(94, 44, 236, 0.45)",
-            },
-          },
-        },
-      ],
-    };
-  }, [barCategoriesAndData]);
+  const portfolioBarOption = useMemo(
+    () => buildBarOption(portfolioBarCategoriesAndData.categories, portfolioBarCategoriesAndData.data),
+    [portfolioBarCategoriesAndData]
+  );
 
-  const barChartHeight = barCategoriesAndData.barCount > 6 ? 248 : 220;
+  const portfolioLineOption = useMemo(
+    () =>
+      buildLineAreaOption(
+        portfolioBarCategoriesAndData.categories,
+        portfolioBarCategoriesAndData.data,
+        "#a78bfa",
+        "#5e2cec",
+        "rgba(167, 139, 250, 0.42)",
+        "rgba(94, 44, 236, 0.12)",
+        "rgba(94, 44, 236, 0.02)"
+      ),
+    [portfolioBarCategoriesAndData]
+  );
 
-  /** Perfil entre categorías del resumen (snapshot actual; no es serie histórica en el tiempo). */
-  const lineAreaOption = useMemo(() => {
-    const { categories, data, barCount } = barCategoriesAndData;
-    const values = data.map((d) => d.value);
-    const rotate = barCount > 6 ? 32 : barCount > 5 ? 22 : 0;
-    const bottomPct = barCount > 6 ? "18%" : barCount > 5 ? "14%" : "8%";
+  const pmsUnitsBarOption = useMemo(
+    () => buildBarOption(pmsUnitsBarCategoriesAndData.categories, pmsUnitsBarCategoriesAndData.data),
+    [pmsUnitsBarCategoriesAndData]
+  );
 
-    return {
-      backgroundColor: "transparent",
-      tooltip: {
-        ...tooltipBase,
-        trigger: "axis" as const,
-        axisPointer: { type: "line" as const, lineStyle: { color: "rgba(155,116,255,0.4)", width: 1 } },
-      },
-      grid: { left: "2%", right: "2%", bottom: bottomPct, top: "12%", containLabel: true },
-      xAxis: {
-        type: "category" as const,
-        data: categories,
-        boundaryGap: false,
-        axisLine: { lineStyle: { color: "rgba(255,255,255,0.12)" } },
-        axisTick: { show: false },
-        axisLabel: {
-          color: "rgba(255,255,255,0.5)",
-          fontSize: barCount > 6 ? 9 : 10,
-          interval: 0,
-          rotate,
-          hideOverlap: true,
-        },
-      },
-      yAxis: {
-        type: "value" as const,
-        splitLine: { lineStyle: { color: "rgba(255,255,255,0.06)" } },
-        axisLabel: { color: "rgba(255,255,255,0.35)", fontSize: 10 },
-      },
-      series: [
-        {
-          type: "line" as const,
-          smooth: true,
-          symbol: "circle",
-          symbolSize: 7,
-          lineStyle: { width: 2.5, color: "#a78bfa" },
-          itemStyle: { color: "#e9d5ff", borderColor: "#5e2cec", borderWidth: 2 },
-          areaStyle: {
-            color: {
-              type: "linear" as const,
-              x: 0,
-              y: 0,
-              x2: 0,
-              y2: 1,
-              colorStops: [
-                { offset: 0, color: "rgba(167, 139, 250, 0.42)" },
-                { offset: 0.55, color: "rgba(94, 44, 236, 0.12)" },
-                { offset: 1, color: "rgba(94, 44, 236, 0.02)" },
-              ],
-            },
-          },
-          data: values,
-        },
-      ],
-    };
-  }, [barCategoriesAndData]);
+  const pmsUnitsLineOption = useMemo(
+    () =>
+      buildLineAreaOption(
+        pmsUnitsBarCategoriesAndData.categories,
+        pmsUnitsBarCategoriesAndData.data,
+        "#22d3ee",
+        "#0891b2",
+        "rgba(34, 211, 238, 0.38)",
+        "rgba(6, 182, 212, 0.14)",
+        "rgba(6, 182, 212, 0.03)"
+      ),
+    [pmsUnitsBarCategoriesAndData]
+  );
+
+  const portfolioBarChartHeight = portfolioBarCategoriesAndData.barCount > 6 ? 248 : 220;
+  const pmsUnitsBarChartHeight = pmsUnitsBarCategoriesAndData.barCount > 6 ? 248 : 220;
 
   const funnelOption = useMemo(() => {
     const total = properties.length;
@@ -290,55 +397,31 @@ export function OperatorInfrastructureCharts({
     };
   }, [properties.length, activeProps, publishedProps]);
 
-  const radarOption = useMemo(() => {
-    const { categories, data } = barCategoriesAndData;
+  const portfolioRadarOption = useMemo(() => {
+    const { categories, data } = portfolioBarCategoriesAndData;
     const rawValues = data.map((d) => d.value);
-    const maxVal = Math.max(...rawValues, 1);
-    const normalized = rawValues.map((v) => Math.round((v / maxVal) * 100));
+    return buildRadarOption(
+      categories,
+      rawValues,
+      "Propiedades y cartera",
+      "#c4b5fd",
+      "rgba(139, 92, 246, 0.22)",
+      "#5e2cec"
+    );
+  }, [portfolioBarCategoriesAndData]);
 
-    return {
-      backgroundColor: "transparent",
-      tooltip: {
-        ...tooltipBase,
-        trigger: "item" as const,
-        formatter: (params: { name?: string; data?: { value?: number[] } }) => {
-          const vals = params.data?.value ?? normalized;
-          const lines = categories.map((c, i) => `${c}: <strong>${rawValues[i]}</strong> <span style="opacity:0.65">(${vals[i]}% del máximo local)</span>`);
-          return `<div style="font-weight:600;margin-bottom:6px">${params.name ?? "Balance"}</div>${lines.join("<br/>")}`;
-        },
-      },
-      radar: {
-        indicator: categories.map((name) => ({ name, max: 100 })),
-        radius: "66%",
-        center: ["50%", "54%"],
-        splitNumber: 4,
-        axisName: {
-          color: "rgba(255,255,255,0.5)",
-          fontSize: 10,
-          lineHeight: 14,
-        },
-        splitLine: { lineStyle: { color: "rgba(255,255,255,0.08)" } },
-        splitArea: {
-          show: true,
-          areaStyle: {
-            color: ["rgba(255,255,255,0.03)", "rgba(139,92,246,0.06)"],
-          },
-        },
-        axisLine: { lineStyle: { color: "rgba(255,255,255,0.12)" } },
-      },
-      series: [
-        {
-          type: "radar" as const,
-          symbol: "circle",
-          symbolSize: 5,
-          lineStyle: { width: 2, color: "#c4b5fd" },
-          areaStyle: { color: "rgba(139, 92, 246, 0.22)" },
-          itemStyle: { color: "#a78bfa", borderColor: "#5e2cec", borderWidth: 1 },
-          data: [{ value: normalized, name: "Balance de KPIs" }],
-        },
-      ],
-    };
-  }, [barCategoriesAndData]);
+  const pmsUnitsRadarOption = useMemo(() => {
+    const { categories, data } = pmsUnitsBarCategoriesAndData;
+    const rawValues = data.map((d) => d.value);
+    return buildRadarOption(
+      categories,
+      rawValues,
+      "Unidades PMS",
+      "#67e8f9",
+      "rgba(34, 211, 238, 0.2)",
+      "#0891b2"
+    );
+  }, [pmsUnitsBarCategoriesAndData]);
 
   const priceGaugeOption = useMemo(() => {
     if (!showPriceChart || averagePriceSynced == null || !Number.isFinite(averagePriceSynced)) {
@@ -592,29 +675,61 @@ export function OperatorInfrastructureCharts({
 
   return (
     <div className="space-y-6 min-w-0">
-      {/* Curvas de línea/área: perfil entre métricas del snapshot; no son histórico temporal. */}
+      {/* Izquierda: propiedades y conexiones. Derecha: tipos/unidades PMS (misma escala propia). */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-        <div className="min-w-0">
-          <p className="text-white/45 text-[0.62rem] uppercase tracking-[0.12em] font-semibold mb-2">
-            Resumen operativo
-          </p>
-          <ReactECharts
-            option={barOption}
-            style={{ height: barChartHeight, width: "100%" }}
-            opts={{ renderer: "svg" }}
-            className="min-w-0"
-          />
+        <div className="min-w-0 space-y-4">
+          <div>
+            <p className="text-white/45 text-[0.62rem] uppercase tracking-[0.12em] font-semibold mb-0.5">
+              Propiedades y conexiones
+            </p>
+            <p className="text-white/30 text-[0.6rem] leading-snug mb-2">
+              Conteos de propiedades en la plataforma y conexiones PMS activas.
+            </p>
+            <ReactECharts
+              option={portfolioBarOption}
+              style={{ height: portfolioBarChartHeight, width: "100%" }}
+              opts={{ renderer: "svg" }}
+              className="min-w-0"
+            />
+          </div>
+          <div>
+            <p className="text-white/45 text-[0.62rem] uppercase tracking-[0.12em] font-semibold mb-2">
+              Perfil (cartera)
+            </p>
+            <ReactECharts
+              option={portfolioLineOption}
+              style={{ height: portfolioBarChartHeight, width: "100%" }}
+              opts={{ renderer: "svg" }}
+              className="min-w-0"
+            />
+          </div>
         </div>
-        <div className="min-w-0">
-          <p className="text-white/45 text-[0.62rem] uppercase tracking-[0.12em] font-semibold mb-2">
-            Perfil de métricas
-          </p>
-          <ReactECharts
-            option={lineAreaOption}
-            style={{ height: barChartHeight, width: "100%" }}
-            opts={{ renderer: "svg" }}
-            className="min-w-0"
-          />
+        <div className="min-w-0 space-y-4">
+          <div>
+            <p className="text-white/45 text-[0.62rem] uppercase tracking-[0.12em] font-semibold mb-0.5">
+              Unidades PMS
+            </p>
+            <p className="text-white/30 text-[0.6rem] leading-snug mb-2">
+              Tipos de habitación / unidades reportadas por el PMS (sincronizadas, pendientes y total).
+            </p>
+            <ReactECharts
+              option={pmsUnitsBarOption}
+              style={{ height: pmsUnitsBarChartHeight, width: "100%" }}
+              opts={{ renderer: "svg" }}
+              className="min-w-0"
+            />
+          </div>
+          <div>
+            <p className="text-white/45 text-[0.62rem] uppercase tracking-[0.12em] font-semibold mb-2">
+              Perfil (unidades PMS)
+            </p>
+            <ReactECharts
+              option={pmsUnitsLineOption}
+              style={{ height: pmsUnitsBarChartHeight, width: "100%" }}
+              opts={{ renderer: "svg" }}
+              className="min-w-0"
+            />
+          </div>
         </div>
       </div>
 
@@ -630,16 +745,37 @@ export function OperatorInfrastructureCharts({
             className="min-w-0"
           />
         </div>
-        <div className="min-w-0">
-          <p className="text-white/45 text-[0.62rem] uppercase tracking-[0.12em] font-semibold mb-2">
-            Balance de KPIs (relativo)
+        <div className="min-w-0 space-y-4">
+          <p className="text-white/45 text-[0.62rem] uppercase tracking-[0.12em] font-semibold mb-1">
+            Balance relativo (dos ejes)
           </p>
-          <ReactECharts
-            option={radarOption}
-            style={{ height: 300, width: "100%" }}
-            opts={{ renderer: "svg" }}
-            className="min-w-0"
-          />
+          <p className="text-white/30 text-[0.6rem] leading-snug mb-2">
+            Cada radar normaliza solo dentro de su grupo: no mezcla propiedades con unidades PMS.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="min-w-0">
+              <p className="text-white/40 text-[0.58rem] uppercase tracking-[0.1em] font-semibold mb-1.5">
+                Propiedades
+              </p>
+              <ReactECharts
+                option={portfolioRadarOption}
+                style={{ height: 280, width: "100%" }}
+                opts={{ renderer: "svg" }}
+                className="min-w-0"
+              />
+            </div>
+            <div className="min-w-0">
+              <p className="text-white/40 text-[0.58rem] uppercase tracking-[0.1em] font-semibold mb-1.5">
+                Unidades PMS
+              </p>
+              <ReactECharts
+                option={pmsUnitsRadarOption}
+                style={{ height: 280, width: "100%" }}
+                opts={{ renderer: "svg" }}
+                className="min-w-0"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
