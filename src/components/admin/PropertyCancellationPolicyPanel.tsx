@@ -238,6 +238,7 @@ export function PropertyCancellationPolicyPanel({ propertyId, readOnly = false }
   const [effectiveFrom, setEffectiveFrom] = useState("");
   const [effectiveUntil, setEffectiveUntil] = useState("");
   const [saving, setSaving] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -289,6 +290,25 @@ export function PropertyCancellationPolicyPanel({ propertyId, readOnly = false }
     }
   }
 
+  async function handleClearPolicy() {
+    const msg =
+      "¿Quitar la política de cancelación de esta propiedad?\n\n" +
+      "Las cancelaciones volverán a regirse por los términos estándar de Newayzi (T&C §19). " +
+      "El historial de políticas anteriores se conserva.";
+    if (!window.confirm(msg)) return;
+    setClearing(true);
+    setError("");
+    try {
+      await propertyCancellationPolicies.clear(propertyId);
+      setError("");
+      await load();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "No se pudo quitar la política.");
+    } finally {
+      setClearing(false);
+    }
+  }
+
   const inputCls = "w-full bg-white/[0.06] border border-white/[0.12] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#7c5cfc]/60 focus:ring-1 focus:ring-[#7c5cfc]/30 transition";
 
   if (loading) {
@@ -317,19 +337,38 @@ export function PropertyCancellationPolicyPanel({ propertyId, readOnly = false }
           </p>
         </div>
         {canEdit && !showEditor && (
-          <button
-            onClick={() => {
-              setPolicyType(active?.policyType ?? "moderate");
-              setTiers(active?.tiers ?? data?.presets?.moderate ?? []);
-              setEffectiveFrom(active?.effectiveFrom ?? "");
-              setEffectiveUntil(active?.effectiveUntil ?? "");
-              setShowEditor(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#5e2cec] text-white text-sm font-semibold hover:bg-[#7c5cfc] transition shrink-0"
-          >
-            <Icon icon={active ? "solar:pen-bold-duotone" : "solar:add-circle-bold-duotone"} className="text-base" />
-            {active ? "Cambiar política" : "Crear política"}
-          </button>
+          <div className="flex flex-wrap items-center gap-2 shrink-0 justify-end">
+            {active ? (
+              <button
+                type="button"
+                onClick={handleClearPolicy}
+                disabled={clearing}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/[0.14] bg-white/[0.04] text-white/85 text-sm font-semibold hover:bg-red-500/10 hover:border-red-400/35 hover:text-red-200 transition disabled:opacity-50"
+              >
+                {clearing ? (
+                  <Icon icon="solar:loading-line-duotone" className="text-base animate-spin" />
+                ) : (
+                  <Icon icon="solar:archive-minimalistic-bold-duotone" className="text-base" />
+                )}
+                {clearing ? "Quitando…" : "Quitar política"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                setPolicyType(active?.policyType ?? "moderate");
+                setTiers(active?.tiers ?? data?.presets?.moderate ?? []);
+                setEffectiveFrom(active?.effectiveFrom ?? "");
+                setEffectiveUntil(active?.effectiveUntil ?? "");
+                setShowEditor(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#5e2cec] text-white text-sm font-semibold hover:bg-[#7c5cfc] transition"
+            >
+              <Icon icon={active ? "solar:pen-bold-duotone" : "solar:add-circle-bold-duotone"} className="text-base" />
+              {active ? "Cambiar política" : "Crear política"}
+            </button>
+          </div>
         )}
         {isLocked && (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/25 text-amber-300 text-xs font-semibold shrink-0">
@@ -338,6 +377,13 @@ export function PropertyCancellationPolicyPanel({ propertyId, readOnly = false }
           </span>
         )}
       </div>
+
+      {error && !showEditor && (
+        <div className="rounded-xl bg-red-500/15 border border-red-400/25 px-4 py-3 flex items-center gap-2">
+          <Icon icon="solar:danger-circle-bold-duotone" className="text-red-400 text-base shrink-0" />
+          <p className="text-red-200 text-sm">{error}</p>
+        </div>
+      )}
 
       {/* Estado actual */}
       {active && !showEditor && <PolicyReadOnly policy={active} />}

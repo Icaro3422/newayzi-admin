@@ -2235,4 +2235,11 @@ export const propertyCancellationPolicies = {
     });
     return res.json();
   },
+
+  /** Desactiva la política de la propiedad; aplica de nuevo la lógica estándar (T&C §19). */
+  async clear(propertyId: number): Promise<void> {
+    await authFetch(`/api/admin/properties/${propertyId}/cancellation-policy/`, {
+      method: "DELETE",
+    });
+  },
 };
