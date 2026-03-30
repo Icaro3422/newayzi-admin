@@ -377,6 +377,8 @@ export interface ConnectionSyncNowResponse {
     pricing_unavailable_properties?: string[];
     phase_totals?: Record<string, unknown>;
     errors: string[];
+    siteconnect_event_driven?: boolean;
+    siteconnect_skip_message?: string;
   };
   window?: {
     start_date: string;
@@ -391,6 +393,7 @@ export interface ConnectionSyncStreamEvent {
     | "phase_started"
     | "item_progress"
     | "phase_summary"
+    | "sync_skipped"
     | "sync_completed"
     | "sync_finished"
     | "sync_error"
@@ -1084,9 +1087,13 @@ export const adminApi = {
 
   async patchConnection(
     id: number,
-    data: { is_active?: boolean; config?: { base_url?: string; username?: string; password?: string } }
+    data: { is_active?: boolean; config?: Record<string, unknown> }
   ): Promise<PMSConnectionDetail> {
     return patchJson<PMSConnectionDetail>(`/api/admin/pms/connections/${id}/`, data);
+  },
+
+  async testPmsConnection(id: number): Promise<{ ok: boolean; detail?: string }> {
+    return postJson<{ ok: boolean; detail?: string }>(`/api/admin/pms/connections/${id}/test/`, {});
   },
 
   async syncConnectionNow(id: number): Promise<ConnectionSyncNowResponse> {

@@ -24,6 +24,7 @@ const PMS_ICONS: Record<string, string> = {
   cloudbeds: "solar:cloud-bold-duotone",
   stays: "solar:home-smile-bold-duotone",
   generic: "solar:link-circle-bold-duotone",
+  siteminder_siteconnect: "solar:global-bold-duotone",
 };
 
 const PMS_DESCRIPTIONS: Record<string, string> = {
@@ -31,6 +32,8 @@ const PMS_DESCRIPTIONS: Record<string, string> = {
   cloudbeds: "Plataforma de gestión hotelera CloudBeds",
   stays: "Sistema de reservas Stays",
   generic: "Cualquier PMS vía API genérica (Booking, OTAs propias, etc.)",
+  siteminder_siteconnect:
+    "Canal SiteMinder SiteConnect (SOAP/OTA): SiteMinder llama a vuestra URL; reservas salen al gateway SOAP.",
 };
 
 /** Campos de credenciales requeridos por cada tipo de PMS */
@@ -51,11 +54,45 @@ const PMS_CONFIG_FIELDS: Record<
     { key: "base_url", label: "URL de la API", required: true, placeholder: "https://partner.stays.net", type: "url", description: "URL base del endpoint Stays" },
     { key: "username", label: "Usuario", required: true, placeholder: "Email o usuario API" },
     { key: "password", label: "Contraseña", required: true, placeholder: "Contraseña API", type: "password" },
+    { key: "property_id", label: "Property ID (opcional)", required: false, placeholder: "Solo esta propiedad Stays", description: "Si se indica, solo se sincronizan listings de esa propiedad." },
+    { key: "listing_ids", label: "Listing IDs (opcional, JSON array)", required: false, placeholder: '["ABC12","XYZ99"]', description: "Lista de IDs de listing (room types) a incluir; se puede combinar con property_id." },
+    {
+      key: "stays_refresh_reservation_after_create",
+      label: "Refrescar reserva tras crear",
+      required: false,
+      placeholder: "true",
+      description: "Si es true, tras POST de reserva en Stays se hace GET para guardar el snapshot completo en Newayzi (una llamada API extra por reserva).",
+    },
   ],
   generic: [
     { key: "base_url", label: "URL de la API", required: true, placeholder: "https://api.ejemplo.com", type: "url" },
     { key: "username", label: "Usuario", required: true, placeholder: "Usuario o API key" },
     { key: "password", label: "Contraseña", required: true, placeholder: "Contraseña o API secret", type: "password" },
+  ],
+  siteminder_siteconnect: [
+    {
+      key: "inbound_wsse_username",
+      label: "WSSE entrante — usuario",
+      required: true,
+      description: "Credencial que usará SiteMinder al POSTear a vuestra URL /api/pms/siteconnect/soap/",
+    },
+    { key: "inbound_wsse_password", label: "WSSE entrante — contraseña", required: true, type: "password" },
+    { key: "outbound_wsse_username", label: "WSSE gateway reservas — usuario", required: true },
+    { key: "outbound_wsse_password", label: "WSSE gateway reservas — contraseña", required: true, type: "password" },
+    { key: "requestor_id", label: "RequestorID (channel code)", required: true },
+    {
+      key: "outbound_reservation_gateway_url",
+      label: "URL SOAP gateway (opcional)",
+      required: false,
+      placeholder: "https://…/siteconnect/services",
+      description: "Si se deja vacío, el backend usa el endpoint de preprod documentado en el WSDL.",
+    },
+    {
+      key: "default_hotel_code",
+      label: "HotelCode por defecto (opcional)",
+      required: false,
+      description: "Útil para cancelaciones si no hay pms_property_id en el mapeo.",
+    },
   ],
 };
 
