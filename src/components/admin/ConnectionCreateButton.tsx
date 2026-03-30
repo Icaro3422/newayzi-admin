@@ -33,7 +33,7 @@ const PMS_DESCRIPTIONS: Record<string, string> = {
   stays: "Sistema de reservas Stays",
   generic: "Cualquier PMS vía API genérica (Booking, OTAs propias, etc.)",
   siteminder_siteconnect:
-    "Canal SiteMinder SiteConnect (SOAP/OTA): SiteMinder llama a vuestra URL; reservas salen al gateway SOAP.",
+    "SOAP/OTA: SiteMinder POSTea a vuestra URL; las reservas salen al gateway. Las credenciales del portal authx.siteminder.com no bastan: necesitáis WSSE + RequestorID (ver guía en el repo).",
 };
 
 /** Campos de credenciales requeridos por cada tipo de PMS */
@@ -322,6 +322,26 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
                     <p className="text-sm font-medium text-white/80">
                       Credenciales {selectedType ? `para ${selectedType.label}` : "de la API"}
                     </p>
+                    {pmsType === "siteminder_siteconnect" && (
+                      <div
+                        className="rounded-lg border border-amber-400/35 bg-amber-500/[0.12] px-3 py-2.5 text-[0.78rem] leading-relaxed text-amber-50/95"
+                        role="note"
+                      >
+                        <p className="font-semibold text-amber-100 mb-1">Importante: AuthX no reemplaza estos campos</p>
+                        <p className="text-amber-50/88">
+                          El email y contraseña de{" "}
+                          <span className="font-mono text-[0.72rem]">authx.siteminder.com</span> son del portal;
+                          la integración usa <strong>WS-Security (SOAP)</strong> y un <strong>RequestorID</strong> de
+                          canal. Pedid a SiteMinder / vuestro account manager las credenciales del{" "}
+                          <strong>gateway de reservas</strong>, el <strong>channel code</strong> y el alta de la URL
+                          entrante. Guía y checklist:{" "}
+                          <span className="font-mono text-[0.7rem] break-all">
+                            backend/docs/SITEMINDER_SITECONNECT.md
+                          </span>{" "}
+                          en el repositorio.
+                        </p>
+                      </div>
+                    )}
                     {fields.map((f) => (
                       <Input
                         key={f.key}

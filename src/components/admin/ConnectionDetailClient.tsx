@@ -1991,10 +1991,18 @@ export function ConnectionDetailClient() {
                 </div>
               )}
             </div>
-            <p className="text-xs text-white/45">
-              Registrad en SiteMinder la URL pública <span className="text-white/60 font-mono">/api/pms/siteconnect/soap/</span> con el usuario/contraseña WSSE entrantes.
-              Las reservas salen hacia el gateway SOAP con las credenciales salientes.
-            </p>
+            <div className="text-xs text-white/45 space-y-2">
+              <p>
+                Registrad en SiteMinder la URL pública{" "}
+                <span className="text-white/60 font-mono">/api/pms/siteconnect/soap/</span> con el usuario/contraseña
+                WSSE entrantes. Las reservas salen hacia el gateway SOAP con las credenciales salientes y el RequestorID.
+              </p>
+              <p className="text-amber-200/80 border border-amber-400/25 bg-amber-500/[0.08] rounded-lg px-2.5 py-2">
+                El login de <span className="font-mono text-[0.65rem]">authx.siteminder.com</span> no sustituye estos
+                campos: hace falta credenciales técnicas del canal SiteConnect. Checklist y detalle:{" "}
+                <span className="font-mono text-[0.65rem] break-all">backend/docs/SITEMINDER_SITECONNECT.md</span>
+              </p>
+            </div>
             {editingConfig ? (
               <div className="space-y-3">
                 <Input
