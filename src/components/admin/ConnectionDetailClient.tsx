@@ -55,7 +55,7 @@ function formatSyncEvent(evt: ConnectionSyncStreamEvent): string {
   if (evt.event === "sync_completed") return "Sincronización completada.";
   if (evt.event === "sync_finished") return "Sincronización finalizada.";
   if (evt.event === "sync_error") return `Error: ${evt.detail || "No se pudo completar."}`;
-  if (evt.event === "sync_skipped") return evt.detail ? String(evt.detail) : "Sincronización omitida (SiteConnect).";
+  if (evt.event === "sync_skipped") return evt.detail ? String(evt.detail) : "Sincronización omitida.";
   if (evt.event === "item_progress") {
     if (evt.status === "init") return `${phaseLabel(evt.phase)}: ${evt.total ?? "?"} elementos a procesar`;
     const item = evt.item ?? {};
@@ -133,8 +133,6 @@ export function ConnectionDetailClient() {
   const [configToken, setConfigToken] = useState("");
   const [configKunasUser, setConfigKunasUser] = useState("");
   const [configKunasPwd, setConfigKunasPwd] = useState("");
-  const [scForm, setScForm] = useState<Record<string, string>>({});
-  const [testingPms, setTestingPms] = useState(false);
   const [syncRuns, setSyncRuns] = useState<PMSSyncRunStatus[]>([]);
   const [loadingSyncRuns, setLoadingSyncRuns] = useState(false);
   const [runDetailModalOpen, setRunDetailModalOpen] = useState(false);
@@ -233,22 +231,6 @@ export function ConnectionDetailClient() {
       setConfigToken(cfg.token ?? "");
       setConfigKunasUser(cfg.username ?? cfg.user ?? "");
     }
-    if (connection.pms_type === "siteminder_siteconnect") {
-      const c = connection.config as Record<string, unknown>;
-      const allow = c.inbound_ip_allowlist;
-      const allowStr = Array.isArray(allow) ? allow.map(String).join(", ") : "";
-      setScForm({
-        inbound_wsse_username: String(c.inbound_wsse_username ?? ""),
-        outbound_wsse_username: String(c.outbound_wsse_username ?? ""),
-        requestor_id: String(c.requestor_id ?? ""),
-        outbound_reservation_gateway_url: String(c.outbound_reservation_gateway_url ?? ""),
-        default_hotel_code: String(c.default_hotel_code ?? ""),
-        default_rate_plan_code: String(c.default_rate_plan_code ?? ""),
-        inbound_ip_allowlist: allowStr,
-        inbound_wsse_password: "",
-        outbound_wsse_password: "",
-      });
-    }
   }, [connection?.id, connection?.config, connection?.pms_type]);
 
   function resetSyncRealtimeState() {
@@ -273,7 +255,7 @@ export function ConnectionDetailClient() {
       setRunDetailPhase("Sincronización finalizada con error.");
     }
     if (evt.event === "sync_skipped") {
-      setRunDetailPhase("Omitido (SiteConnect).");
+      setRunDetailPhase("Omitido.");
     }
     const phase = evt.phase as SyncPhaseKey | undefined;
     if (phase) {
@@ -434,7 +416,7 @@ export function ConnectionDetailClient() {
       setSyncCurrentPhase("Sincronización finalizada con error.");
     }
     if (evt.event === "sync_skipped") {
-      setSyncCurrentPhase("Omitido (SiteConnect — event-driven).");
+      setSyncCurrentPhase("Omitido.");
     }
 
     if (!evt.phase) return;
@@ -646,15 +628,7 @@ export function ConnectionDetailClient() {
         });
       }
 
-      if (summary?.siteconnect_event_driven) {
-        addToast({
-          title: "SiteConnect",
-          description:
-            (summary as { siteconnect_skip_message?: string }).siteconnect_skip_message
-            ?? "Sin pull de catálogo/disponibilidad: los datos llegan por mensajes OTA entrantes.",
-          color: "warning",
-        });
-      } else if (syncResult.status === "ok") {
+      if (syncResult.status === "ok") {
         const pricingNote = pricingUnavailable
           ? " Parte de los precios del PMS no respondió en esta corrida; disponibilidad y catálogo quedaron actualizados."
           : "";
@@ -722,59 +696,6 @@ export function ConnectionDetailClient() {
       setEditingConfig(false);
       setConfigPassword("");
     } finally { setSavingConfig(false); }
-  }
-
-  async function testSiteconnectConnection() {
-    if (!connection || !canSyncConnection || connection.pms_type !== "siteminder_siteconnect") return;
-    setTestingPms(true);
-    try {
-      const r = await adminApi.testPmsConnection(id);
-      if (r.ok) {
-        addToast({ title: "Conexión OK", description: "Campos obligatorios y alcance del gateway verificados.", color: "success" });
-      } else {
-        addToast({
-          title: "Prueba fallida",
-          description: r.detail || "Revisa URL del gateway y credenciales WSSE.",
-          color: "danger",
-        });
-      }
-    } catch (e) {
-      addToast({
-        title: "Error",
-        description: e instanceof Error ? e.message : "No se pudo probar la conexión.",
-        color: "danger",
-      });
-    } finally {
-      setTestingPms(false);
-    }
-  }
-
-  async function saveSiteconnectConfig() {
-    if (!connection || !canEditConnections || connection.pms_type !== "siteminder_siteconnect") return;
-    const payload: Record<string, unknown> = {
-      inbound_wsse_username: scForm.inbound_wsse_username?.trim() || "",
-      outbound_wsse_username: scForm.outbound_wsse_username?.trim() || "",
-      requestor_id: scForm.requestor_id?.trim() || "",
-      outbound_reservation_gateway_url: scForm.outbound_reservation_gateway_url?.trim() || "",
-      default_hotel_code: scForm.default_hotel_code?.trim() || "",
-      default_rate_plan_code: scForm.default_rate_plan_code?.trim() || "",
-      inbound_ip_allowlist: scForm.inbound_ip_allowlist?.trim() || "",
-    };
-    if (scForm.inbound_wsse_password?.trim()) {
-      payload.inbound_wsse_password = scForm.inbound_wsse_password.trim();
-    }
-    if (scForm.outbound_wsse_password?.trim()) {
-      payload.outbound_wsse_password = scForm.outbound_wsse_password.trim();
-    }
-    setSavingConfig(true);
-    try {
-      const updated = await adminApi.patchConnection(id, { config: payload });
-      setConnection(updated);
-      setEditingConfig(false);
-      setScForm((f) => ({ ...f, inbound_wsse_password: "", outbound_wsse_password: "" }));
-    } finally {
-      setSavingConfig(false);
-    }
   }
 
   async function saveKunasConfig() {
@@ -916,6 +837,10 @@ export function ConnectionDetailClient() {
                   </>
                 )}
               </div>
+              <p className="text-white/45 text-xs mt-2 max-w-xl leading-relaxed">
+                Flujo estándar: credenciales de tu PMS → <strong className="text-white/55 font-semibold">Sincronizar ahora</strong> para
+                importar propiedades, habitaciones, disponibilidad y tarifas (igual que Kunas o Stays).
+              </p>
             </div>
           </div>
 
@@ -937,18 +862,6 @@ export function ConnectionDetailClient() {
             {canSyncConnection && (
               <>
                 <div className="flex items-center gap-2">
-                  {connection.pms_type === "siteminder_siteconnect" && (
-                    <Button
-                      variant="flat"
-                      size="sm"
-                      className="!text-white/80 bg-white/[0.07] border border-white/[0.12]"
-                      onPress={testSiteconnectConnection}
-                      isLoading={testingPms}
-                      startContent={!testingPms ? <Icon icon="solar:plug-circle-bold" width={16} /> : undefined}
-                    >
-                      Probar conexión
-                    </Button>
-                  )}
                   <Button
                     className="btn-newayzi-primary"
                     onPress={handleSyncNow}
@@ -1928,159 +1841,6 @@ export function ConnectionDetailClient() {
               <div className="text-sm text-white/40 space-y-1">
                 <p>Token: <span className="text-white/70">{configToken ? "••••••••" : "—"}</span></p>
                 <p>Usuario: <span className="text-white/70">{configKunasUser || "—"}</span></p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {connection.pms_type === "siteminder_siteconnect" && canEditConnections && (
-          <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Icon icon="solar:global-bold-duotone" width={17} className="text-[#b89eff]" />
-                <p className="text-sm font-semibold text-white/80">SiteMinder SiteConnect</p>
-              </div>
-              {!editingConfig ? (
-                <Button
-                  size="sm"
-                  variant="flat"
-                  onPress={() => setEditingConfig(true)}
-                  className="!text-white/70 bg-white/[0.07] border border-white/[0.12] hover:bg-white/[0.12]"
-                >
-                  Editar
-                </Button>
-              ) : (
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="flat"
-                    className="!text-white/60 bg-white/[0.05] border border-white/[0.1]"
-                    onPress={() => {
-                      setEditingConfig(false);
-                      const c = (connection.config ?? {}) as Record<string, unknown>;
-                      const allow = c.inbound_ip_allowlist;
-                      const allowStr = Array.isArray(allow) ? allow.map(String).join(", ") : "";
-                      setScForm({
-                        inbound_wsse_username: String(c.inbound_wsse_username ?? ""),
-                        outbound_wsse_username: String(c.outbound_wsse_username ?? ""),
-                        requestor_id: String(c.requestor_id ?? ""),
-                        outbound_reservation_gateway_url: String(c.outbound_reservation_gateway_url ?? ""),
-                        default_hotel_code: String(c.default_hotel_code ?? ""),
-                        default_rate_plan_code: String(c.default_rate_plan_code ?? ""),
-                        inbound_ip_allowlist: allowStr,
-                        inbound_wsse_password: "",
-                        outbound_wsse_password: "",
-                      });
-                    }}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="btn-newayzi-primary"
-                    onPress={saveSiteconnectConfig}
-                    isLoading={savingConfig}
-                    isDisabled={
-                      !scForm.inbound_wsse_username?.trim()
-                      || !scForm.outbound_wsse_username?.trim()
-                      || !scForm.requestor_id?.trim()
-                    }
-                  >
-                    Guardar
-                  </Button>
-                </div>
-              )}
-            </div>
-            <div className="text-xs text-white/45 space-y-2">
-              <p>
-                Registrad en SiteMinder la URL pública{" "}
-                <span className="text-white/60 font-mono">/api/pms/siteconnect/soap/</span> con el usuario/contraseña
-                WSSE entrantes. Las reservas salen hacia el gateway SOAP con las credenciales salientes y el RequestorID.
-              </p>
-              <p className="text-amber-200/80 border border-amber-400/25 bg-amber-500/[0.08] rounded-lg px-2.5 py-2">
-                El login de <span className="font-mono text-[0.65rem]">authx.siteminder.com</span> no sustituye estos
-                campos: hace falta credenciales técnicas del canal SiteConnect. Checklist y detalle:{" "}
-                <span className="font-mono text-[0.65rem] break-all">backend/docs/SITEMINDER_SITECONNECT.md</span>
-              </p>
-            </div>
-            {editingConfig ? (
-              <div className="space-y-3">
-                <Input
-                  label="WSSE entrante — usuario"
-                  value={scForm.inbound_wsse_username ?? ""}
-                  onValueChange={(v) => setScForm((f) => ({ ...f, inbound_wsse_username: v }))}
-                  size="sm"
-                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
-                />
-                <Input
-                  label="WSSE entrante — contraseña"
-                  type="password"
-                  value={scForm.inbound_wsse_password ?? ""}
-                  onValueChange={(v) => setScForm((f) => ({ ...f, inbound_wsse_password: v }))}
-                  placeholder="Dejar vacío para mantener la actual"
-                  size="sm"
-                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
-                />
-                <Input
-                  label="WSSE gateway reservas — usuario"
-                  value={scForm.outbound_wsse_username ?? ""}
-                  onValueChange={(v) => setScForm((f) => ({ ...f, outbound_wsse_username: v }))}
-                  size="sm"
-                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
-                />
-                <Input
-                  label="WSSE gateway reservas — contraseña"
-                  type="password"
-                  value={scForm.outbound_wsse_password ?? ""}
-                  onValueChange={(v) => setScForm((f) => ({ ...f, outbound_wsse_password: v }))}
-                  placeholder="Dejar vacío para mantener la actual"
-                  size="sm"
-                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
-                />
-                <Input
-                  label="RequestorID (channel code)"
-                  value={scForm.requestor_id ?? ""}
-                  onValueChange={(v) => setScForm((f) => ({ ...f, requestor_id: v }))}
-                  size="sm"
-                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
-                />
-                <Input
-                  label="URL SOAP gateway (opcional)"
-                  value={scForm.outbound_reservation_gateway_url ?? ""}
-                  onValueChange={(v) => setScForm((f) => ({ ...f, outbound_reservation_gateway_url: v }))}
-                  placeholder="https://…/siteconnect/services"
-                  size="sm"
-                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
-                />
-                <Input
-                  label="HotelCode por defecto (cancelaciones / fallback)"
-                  value={scForm.default_hotel_code ?? ""}
-                  onValueChange={(v) => setScForm((f) => ({ ...f, default_hotel_code: v }))}
-                  size="sm"
-                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
-                />
-                <Input
-                  label="Código tarifa por defecto (p. ej. BAR)"
-                  value={scForm.default_rate_plan_code ?? ""}
-                  onValueChange={(v) => setScForm((f) => ({ ...f, default_rate_plan_code: v }))}
-                  size="sm"
-                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
-                />
-                <Input
-                  label="Allowlist IP (coma)"
-                  value={scForm.inbound_ip_allowlist ?? ""}
-                  onValueChange={(v) => setScForm((f) => ({ ...f, inbound_ip_allowlist: v }))}
-                  placeholder="52.13.134.140, …"
-                  size="sm"
-                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
-                />
-              </div>
-            ) : (
-              <div className="text-sm text-white/40 space-y-1">
-                <p>WSSE entrante: <span className="text-white/70">{scForm.inbound_wsse_username || "—"}</span></p>
-                <p>WSSE saliente: <span className="text-white/70">{scForm.outbound_wsse_username || "—"}</span></p>
-                <p>RequestorID: <span className="text-white/70">{scForm.requestor_id || "—"}</span></p>
-                <p>Gateway: <span className="text-white/60 break-all">{scForm.outbound_reservation_gateway_url || "— (default preprod)"}</span></p>
               </div>
             )}
           </div>

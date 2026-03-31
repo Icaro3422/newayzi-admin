@@ -279,7 +279,11 @@ export function RoomTypeEditClient() {
       <GlassCard>
         <h3 className="text-sm font-semibold text-white/80 mb-3">Tarifas base (referencia)</h3>
         <p className="text-[0.7rem] text-white/40 -mt-2 mb-3 leading-snug">
-          Moneda e importe según sincronización PMS (sin conversión en el panel).
+          Moneda e importe según sincronización PMS (sin conversión en el panel). La fila de referencia usa el precio de
+          la <span className="text-white/55">última noche del rango que sincronizó el PMS</span> (no se promedian días).
+          En la web pública el cobro se calcula con el desglose por fechas del catálogo (tiers / mínimo de noches) más la
+          comisión Newayzi en el motor de precios; puede diferir de esta referencia si las fechas del huésped no son esa
+          última noche.
         </p>
         {detail.base_rates?.length ? (
           <ul className="space-y-1.5">

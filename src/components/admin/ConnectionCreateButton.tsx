@@ -24,7 +24,6 @@ const PMS_ICONS: Record<string, string> = {
   cloudbeds: "solar:cloud-bold-duotone",
   stays: "solar:home-smile-bold-duotone",
   generic: "solar:link-circle-bold-duotone",
-  siteminder_siteconnect: "solar:global-bold-duotone",
 };
 
 const PMS_DESCRIPTIONS: Record<string, string> = {
@@ -32,8 +31,6 @@ const PMS_DESCRIPTIONS: Record<string, string> = {
   cloudbeds: "Plataforma de gestión hotelera CloudBeds",
   stays: "Sistema de reservas Stays",
   generic: "Cualquier PMS vía API genérica (Booking, OTAs propias, etc.)",
-  siteminder_siteconnect:
-    "SOAP/OTA: SiteMinder POSTea a vuestra URL; las reservas salen al gateway. Las credenciales del portal authx.siteminder.com no bastan: necesitáis WSSE + RequestorID (ver guía en el repo).",
 };
 
 /** Campos de credenciales requeridos por cada tipo de PMS */
@@ -68,31 +65,6 @@ const PMS_CONFIG_FIELDS: Record<
     { key: "base_url", label: "URL de la API", required: true, placeholder: "https://api.ejemplo.com", type: "url" },
     { key: "username", label: "Usuario", required: true, placeholder: "Usuario o API key" },
     { key: "password", label: "Contraseña", required: true, placeholder: "Contraseña o API secret", type: "password" },
-  ],
-  siteminder_siteconnect: [
-    {
-      key: "inbound_wsse_username",
-      label: "WSSE entrante — usuario",
-      required: true,
-      description: "Credencial que usará SiteMinder al POSTear a vuestra URL /api/pms/siteconnect/soap/",
-    },
-    { key: "inbound_wsse_password", label: "WSSE entrante — contraseña", required: true, type: "password" },
-    { key: "outbound_wsse_username", label: "WSSE gateway reservas — usuario", required: true },
-    { key: "outbound_wsse_password", label: "WSSE gateway reservas — contraseña", required: true, type: "password" },
-    { key: "requestor_id", label: "RequestorID (channel code)", required: true },
-    {
-      key: "outbound_reservation_gateway_url",
-      label: "URL SOAP gateway (opcional)",
-      required: false,
-      placeholder: "https://…/siteconnect/services",
-      description: "Si se deja vacío, el backend usa el endpoint de preprod documentado en el WSDL.",
-    },
-    {
-      key: "default_hotel_code",
-      label: "HotelCode por defecto (opcional)",
-      required: false,
-      description: "Útil para cancelaciones si no hay pms_property_id en el mapeo.",
-    },
   ],
 };
 
@@ -225,7 +197,7 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
               <ModalHeader>Conectar un PMS</ModalHeader>
               <ModalBody className="space-y-3">
                 <p className="text-white/60 text-[0.82rem]">
-                  Elige el sistema de gestión (PMS) que utilizas. Solo verás los tipos disponibles en Newayzi — tus credenciales son propias y nunca se comparten con otros operadores.
+                  Elige el PMS donde tienes el inventario. Introduce las credenciales que te da tu proveedor; luego podrás sincronizar catálogo y disponibilidad desde el detalle de la conexión. Tus credenciales son solo tuyas y no se comparten con otros operadores.
                 </p>
                 <div className="grid grid-cols-1 gap-2.5">
                   {connectionTypes.map((t) => (
@@ -322,26 +294,6 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
                     <p className="text-sm font-medium text-white/80">
                       Credenciales {selectedType ? `para ${selectedType.label}` : "de la API"}
                     </p>
-                    {pmsType === "siteminder_siteconnect" && (
-                      <div
-                        className="rounded-lg border border-amber-400/35 bg-amber-500/[0.12] px-3 py-2.5 text-[0.78rem] leading-relaxed text-amber-50/95"
-                        role="note"
-                      >
-                        <p className="font-semibold text-amber-100 mb-1">Importante: AuthX no reemplaza estos campos</p>
-                        <p className="text-amber-50/88">
-                          El email y contraseña de{" "}
-                          <span className="font-mono text-[0.72rem]">authx.siteminder.com</span> son del portal;
-                          la integración usa <strong>WS-Security (SOAP)</strong> y un <strong>RequestorID</strong> de
-                          canal. Pedid a SiteMinder / vuestro account manager las credenciales del{" "}
-                          <strong>gateway de reservas</strong>, el <strong>channel code</strong> y el alta de la URL
-                          entrante. Guía y checklist:{" "}
-                          <span className="font-mono text-[0.7rem] break-all">
-                            backend/docs/SITEMINDER_SITECONNECT.md
-                          </span>{" "}
-                          en el repositorio.
-                        </p>
-                      </div>
-                    )}
                     {fields.map((f) => (
                       <Input
                         key={f.key}

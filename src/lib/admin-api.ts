@@ -377,8 +377,6 @@ export interface ConnectionSyncNowResponse {
     pricing_unavailable_properties?: string[];
     phase_totals?: Record<string, unknown>;
     errors: string[];
-    siteconnect_event_driven?: boolean;
-    siteconnect_skip_message?: string;
   };
   window?: {
     start_date: string;
@@ -826,7 +824,13 @@ async function streamSSE(
 
 export interface RewardPoolMovement {
   id: number;
-  kind: "contribution" | "cashback_issued" | "redemption" | "breakage" | "adjustment";
+  kind:
+    | "contribution"
+    | "cashback_issued"
+    | "redemption"
+    | "breakage"
+    | "adjustment"
+    | "corporate_contribution";
   amount: number;
   notes: string;
   createdAt: string;
@@ -1943,6 +1947,7 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
     case "reviews":
     case "coupons":
     case "users":
+    case "corporate-credits":
     case "audit":
       return false; // solo super_admin (ya retornó arriba)
     default:
@@ -2106,6 +2111,81 @@ export const agentWallets = {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return null;
+    return res.json();
+  },
+};
+
+export interface CorporateCreditMovementRow {
+  id: number;
+  profile_id: number;
+  profile_email: string;
+  profile_name: string;
+  amount: number;
+  reference_id: string;
+  created_at: string;
+}
+
+export interface CorporateCreditListResponse {
+  total: number;
+  offset: number;
+  limit: number;
+  results: CorporateCreditMovementRow[];
+}
+
+export interface CorporateCreditPostResponse {
+  idempotent: boolean;
+  movement_id: number;
+  profile_id: number;
+  points: number;
+  test_points: number;
+  pool_total_contributed: number;
+}
+
+/** Créditos corporativos prepago (super_admin): puntos + aporte Reward Pool */
+export const corporateCreditsApi = {
+  async list(
+    token: string,
+    params?: { limit?: number; offset?: number }
+  ): Promise<CorporateCreditListResponse> {
+    const q = new URLSearchParams();
+    if (params?.limit != null) q.set("limit", String(params.limit));
+    if (params?.offset != null) q.set("offset", String(params.offset));
+    const qs = q.toString();
+    const url = `${API_BASE}/api/admin/corporate-credits/${qs ? `?${qs}` : ""}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail ?? `Error ${res.status}`);
+    }
+    return res.json();
+  },
+
+  async credit(
+    token: string,
+    payload: {
+      profile_id: number;
+      amount: number;
+      transfer_reference: string;
+      note?: string;
+    }
+  ): Promise<CorporateCreditPostResponse> {
+    const res = await fetch(`${API_BASE}/api/admin/corporate-credits/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        profile_id: payload.profile_id,
+        amount: payload.amount,
+        transfer_reference: payload.transfer_reference,
+        note: payload.note ?? "",
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail ?? `Error ${res.status}`);
+    }
     return res.json();
   },
 };

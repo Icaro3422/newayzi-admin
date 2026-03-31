@@ -10,6 +10,7 @@ const KIND_LABELS: Record<RewardPoolMovement["kind"], string> = {
   redemption: "Redención",
   breakage: "Breakage",
   adjustment: "Ajuste",
+  corporate_contribution: "Prepago corporativo",
 };
 
 const KIND_ICONS: Record<RewardPoolMovement["kind"], string> = {
@@ -18,6 +19,7 @@ const KIND_ICONS: Record<RewardPoolMovement["kind"], string> = {
   redemption: "solar:wallet-money-bold-duotone",
   breakage: "solar:fire-bold-duotone",
   adjustment: "solar:settings-bold-duotone",
+  corporate_contribution: "solar:buildings-2-bold-duotone",
 };
 
 const KIND_COLORS: Record<RewardPoolMovement["kind"], string> = {
@@ -26,6 +28,7 @@ const KIND_COLORS: Record<RewardPoolMovement["kind"], string> = {
   redemption: "text-amber-400",
   breakage: "text-rose-400",
   adjustment: "text-sky-400",
+  corporate_contribution: "text-cyan-400",
 };
 
 function fmt(n: number) {
