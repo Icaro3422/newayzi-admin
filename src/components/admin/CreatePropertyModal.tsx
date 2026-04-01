@@ -24,7 +24,19 @@ import {
   type Operator,
 } from "@/lib/admin-api";
 
-const inputDark = "rounded-xl border";
+/** Alineado con ConnectionCreateButton / globals `.admin-modal-dark` */
+const inputDark = "rounded-xl border border-white/[0.12] bg-white/[0.06] shadow-none";
+
+const modalClassNames = {
+  base: "admin-modal-dark !bg-[#0f1220] rounded-[28px] border border-white/[0.12] backdrop-blur-xl shadow-2xl shadow-black/50 max-h-[90vh] overflow-hidden flex flex-col",
+  header: "border-b border-white/[0.08] !text-white shrink-0 flex flex-col gap-1 !py-5 !px-6",
+  body: "!text-white/95 !bg-transparent overflow-y-auto !px-6 !py-5 gap-5",
+  footer: "border-t border-white/[0.08] !bg-transparent gap-3 shrink-0 !px-6 !py-4",
+  closeButton:
+    "!text-white/70 hover:!bg-white/10 hover:!text-white rounded-xl top-4 right-4",
+  backdrop: "!bg-black/70 backdrop-blur-md",
+  wrapper: "!bg-transparent",
+};
 
 const PROPERTY_TYPES: { value: string; label: string }[] = [
   { value: "hotel", label: "Hotel" },
@@ -46,6 +58,21 @@ const TIMEZONES = [
   "Europe/Madrid",
   "UTC",
 ] as const;
+
+const fieldClassNames = {
+  inputWrapper: inputDark,
+  input: "!text-white/95 placeholder:!text-white/38",
+  label: "!text-white/70 font-medium",
+};
+
+const selectClassNames = {
+  trigger: inputDark,
+  label: "!text-white/70 font-medium",
+  value: "!text-white/92 font-medium",
+  innerWrapper: "!text-white",
+  selectorIcon: "!text-white/50",
+  popoverContent: "bg-[#0f1220] border border-white/[0.12] rounded-xl",
+};
 
 type Props = {
   isOpen: boolean;
@@ -171,20 +198,32 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
       onOpenChange={onOpenChange}
       size="2xl"
       scrollBehavior="inside"
-      classNames={{ base: "bg-[#0f1220] border border-white/[0.1]" }}
+      backdrop="blur"
+      classNames={modalClassNames}
     >
       <ModalContent>
-        <ModalHeader className="text-white font-sora flex flex-col gap-1">
-          <span>Nueva propiedad (manual)</span>
-          <span className="text-xs font-normal text-white/45 font-sans">
-            Sin PMS: luego usa Inventario manual en la ficha para el Excel de semanas y la galería para fotos.
-          </span>
+        <ModalHeader>
+          <div className="flex items-start gap-3 w-full pr-8">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5e2cec]/35 to-[#9430cf]/25 border border-white/[0.12] flex items-center justify-center shrink-0">
+              <Icon icon="solar:buildings-2-bold-duotone" className="text-[#b89eff] text-xl" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-sora font-bold text-lg text-white tracking-tight">Nueva propiedad (manual)</h2>
+              <p className="text-[0.8125rem] text-white/50 mt-1.5 leading-relaxed">
+                Sin PMS: en la ficha usa <span className="text-emerald-300/90">Inventario manual</span> para el Excel
+                de semanas y la galería para fotos.
+              </p>
+            </div>
+          </div>
         </ModalHeader>
-        <ModalBody className="gap-4">
+        <ModalBody className="space-y-5">
           {needsOperator && (
             <div>
               {loadingOps ? (
-                <Spinner size="sm" />
+                <div className="flex items-center gap-2 text-white/50 text-sm py-2">
+                  <Spinner size="sm" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#9b74ff]" }} />
+                  Cargando operadores…
+                </div>
               ) : (
                 <Select
                   label="Operador"
@@ -194,15 +233,10 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
                     const v = Array.from(keys)[0];
                     setOperatorId(v != null ? String(v) : "");
                   }}
-                  classNames={{
-                    trigger: inputDark,
-                    label: "!text-white/65",
-                    value: "!text-white/92",
-                    popoverContent: "bg-[#0f1220] border border-white/[0.1]",
-                  }}
+                  classNames={selectClassNames}
                 >
                   {operators.map((o) => (
-                    <SelectItem key={String(o.id)} className="text-white">
+                    <SelectItem key={String(o.id)} className="text-white data-[hover=true]:bg-white/10">
                       {o.name}
                     </SelectItem>
                   ))}
@@ -216,28 +250,27 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
             placeholder="Ej. Hotel Santa Clara"
             value={name}
             onValueChange={setName}
-            classNames={{
-              inputWrapper: inputDark,
-              input: "!text-white/95",
-              label: "!text-white/65",
-            }}
+            classNames={fieldClassNames}
           />
 
-          <div className="space-y-2">
-            <p className="text-xs text-white/50">Ciudad</p>
+          <div className="rounded-2xl border border-white/[0.09] bg-white/[0.04] p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Icon icon="solar:map-point-bold-duotone" className="text-[#9b74ff] shrink-0" width={18} />
+              <span className="text-xs font-semibold uppercase tracking-wider text-white/45">Ubicación</span>
+            </div>
             {pickedCity ? (
-              <div className="flex items-center gap-2 flex-wrap rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
-                <Icon icon="solar:map-point-bold-duotone" className="text-emerald-400 shrink-0" width={20} />
+              <div className="flex items-center gap-2 flex-wrap rounded-xl border border-emerald-500/35 bg-emerald-500/[0.12] px-3 py-2.5">
+                <Icon icon="solar:check-circle-bold-duotone" className="text-emerald-400 shrink-0" width={20} />
                 <span className="text-sm text-white/90 flex-1">
                   {pickedCity.name}
                   {pickedCity.country_name ? (
-                    <span className="text-white/50"> · {pickedCity.country_name}</span>
+                    <span className="text-white/45"> · {pickedCity.country_name}</span>
                   ) : null}
                 </span>
                 <Button
                   size="sm"
-                  variant="light"
-                  className="!text-white/60"
+                  variant="flat"
+                  className="!text-white/85 bg-white/[0.08] border border-white/[0.12]"
                   onPress={() => {
                     setPickedCity(null);
                     setCityQuery("");
@@ -250,34 +283,35 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
             ) : (
               <>
                 <Input
-                  placeholder="Escribe al menos 2 letras para buscar"
+                  label="Buscar ciudad"
+                  placeholder="Escribe al menos 2 letras"
                   value={cityQuery}
                   onValueChange={setCityQuery}
-                  startContent={<Icon icon="solar:magnifer-bold-duotone" className="text-white/35" width={18} />}
-                  classNames={{
-                    inputWrapper: inputDark,
-                    input: "!text-white/95",
-                  }}
+                  startContent={<Icon icon="solar:magnifer-bold-duotone" className="text-white/40" width={18} />}
+                  classNames={fieldClassNames}
                 />
                 {cityLoading && (
                   <div className="flex justify-center py-2">
-                    <Spinner size="sm" />
+                    <Spinner
+                      size="sm"
+                      classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#9b74ff]" }}
+                    />
                   </div>
                 )}
                 {!cityLoading && cityResults.length > 0 && (
-                  <ul className="max-h-44 overflow-y-auto rounded-xl border border-white/[0.08] bg-black/30 divide-y divide-white/[0.06]">
+                  <ul className="max-h-44 overflow-y-auto rounded-xl border border-white/[0.1] bg-[#0a0c14] divide-y divide-white/[0.06]">
                     {cityResults.map((c) => (
                       <li key={c.id}>
                         <button
                           type="button"
-                          className="w-full text-left px-3 py-2.5 text-sm text-white/85 hover:bg-white/[0.06] transition-colors"
+                          className="w-full text-left px-3 py-2.5 text-sm text-white/88 hover:bg-[#5e2cec]/15 transition-colors"
                           onClick={() => {
                             setPickedCity(c);
                             setCityQuery("");
                             setCityResults([]);
                           }}
                         >
-                          <span className="font-medium">{c.name}</span>
+                          <span className="font-medium text-white">{c.name}</span>
                           {c.country_name ? (
                             <span className="text-white/45"> — {c.country_name}</span>
                           ) : null}
@@ -290,7 +324,7 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
               label="Zona horaria"
               selectedKeys={[timezone]}
@@ -298,15 +332,10 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
                 const v = Array.from(s)[0];
                 if (v) setTimezone(String(v));
               }}
-              classNames={{
-                trigger: inputDark,
-                label: "!text-white/65",
-                value: "!text-white/92",
-                popoverContent: "bg-[#0f1220] border border-white/[0.1]",
-              }}
+              classNames={selectClassNames}
             >
               {TIMEZONES.map((tz) => (
-                <SelectItem key={tz} className="text-white">
+                <SelectItem key={tz} className="text-white data-[hover=true]:bg-white/10">
                   {tz}
                 </SelectItem>
               ))}
@@ -318,15 +347,10 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
                 const v = Array.from(s)[0];
                 if (v) setCurrency(String(v));
               }}
-              classNames={{
-                trigger: inputDark,
-                label: "!text-white/65",
-                value: "!text-white/92",
-                popoverContent: "bg-[#0f1220] border border-white/[0.1]",
-              }}
+              classNames={selectClassNames}
             >
               {CURRENCIES.map((c) => (
-                <SelectItem key={c} className="text-white">
+                <SelectItem key={c} className="text-white data-[hover=true]:bg-white/10">
                   {c}
                 </SelectItem>
               ))}
@@ -340,15 +364,10 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
               const v = Array.from(s)[0];
               if (v) setPropertyType(String(v));
             }}
-            classNames={{
-              trigger: inputDark,
-              label: "!text-white/65",
-              value: "!text-white/92",
-              popoverContent: "bg-[#0f1220] border border-white/[0.1]",
-            }}
+            classNames={selectClassNames}
           >
             {PROPERTY_TYPES.map((pt) => (
-              <SelectItem key={pt.value} className="text-white">
+              <SelectItem key={pt.value} className="text-white data-[hover=true]:bg-white/10">
                 {pt.label}
               </SelectItem>
             ))}
@@ -356,25 +375,25 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
 
           <Textarea
             label="Descripción (opcional)"
-            minRows={2}
+            minRows={3}
             value={description}
             onValueChange={setDescription}
+            placeholder="Breve descripción para la ficha; puedes ampliarla después."
             classNames={{
-              inputWrapper: inputDark,
-              input: "!text-white/95",
-              label: "!text-white/65",
+              ...fieldClassNames,
+              input: "!text-white/95 placeholder:!text-white/35 min-h-[88px]",
             }}
           />
         </ModalBody>
         <ModalFooter>
-          <Button variant="flat" className="!text-white/70" onPress={() => onOpenChange(false)}>
+          <Button
+            variant="flat"
+            onPress={() => onOpenChange(false)}
+            className="!text-white/85 hover:bg-white/[0.12] bg-white/[0.08] border border-white/[0.14]"
+          >
             Cancelar
           </Button>
-          <Button
-            className="btn-newayzi-primary"
-            isLoading={submitting}
-            onPress={handleSubmit}
-          >
+          <Button className="btn-newayzi-primary font-semibold" isLoading={submitting} onPress={handleSubmit}>
             Crear y abrir ficha
           </Button>
         </ModalFooter>

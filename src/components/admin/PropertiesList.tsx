@@ -447,11 +447,14 @@ export function PropertiesList() {
   return (
     <div className="space-y-5">
       {canEditProperty && role !== "agente" && (
-        <div className="flex flex-wrap justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-white/[0.09] bg-white/[0.04] backdrop-blur-sm px-4 py-3 sm:px-5">
+          <p className="text-[0.8125rem] text-white/50 max-w-xl leading-snug hidden sm:block">
+            ¿Sin inventario en PMS? Crea la propiedad aquí y completa semanas, fotos y políticas en la ficha.
+          </p>
           <Button
-            className="btn-newayzi-primary"
-            size="sm"
-            startContent={<Icon icon="solar:add-circle-bold-duotone" width={18} />}
+            className="btn-newayzi-primary font-semibold shrink-0 ml-auto"
+            size="md"
+            startContent={<Icon icon="solar:add-circle-bold-duotone" width={20} />}
             onPress={() => setCreateOpen(true)}
           >
             Nueva propiedad (manual)
@@ -554,7 +557,7 @@ export function PropertiesList() {
           </p>
           {canEditProperty && role !== "agente" && (
             <Button
-              className="mt-6 btn-newayzi-primary"
+              className="mt-6 btn-newayzi-primary font-semibold"
               size="md"
               startContent={<Icon icon="solar:add-circle-bold-duotone" width={20} />}
               onPress={() => setCreateOpen(true)}

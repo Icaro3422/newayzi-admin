@@ -9,7 +9,8 @@ import {
   type RoomTypeAdminSummary,
 } from "@/lib/admin-api";
 
-const inputDark = "rounded-xl border";
+const inputDark =
+  "rounded-xl border border-white/[0.12] bg-white/[0.06] shadow-none data-[hover=true]:bg-white/[0.08]";
 
 export function ManualInventoryPanel({
   propertyId,
@@ -123,16 +124,21 @@ export function ManualInventoryPanel({
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-white/55">
-        Para propiedades <strong className="text-white/80">sin PMS</strong>: sube el Excel de semanas (precio total
-        por semana por unidad). Las fotos se gestionan en la galería inferior. Formato descrito en la plantilla.
-      </p>
+      <div className="flex gap-3">
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/25 to-teal-500/15 border border-white/[0.1] flex items-center justify-center shrink-0">
+          <Icon icon="solar:document-text-bold-duotone" className="text-emerald-300/90 text-lg" />
+        </div>
+        <p className="text-sm text-white/55 leading-relaxed flex-1 min-w-0">
+          Para propiedades <strong className="text-white/85">sin PMS</strong>: sube el Excel de semanas (precio total
+          por semana por unidad). Las fotos se gestionan en la galería de abajo. El formato está descrito en la plantilla.
+        </p>
+      </div>
 
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
           variant="flat"
-          className="!text-white/80 bg-white/[0.07] border border-white/[0.12]"
+          className="!text-white/85 bg-white/[0.08] border border-white/[0.12] hover:bg-white/[0.12]"
           startContent={<Icon icon="solar:download-minimalistic-bold-duotone" width={18} />}
           onPress={downloadTemplate}
         >
@@ -149,7 +155,7 @@ export function ManualInventoryPanel({
           <Button
             as="span"
             size="sm"
-            className="btn-newayzi-primary"
+            className="btn-newayzi-primary font-semibold"
             isLoading={uploading}
             startContent={<Icon icon="solar:upload-minimalistic-bold-duotone" width={18} />}
           >
@@ -159,8 +165,8 @@ export function ManualInventoryPanel({
       </div>
 
       {lastResult && (
-        <div className="rounded-xl border border-white/[0.1] bg-black/20 p-4 text-sm space-y-2">
-          <p className="font-semibold text-white/85">Última importación</p>
+        <div className="rounded-2xl border border-white/[0.1] bg-white/[0.04] backdrop-blur-sm p-4 text-sm space-y-2">
+          <p className="font-sora font-semibold text-white/90">Última importación</p>
           <p className="text-white/60">
             Estado: <span className="text-white/90">{lastResult.status}</span> — filas: {lastResult.rows_processed}{" "}
             (errores parseo: {lastResult.rows_failed})
@@ -178,16 +184,19 @@ export function ManualInventoryPanel({
         </div>
       )}
 
-      <div>
-        <p className="text-xs font-semibold text-white/50 mb-2">Historial reciente</p>
+      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
+        <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-white/40 mb-3">Historial reciente</p>
         {loadingImports ? (
-          <Spinner size="sm" />
+          <Spinner
+            size="sm"
+            classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#9b74ff]" }}
+          />
         ) : imports.length === 0 ? (
-          <p className="text-sm text-white/35">Aún no hay importaciones.</p>
+          <p className="text-sm text-white/38">Aún no hay importaciones.</p>
         ) : (
-          <ul className="space-y-2 text-sm text-white/65">
+          <ul className="space-y-2 text-sm text-white/70">
             {imports.map((im) => (
-              <li key={im.id} className="flex flex-wrap gap-x-3 border-b border-white/[0.06] pb-2">
+              <li key={im.id} className="flex flex-wrap gap-x-3 border-b border-white/[0.06] last:border-0 last:pb-0 pb-2">
                 <span>{im.created_at?.replace("T", " ").slice(0, 19)}</span>
                 <span className="text-white/80">{im.status}</span>
                 <span>{im.rows_processed} filas</span>
@@ -200,14 +209,14 @@ export function ManualInventoryPanel({
 
       {roomTypes.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-white/50 mb-3">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-white/40 mb-3">
             Habitaciones físicas por tipo (solo aumentar cupo; v1 no reduce)
           </p>
           <div className="space-y-3">
             {roomTypes.map((rt) => (
               <div
                 key={rt.id}
-                className="flex flex-wrap items-end gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] p-3"
+                className="flex flex-wrap items-end gap-2 rounded-2xl border border-white/[0.1] bg-white/[0.04] p-3.5"
               >
                 <div className="flex-1 min-w-[160px]">
                   <p className="text-sm text-white/85 font-medium">{rt.name}</p>
@@ -226,8 +235,8 @@ export function ManualInventoryPanel({
                   isDisabled={readOnly}
                   classNames={{
                     inputWrapper: inputDark,
-                    input: "!text-white/95",
-                    label: "!text-white/50",
+                    input: "!text-white/95 placeholder:!text-white/35",
+                    label: "!text-white/65",
                   }}
                   className="max-w-[160px]"
                 />
@@ -237,7 +246,7 @@ export function ManualInventoryPanel({
                   isDisabled={readOnly}
                   isLoading={ensuringId === rt.id}
                   onPress={() => ensureRooms(rt)}
-                  className="!text-white/80"
+                  className="!text-white/88 bg-white/[0.08] border border-white/[0.12]"
                 >
                   Asegurar
                 </Button>
