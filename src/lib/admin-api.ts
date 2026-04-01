@@ -198,6 +198,8 @@ export interface AdminCitySearchRow {
   name: string;
   country_name: string;
   country_code: string;
+  /** Centro aproximado del punto de ciudad en el catálogo (WGS84), si existe */
+  center?: { lat: number; lng: number } | null;
 }
 
 export interface PropertyDetail extends PropertyListItem {
@@ -951,6 +953,8 @@ export const adminApi = {
     property_type?: string;
     description?: string;
     operator_id?: number;
+    address?: string;
+    location?: { lat: number; lng: number } | null;
   }): Promise<PropertyDetail> {
     return postJson<PropertyDetail>("/api/admin/properties/", data);
   },

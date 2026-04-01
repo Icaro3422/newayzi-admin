@@ -23,6 +23,11 @@ import {
   type AdminRole,
   type Operator,
 } from "@/lib/admin-api";
+import { mapboxForwardGeocode } from "@/lib/mapbox-geocode";
+import { PropertyLocationMapPicker } from "./PropertyLocationMapPicker";
+
+/** Centro Colombia por defecto si la ciudad del catálogo no tiene punto */
+const DEFAULT_CO = { lat: 4.5709, lng: -74.2973 };
 
 /** Alineado con ConnectionCreateButton / globals `.admin-modal-dark` */
 const inputDark = "rounded-xl border border-white/[0.12] bg-white/[0.06] shadow-none";
@@ -97,6 +102,10 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
   const [operators, setOperators] = useState<Operator[]>([]);
   const [loadingOps, setLoadingOps] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [address, setAddress] = useState("");
+  const [pinLat, setPinLat] = useState(DEFAULT_CO.lat);
+  const [pinLng, setPinLng] = useState(DEFAULT_CO.lng);
+  const [geocoding, setGeocoding] = useState(false);
 
   const reset = useCallback(() => {
     setName("");
@@ -108,7 +117,22 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
     setCurrency("COP");
     setPropertyType("hotel");
     setOperatorId("");
+    setAddress("");
+    setPinLat(DEFAULT_CO.lat);
+    setPinLng(DEFAULT_CO.lng);
   }, []);
+
+  useEffect(() => {
+    if (!pickedCity) return;
+    const c = pickedCity.center;
+    if (c && typeof c.lat === "number" && typeof c.lng === "number") {
+      setPinLat(c.lat);
+      setPinLng(c.lng);
+    } else {
+      setPinLat(DEFAULT_CO.lat);
+      setPinLng(DEFAULT_CO.lng);
+    }
+  }, [pickedCity]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -172,6 +196,8 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
         currency,
         property_type: propertyType,
         description: description.trim() || undefined,
+        address: address.trim() || undefined,
+        location: { lat: pinLat, lng: pinLng },
         ...(needsOperator ? { operator_id: parseInt(operatorId, 10) } : {}),
       });
       addToast({
@@ -189,6 +215,39 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
       });
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function geocodeAddress() {
+    if (!pickedCity) return;
+    const parts = [address.trim(), pickedCity.name, pickedCity.country_name].filter(Boolean);
+    const q = parts.join(", ");
+    if (q.length < 6) {
+      addToast({
+        title: "Indica dirección o referencia",
+        description: "Escribe calle, barrio o punto de referencia y vuelve a intentar.",
+        color: "warning",
+      });
+      return;
+    }
+    setGeocoding(true);
+    try {
+      const r = await mapboxForwardGeocode(q, { lng: pinLng, lat: pinLat });
+      if (!r) {
+        addToast({ title: "No se encontró la dirección", color: "warning" });
+        return;
+      }
+      setPinLat(r.lat);
+      setPinLng(r.lng);
+      addToast({
+        title: "Ubicación encontrada",
+        description: r.placeName.length > 90 ? `${r.placeName.slice(0, 90)}…` : r.placeName,
+        color: "success",
+      });
+    } catch {
+      addToast({ title: "Error al buscar la dirección", color: "danger" });
+    } finally {
+      setGeocoding(false);
     }
   }
 
@@ -247,7 +306,7 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
 
           <Input
             label="Nombre del alojamiento"
-            placeholder="Ej. Hotel Santa Clara"
+            placeholder="Ej. hotel o apartamento (nombre comercial)"
             value={name}
             onValueChange={setName}
             classNames={fieldClassNames}
@@ -321,6 +380,72 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
                   </ul>
                 )}
               </>
+            )}
+
+            {pickedCity && (
+              <div className="space-y-3 pt-1 border-t border-white/[0.06]">
+                <Textarea
+                  label="Dirección exacta"
+                  minRows={2}
+                  placeholder="Calle, número, barrio, referencias (como la verás en el mapa y para huéspedes)"
+                  value={address}
+                  onValueChange={setAddress}
+                  classNames={{
+                    ...fieldClassNames,
+                    input: "!text-white/95 placeholder:!text-white/32 min-h-[72px]",
+                  }}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    isLoading={geocoding}
+                    isDisabled={geocoding}
+                    className="!text-white/88 bg-white/[0.08] border border-white/[0.12]"
+                    startContent={<Icon icon="solar:map-arrow-square-bold-duotone" width={18} />}
+                    onPress={geocodeAddress}
+                  >
+                    Centrar mapa con esta dirección
+                  </Button>
+                </div>
+                <PropertyLocationMapPicker
+                  mapKey={pickedCity.id}
+                  lat={pinLat}
+                  lng={pinLng}
+                  onChange={(la, ln) => {
+                    setPinLat(la);
+                    setPinLng(ln);
+                  }}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    size="sm"
+                    label="Latitud"
+                    type="text"
+                    value={String(pinLat)}
+                    onValueChange={(v) => {
+                      const x = parseFloat(v.replace(",", "."));
+                      if (!Number.isFinite(x)) return;
+                      if (x < -90 || x > 90) return;
+                      setPinLat(x);
+                    }}
+                    classNames={fieldClassNames}
+                  />
+                  <Input
+                    size="sm"
+                    label="Longitud"
+                    type="text"
+                    value={String(pinLng)}
+                    onValueChange={(v) => {
+                      const x = parseFloat(v.replace(",", "."));
+                      if (!Number.isFinite(x)) return;
+                      if (x < -180 || x > 180) return;
+                      setPinLng(x);
+                    }}
+                    classNames={fieldClassNames}
+                  />
+                </div>
+              </div>
             )}
           </div>
 
