@@ -263,6 +263,18 @@ export interface RoomTypePhysicalRoomRow {
   floor: number | null;
 }
 
+export interface ManualInventoryImportRow {
+  id: number;
+  status: string;
+  original_filename: string;
+  rows_processed: number;
+  rows_failed: number;
+  error_summary: Array<Record<string, unknown>>;
+  stats: Record<string, unknown>;
+  created_at: string | null;
+  created_by_label: string;
+}
+
 export interface RoomTypeAdminDetail extends Omit<RoomTypeAdminSummary, "description_preview"> {
   description: string;
   property_id: number;
@@ -963,6 +975,47 @@ export const adminApi = {
       const text = await res.text();
       throw new Error(text || "Error al eliminar propiedad");
     }
+  },
+
+  async downloadManualInventoryTemplate(): Promise<Blob> {
+    const res = await authFetch("/api/admin/properties/manual-inventory/template/");
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(t || "Error al descargar plantilla");
+    }
+    return res.blob();
+  },
+
+  async importManualInventory(
+    propertyId: number,
+    file: File,
+    replace = true
+  ): Promise<ManualInventoryImportRow> {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("replace", replace ? "true" : "false");
+    const res = await authFetchMultipart(
+      `/api/admin/properties/${propertyId}/manual-inventory/import/`,
+      "POST",
+      fd
+    );
+    return res.json() as Promise<ManualInventoryImportRow>;
+  },
+
+  async getManualInventoryImports(
+    propertyId: number
+  ): Promise<{ results: ManualInventoryImportRow[] } | null> {
+    return getJson<{ results: ManualInventoryImportRow[] }>(
+      `/api/admin/properties/${propertyId}/manual-imports/`
+    );
+  },
+
+  async ensureRoomTypePhysicalRooms(
+    propertyId: number,
+    roomTypeId: number,
+    data: { desired_count: number; label_prefix?: string }
+  ): Promise<{ created: number; current_count: number; desired_count: number; message?: string }> {
+    return putJson(`/api/admin/properties/${propertyId}/room-types/${roomTypeId}/physical-rooms/`, data);
   },
 
   async getPropertyPictures(propertyId: number): Promise<PropertyPicture[]> {

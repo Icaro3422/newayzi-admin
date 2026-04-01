@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Button,
@@ -31,6 +31,7 @@ import { useRouter, useParams } from "next/navigation";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { PropertyCancellationPolicyPanel } from "./PropertyCancellationPolicyPanel";
 import { PropertyGalleryPanel } from "./PropertyGalleryPanel";
+import { ManualInventoryPanel } from "./ManualInventoryPanel";
 
 /* ─── Primitivos de UI ─────────────────────────────────── */
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -192,6 +193,10 @@ export function PropertyEditClient() {
       setAiSuggesting(false);
     }
   }
+
+  const refreshProperty = useCallback(() => {
+    adminApi.getProperty(propertyId).then((p) => setProperty(p ?? null));
+  }, [propertyId]);
 
   useEffect(() => {
     if (Number.isNaN(propertyId) || propertyId <= 0) { setLoading(false); return; }
@@ -994,6 +999,23 @@ export function PropertyEditClient() {
           </p>
         </GlassCard>
       ) : null}
+
+      {/* ── Inventario manual (sin PMS) ── */}
+      <div className="rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6">
+        <SectionHeader
+          icon="solar:database-bold-duotone"
+          title="Inventario manual"
+          subtitle="Excel de semanas y unidades físicas cuando no hay conexión PMS."
+          iconBg="from-emerald-500/20 to-teal-500/20"
+          iconColor="text-emerald-300"
+        />
+        <ManualInventoryPanel
+          propertyId={propertyId}
+          roomTypes={property.room_types ?? []}
+          readOnly={readOnly}
+          onRefresh={refreshProperty}
+        />
+      </div>
 
       {/* ── 9. Galería de imágenes ── */}
       <div className="rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6">
