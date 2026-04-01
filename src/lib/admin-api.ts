@@ -192,6 +192,14 @@ export interface PropertyFaq {
   answer: string;
 }
 
+/** Resultado de búsqueda de ciudad para alta manual de propiedades (admin). */
+export interface AdminCitySearchRow {
+  id: number;
+  name: string;
+  country_name: string;
+  country_code: string;
+}
+
 export interface PropertyDetail extends PropertyListItem {
   description?: string;
   // Contacto y ubicación
@@ -925,6 +933,26 @@ export const adminApi = {
     const query = q.toString();
     const path = query ? `/api/admin/properties/?${query}` : "/api/admin/properties/";
     return getJson<{ results: PropertyListItem[] }>(path);
+  },
+
+  async searchAdminCities(q: string): Promise<{ results: AdminCitySearchRow[] } | null> {
+    const t = q.trim();
+    if (t.length < 2) return { results: [] };
+    return getJson<{ results: AdminCitySearchRow[] }>(
+      `/api/admin/properties/cities/search/?q=${encodeURIComponent(t)}`
+    );
+  },
+
+  async createProperty(data: {
+    name: string;
+    city_id: number;
+    timezone?: string;
+    currency?: string;
+    property_type?: string;
+    description?: string;
+    operator_id?: number;
+  }): Promise<PropertyDetail> {
+    return postJson<PropertyDetail>("/api/admin/properties/", data);
   },
 
   async getProperty(id: number): Promise<PropertyDetail | null> {
