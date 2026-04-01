@@ -32,6 +32,7 @@ import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { PropertyCancellationPolicyPanel } from "./PropertyCancellationPolicyPanel";
 import { PropertyGalleryPanel } from "./PropertyGalleryPanel";
 import { ManualInventoryPanel } from "./ManualInventoryPanel";
+import { BookingComSyncPanel } from "./BookingComSyncPanel";
 
 /* ─── Primitivos de UI ─────────────────────────────────── */
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -999,6 +1000,23 @@ export function PropertyEditClient() {
           </p>
         </GlassCard>
       ) : null}
+
+      {/* ── Sincronización desde Booking.com ── */}
+      <div className="rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6">
+        <SectionHeader
+          icon="solar:bed-bold-duotone"
+          title="Sincronizar desde Booking.com"
+          subtitle="Fotos, descripciones y amenidades por tipo de habitación (emparejamiento automático)."
+          iconBg="from-sky-500/20 to-blue-600/20"
+          iconColor="text-sky-300"
+        />
+        <BookingComSyncPanel
+          propertyId={propertyId}
+          initialListingUrl={property.booking_com_listing_url}
+          readOnly={readOnly}
+          onRefresh={refreshProperty}
+        />
+      </div>
 
       {/* ── Inventario manual (sin PMS) ── */}
       <div className="rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6">

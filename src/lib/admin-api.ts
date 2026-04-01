@@ -202,8 +202,21 @@ export interface AdminCitySearchRow {
   center?: { lat: number; lng: number } | null;
 }
 
+export interface BookingComSyncRunRow {
+  id: number;
+  booking_url: string;
+  status: string;
+  summary: Record<string, unknown>;
+  error_message: string;
+  celery_task_id: string;
+  created_at: string | null;
+  finished_at: string | null;
+}
+
 export interface PropertyDetail extends PropertyListItem {
   description?: string;
+  /** URL pública del hotel en Booking.com (sincronización de habitaciones). */
+  booking_com_listing_url?: string;
   // Contacto y ubicación
   address?: string;
   phone?: string;
@@ -248,6 +261,8 @@ export interface RoomTypeAdminSummary {
   num_rooms: number | null;
   num_bathrooms: number | null;
   area_sqm: number | null;
+  /** Amenidades de habitación (p. ej. importadas desde Booking.com). */
+  room_amenities?: string[];
   primary_picture_url: string;
   base_rates: RoomTypeBaseRateRow[];
   physical_rooms_count: number;
@@ -996,6 +1011,7 @@ export const adminApi = {
       amenities: string[] | Record<string, unknown>[];
       important_info: string[];
       faqs: { question: string; answer: string }[];
+      booking_com_listing_url: string;
     }>
   ): Promise<PropertyDetail> {
     return patchJson<PropertyDetail>(`/api/admin/properties/${id}/`, data);
@@ -1039,6 +1055,26 @@ export const adminApi = {
   ): Promise<{ results: ManualInventoryImportRow[] } | null> {
     return getJson<{ results: ManualInventoryImportRow[] }>(
       `/api/admin/properties/${propertyId}/manual-imports/`
+    );
+  },
+
+  async startBookingComSync(
+    propertyId: number,
+    body: { booking_url?: string; save_url_on_property?: boolean }
+  ): Promise<{ run: BookingComSyncRunRow; message?: string }> {
+    return postJson<{ run: BookingComSyncRunRow; message?: string }>(
+      `/api/admin/properties/${propertyId}/booking-sync/`,
+      body
+    );
+  },
+
+  async getBookingComSyncRuns(
+    propertyId: number,
+    limit = 20
+  ): Promise<{ results: BookingComSyncRunRow[] } | null> {
+    const q = limit ? `?limit=${encodeURIComponent(String(limit))}` : "";
+    return getJson<{ results: BookingComSyncRunRow[] }>(
+      `/api/admin/properties/${propertyId}/booking-sync/runs/${q}`
     );
   },
 
@@ -1091,6 +1127,7 @@ export const adminApi = {
       num_rooms: number | null;
       num_bathrooms: number | null;
       area_sqm: number | string | null;
+      room_amenities: string[];
     }>
   ): Promise<RoomTypeAdminDetail> {
     return patchJson<RoomTypeAdminDetail>(
