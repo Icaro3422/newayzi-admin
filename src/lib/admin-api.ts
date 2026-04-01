@@ -1076,7 +1076,7 @@ export const adminApi = {
     name?: string;
     pms_type: string;
     operator_id?: number;
-    config?: Record<string, string>;
+    config?: Record<string, unknown>;
   }): Promise<PMSConnectionListItem> {
     return postJson<PMSConnectionListItem>("/api/admin/pms/connections/", data);
   },

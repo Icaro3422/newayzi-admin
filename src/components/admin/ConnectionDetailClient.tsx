@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button, Switch, Input, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Popover, PopoverTrigger, PopoverContent } from "@heroui/react";
+import { Button, Switch, Input, Textarea, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Popover, PopoverTrigger, PopoverContent } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useParams } from "next/navigation";
 import {
@@ -133,6 +133,20 @@ export function ConnectionDetailClient() {
   const [configToken, setConfigToken] = useState("");
   const [configKunasUser, setConfigKunasUser] = useState("");
   const [configKunasPwd, setConfigKunasPwd] = useState("");
+  const [configSmBaseUrl, setConfigSmBaseUrl] = useState("");
+  const [configSmEmail, setConfigSmEmail] = useState("");
+  const [configSmPwd, setConfigSmPwd] = useState("");
+  const [configSmInventoryUrl, setConfigSmInventoryUrl] = useState("");
+  const [configSmGraphqlPath, setConfigSmGraphqlPath] = useState("");
+  const [configSmGraphqlQuery, setConfigSmGraphqlQuery] = useState("");
+  const [configSmGraphqlVariables, setConfigSmGraphqlVariables] = useState("");
+  const [configSmPropertiesListPath, setConfigSmPropertiesListPath] = useState("");
+  const [configRgBaseUrl, setConfigRgBaseUrl] = useState("");
+  const [configRgApiKey, setConfigRgApiKey] = useState("");
+  const [configRgApiSecret, setConfigRgApiSecret] = useState("");
+  const [configRgPropertyIds, setConfigRgPropertyIds] = useState("");
+  const [configRgMaxDays, setConfigRgMaxDays] = useState("");
+  const [testingRategain, setTestingRategain] = useState(false);
   const [syncRuns, setSyncRuns] = useState<PMSSyncRunStatus[]>([]);
   const [loadingSyncRuns, setLoadingSyncRuns] = useState(false);
   const [runDetailModalOpen, setRunDetailModalOpen] = useState(false);
@@ -230,6 +244,38 @@ export function ConnectionDetailClient() {
     if (connection.pms_type === "kunas") {
       setConfigToken(cfg.token ?? "");
       setConfigKunasUser(cfg.username ?? cfg.user ?? "");
+    }
+    if (connection.pms_type === "siteminder_dashboard") {
+      setConfigSmBaseUrl(cfg.base_url ?? "");
+      setConfigSmEmail(cfg.email ?? "");
+      setConfigSmInventoryUrl(cfg.inventory_url ?? "");
+      setConfigSmGraphqlPath(cfg.graphql_path ?? "");
+      setConfigSmGraphqlQuery(cfg.graphql_query ?? "");
+      setConfigSmPropertiesListPath(cfg.properties_list_path ?? "");
+      const gv = cfg.graphql_variables as unknown;
+      if (gv && typeof gv === "object") {
+        setConfigSmGraphqlVariables(JSON.stringify(gv, null, 2));
+      } else if (typeof gv === "string") {
+        setConfigSmGraphqlVariables(gv);
+      } else {
+        setConfigSmGraphqlVariables("");
+      }
+    }
+    if (connection.pms_type === "rategain") {
+      const c = connection.config as Record<string, unknown>;
+      setConfigRgBaseUrl(String(c.base_url ?? ""));
+      setConfigRgApiKey(String(c.api_key ?? c.apiKey ?? ""));
+      setConfigRgApiSecret("");
+      const rawIds = c.property_ids;
+      if (Array.isArray(rawIds)) {
+        setConfigRgPropertyIds(JSON.stringify(rawIds));
+      } else if (c.property_id != null && String(c.property_id).trim()) {
+        setConfigRgPropertyIds(JSON.stringify([String(c.property_id).trim()]));
+      } else {
+        setConfigRgPropertyIds("");
+      }
+      const md = c.max_availability_days;
+      setConfigRgMaxDays(md != null && md !== "" ? String(md) : "");
     }
   }, [connection?.id, connection?.config, connection?.pms_type]);
 
@@ -717,6 +763,136 @@ export function ConnectionDetailClient() {
       setEditingConfig(false);
       setConfigKunasPwd("");
     } finally { setSavingConfig(false); }
+  }
+
+  async function saveSiteMinderConfig() {
+    if (!connection || !canEditConnections || connection.pms_type !== "siteminder_dashboard") return;
+    const prev = { ...(connection.config as Record<string, unknown>) };
+    delete prev.password;
+    const newConfig: Record<string, unknown> = {
+      ...prev,
+      base_url: configSmBaseUrl.trim(),
+      email: configSmEmail.trim(),
+      inventory_url: configSmInventoryUrl.trim(),
+    };
+    if (configSmGraphqlQuery.trim()) {
+      newConfig.graphql_query = configSmGraphqlQuery.trim();
+    } else {
+      delete newConfig.graphql_query;
+    }
+    if (configSmGraphqlPath.trim()) {
+      newConfig.graphql_path = configSmGraphqlPath.trim();
+    } else {
+      delete newConfig.graphql_path;
+    }
+    if (configSmPropertiesListPath.trim()) {
+      newConfig.properties_list_path = configSmPropertiesListPath.trim();
+    } else {
+      delete newConfig.properties_list_path;
+    }
+    const gvRaw = configSmGraphqlVariables.trim();
+    if (gvRaw) {
+      try {
+        newConfig.graphql_variables = JSON.parse(gvRaw) as Record<string, unknown>;
+      } catch {
+        addToast({
+          title: "Variables GraphQL inválidas",
+          description: "Debe ser JSON válido u estar vacío.",
+          color: "danger",
+        });
+        return;
+      }
+    } else {
+      delete newConfig.graphql_variables;
+    }
+    if (configSmPwd) newConfig.password = configSmPwd;
+    setSavingConfig(true);
+    try {
+      const updated = await adminApi.patchConnection(id, { config: newConfig });
+      setConnection(updated);
+      setEditingConfig(false);
+      setConfigSmPwd("");
+    } finally { setSavingConfig(false); }
+  }
+
+  async function saveRategainConfig() {
+    if (!connection || !canEditConnections || connection.pms_type !== "rategain") return;
+    const prev = { ...(connection.config as Record<string, unknown>) };
+    delete prev.api_key;
+    delete prev.apiKey;
+    delete prev.api_secret;
+    delete prev.apiSecret;
+    let propertyIds: string[] = [];
+    const raw = configRgPropertyIds.trim();
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        if (Array.isArray(parsed)) {
+          propertyIds = parsed.map((x) => String(x).trim()).filter(Boolean);
+        }
+      } catch {
+        propertyIds = raw
+          .split(/[\s,]+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+    }
+    const newConfig: Record<string, unknown> = {
+      ...prev,
+      base_url: configRgBaseUrl.trim().replace(/\/+$/, ""),
+    };
+    if (propertyIds.length) {
+      newConfig.property_ids = propertyIds;
+    } else {
+      newConfig.property_ids = [];
+    }
+    delete newConfig.property_id;
+    delete newConfig.propertyID;
+    const ak = configRgApiKey.trim();
+    if (ak && ak !== "••••••••") {
+      newConfig.api_key = ak;
+    }
+    const sec = configRgApiSecret.trim();
+    if (sec) {
+      newConfig.api_secret = sec;
+    }
+    const md = configRgMaxDays.trim();
+    if (md) {
+      const n = parseInt(md, 10);
+      if (!Number.isNaN(n) && n > 0) newConfig.max_availability_days = n;
+    } else {
+      delete newConfig.max_availability_days;
+    }
+    setSavingConfig(true);
+    try {
+      const updated = await adminApi.patchConnection(id, { config: newConfig });
+      setConnection(updated);
+      setEditingConfig(false);
+      setConfigRgApiSecret("");
+    } finally {
+      setSavingConfig(false);
+    }
+  }
+
+  async function testRategainConnection() {
+    if (!connection || connection.pms_type !== "rategain") return;
+    setTestingRategain(true);
+    try {
+      const r = await adminApi.testPmsConnection(id);
+      addToast({
+        title: r.ok ? "Conexión OK" : "Conexión fallida",
+        description: r.detail || (r.ok ? "RateGain respondió correctamente." : "Revisa credenciales, SD-Domain o descubrimiento de propiedades."),
+        color: r.ok ? "success" : "danger",
+      });
+    } catch (e) {
+      addToast({
+        title: "Error al probar",
+        description: e instanceof Error ? e.message : "No se pudo completar la prueba.",
+        color: "danger",
+      });
+    } finally {
+      setTestingRategain(false);
+    }
   }
 
   async function handleDeleteConnection() {
@@ -1841,6 +2017,296 @@ export function ConnectionDetailClient() {
               <div className="text-sm text-white/40 space-y-1">
                 <p>Token: <span className="text-white/70">{configToken ? "••••••••" : "—"}</span></p>
                 <p>Usuario: <span className="text-white/70">{configKunasUser || "—"}</span></p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {connection.pms_type === "siteminder_dashboard" && canEditConnections && (
+          <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:key-bold-duotone" width={17} className="text-[#b89eff]" />
+                <p className="text-sm font-semibold text-white/80">SiteMinder (dashboard)</p>
+              </div>
+              {!editingConfig ? (
+                <Button
+                  size="sm"
+                  variant="flat"
+                  onPress={() => setEditingConfig(true)}
+                  className="!text-white/70 bg-white/[0.07] border border-white/[0.12] hover:bg-white/[0.12]"
+                >
+                  Editar
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    className="!text-white/60 bg-white/[0.05] border border-white/[0.1]"
+                    onPress={() => {
+                      setEditingConfig(false);
+                      const cfg = (connection.config ?? {}) as Record<string, string>;
+                      setConfigSmBaseUrl(cfg.base_url ?? "");
+                      setConfigSmEmail(cfg.email ?? "");
+                      setConfigSmInventoryUrl(cfg.inventory_url ?? "");
+                      setConfigSmGraphqlPath(cfg.graphql_path ?? "");
+                      setConfigSmGraphqlQuery(cfg.graphql_query ?? "");
+                      setConfigSmPropertiesListPath(cfg.properties_list_path ?? "");
+                      const gv = cfg.graphql_variables as unknown;
+                      if (gv && typeof gv === "object") {
+                        setConfigSmGraphqlVariables(JSON.stringify(gv, null, 2));
+                      } else if (typeof gv === "string") {
+                        setConfigSmGraphqlVariables(gv);
+                      } else {
+                        setConfigSmGraphqlVariables("");
+                      }
+                      setConfigSmPwd("");
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="btn-newayzi-primary"
+                    onPress={saveSiteMinderConfig}
+                    isLoading={savingConfig}
+                    isDisabled={!configSmBaseUrl.trim() || !configSmEmail.trim()}
+                  >
+                    Guardar
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {editingConfig ? (
+              <div className="space-y-3">
+                <Input
+                  label="URL del dashboard"
+                  value={configSmBaseUrl}
+                  onValueChange={setConfigSmBaseUrl}
+                  placeholder="https://platform.siteminder.com"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Email"
+                  value={configSmEmail}
+                  onValueChange={setConfigSmEmail}
+                  placeholder="usuario@hotel.com"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Contraseña"
+                  type="password"
+                  value={configSmPwd}
+                  onValueChange={setConfigSmPwd}
+                  placeholder="Dejar vacío para mantener la actual"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="URL inventario GET (opcional, modo http_get)"
+                  value={configSmInventoryUrl}
+                  onValueChange={setConfigSmInventoryUrl}
+                  placeholder="/ruta GET que devuelve JSON"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Ruta GraphQL (opcional)"
+                  value={configSmGraphqlPath}
+                  onValueChange={setConfigSmGraphqlPath}
+                  placeholder="/api/cm-beef/graphql"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Textarea
+                  label="Query GraphQL (opcional)"
+                  value={configSmGraphqlQuery}
+                  onValueChange={setConfigSmGraphqlQuery}
+                  placeholder="Pega la query desde DevTools → Payload"
+                  minRows={5}
+                  classNames={{
+                    inputWrapper: `${inputDark} border-white/[0.12]`,
+                    input: "!text-white/95 placeholder:!text-white/30 min-h-[120px]",
+                    label: "!text-white/60",
+                  }}
+                />
+                <Textarea
+                  label="Variables GraphQL JSON (opcional)"
+                  value={configSmGraphqlVariables}
+                  onValueChange={setConfigSmGraphqlVariables}
+                  placeholder='{}'
+                  minRows={3}
+                  classNames={{
+                    inputWrapper: `${inputDark} border-white/[0.12]`,
+                    input: "!text-white/95 placeholder:!text-white/30 font-mono text-xs",
+                    label: "!text-white/60",
+                  }}
+                />
+                <Input
+                  label="Ruta lista en respuesta (properties_list_path)"
+                  value={configSmPropertiesListPath}
+                  onValueChange={setConfigSmPropertiesListPath}
+                  placeholder="ej. data.misPropiedades"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+              </div>
+            ) : (
+              <div className="text-sm text-white/40 space-y-1">
+                <p>Dashboard: <span className="text-white/70">{configSmBaseUrl || "—"}</span></p>
+                <p>Email: <span className="text-white/70">{configSmEmail || "—"}</span></p>
+                <p>Contraseña: <span className="text-white/50 tracking-widest">••••••••</span></p>
+                <p>Inventario GET: <span className="text-white/70">{configSmInventoryUrl || "—"}</span></p>
+                <p>GraphQL path: <span className="text-white/70">{configSmGraphqlPath || "—"}</span></p>
+                <p>Lista (path): <span className="text-white/70">{configSmPropertiesListPath || "—"}</span></p>
+                <p>Query GraphQL: <span className="text-white/70">{configSmGraphqlQuery ? `${configSmGraphqlQuery.slice(0, 80)}…` : "—"}</span></p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {connection.pms_type === "rategain" && canEditConnections && (
+          <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:graph-up-bold-duotone" width={17} className="text-[#b89eff]" />
+                <p className="text-sm font-semibold text-white/80">RateGain Smart Distribution</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="flat"
+                  className="!text-white/70 bg-white/[0.07] border border-white/[0.12] hover:bg-white/[0.12]"
+                  onPress={testRategainConnection}
+                  isLoading={testingRategain}
+                  isDisabled={!configRgBaseUrl.trim() || testingRategain}
+                >
+                  Probar conexión
+                </Button>
+                {!editingConfig ? (
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    onPress={() => setEditingConfig(true)}
+                    className="!text-white/70 bg-white/[0.07] border border-white/[0.12] hover:bg-white/[0.12]"
+                  >
+                    Editar
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      className="!text-white/60 bg-white/[0.05] border border-white/[0.1]"
+                      onPress={() => {
+                        setEditingConfig(false);
+                        const c = (connection.config ?? {}) as Record<string, unknown>;
+                        setConfigRgBaseUrl(String(c.base_url ?? ""));
+                        setConfigRgApiKey(String(c.api_key ?? c.apiKey ?? ""));
+                        setConfigRgApiSecret("");
+                        const rawIds = c.property_ids;
+                        if (Array.isArray(rawIds)) {
+                          setConfigRgPropertyIds(JSON.stringify(rawIds));
+                        } else if (c.property_id != null && String(c.property_id).trim()) {
+                          setConfigRgPropertyIds(JSON.stringify([String(c.property_id).trim()]));
+                        } else {
+                          setConfigRgPropertyIds("");
+                        }
+                        const mdx = c.max_availability_days;
+                        setConfigRgMaxDays(mdx != null && mdx !== "" ? String(mdx) : "");
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="btn-newayzi-primary"
+                      onPress={saveRategainConfig}
+                      isLoading={savingConfig}
+                      isDisabled={!configRgBaseUrl.trim()}
+                    >
+                      Guardar
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {editingConfig ? (
+              <div className="space-y-3">
+                <Input
+                  label="SD-Domain (base URL)"
+                  value={configRgBaseUrl}
+                  onValueChange={setConfigRgBaseUrl}
+                  placeholder="https://partner.ejemplo.com"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Api Key"
+                  type="password"
+                  value={configRgApiKey}
+                  onValueChange={setConfigRgApiKey}
+                  placeholder="Dejar enmascarado para no cambiar"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Api Secret"
+                  type="password"
+                  value={configRgApiSecret}
+                  onValueChange={setConfigRgApiSecret}
+                  placeholder="Dejar vacío para mantener el actual"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Textarea
+                  label="Property IDs (opcional; vacío = todas vía API)"
+                  value={configRgPropertyIds}
+                  onValueChange={setConfigRgPropertyIds}
+                  placeholder="Vacío = descubrir todas (getDestinations + bestproperties)"
+                  minRows={3}
+                  classNames={{
+                    inputWrapper: `${inputDark} border-white/[0.12]`,
+                    input: "!text-white/95 placeholder:!text-white/30 font-mono text-xs",
+                    label: "!text-white/60",
+                  }}
+                />
+                <Input
+                  label="Máx. días disponibilidad (opcional)"
+                  value={configRgMaxDays}
+                  onValueChange={setConfigRgMaxDays}
+                  placeholder="62"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+              </div>
+            ) : (
+              <div className="text-sm text-white/40 space-y-1">
+                <p>
+                  Base URL: <span className="text-white/70">{configRgBaseUrl || "—"}</span>
+                </p>
+                <p>
+                  Api Key: <span className="text-white/70">{configRgApiKey ? "••••••••" : "—"}</span>
+                </p>
+                <p>
+                  Api Secret: <span className="text-white/50 tracking-widest">••••••••</span>
+                </p>
+                <p>
+                  Property IDs:{" "}
+                  <span className="text-white/70 font-mono text-xs">
+                    {configRgPropertyIds.trim()
+                      ? configRgPropertyIds
+                      : "Automático (todas las detectadas en RateGain SD)"}
+                  </span>
+                </p>
+                <p>
+                  Máx. días ARI: <span className="text-white/70">{configRgMaxDays || "predeterminado (62)"}</span>
+                </p>
               </div>
             )}
           </div>
