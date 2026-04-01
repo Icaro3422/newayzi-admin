@@ -1619,10 +1619,23 @@ export interface AdminCoupon {
   max_uses: number | null;
   max_uses_per_user: number;
   times_used: number;
+  /** Reservas no canceladas con este cupón (pending + confirmadas); gobierna max_uses. */
+  active_reservations_with_coupon: number;
+  /** Filas CouponUsage (pagos confirmados con cupón). */
+  coupon_usage_records_count: number;
+  /** Cupos globales restantes según reservas activas; null si max_uses es ilimitado. */
+  max_uses_remaining: number | null;
+  /** True si ya no caben más reservas por límite global. */
+  at_global_use_limit: boolean;
+  /** times_used en BD coincide con coupon_usage_records_count. */
+  ledger_counter_in_sync: boolean;
   valid_from: string;
   valid_until: string | null;
   status: "active" | "paused" | "expired";
   created: string;
+  updated: string;
+  applies_to_property_id: number | null;
+  applies_to_operator_id: number | null;
 }
 
 export interface CouponsListResponse {
@@ -1652,10 +1665,27 @@ export const couponsApi = {
     max_uses_per_user?: number;
     valid_from?: string;
     valid_until?: string | null;
+    applies_to_property_id?: number | null;
+    applies_to_operator_id?: number | null;
   }): Promise<AdminCoupon> {
     return postJson<AdminCoupon>("/api/admin/coupons/", data);
   },
-  async patch(id: number, data: { status?: string }): Promise<AdminCoupon> {
+  async patch(
+    id: number,
+    data: {
+      status?: string;
+      applies_to_property_id?: number | null;
+      applies_to_operator_id?: number | null;
+      min_booking_amount?: string;
+      max_uses?: number | null;
+      max_uses_per_user?: number;
+      valid_from?: string;
+      valid_until?: string | null;
+      discount_type?: "percentage" | "fixed";
+      discount_value?: string;
+      description?: string;
+    }
+  ): Promise<AdminCoupon> {
     return patchJson<AdminCoupon>(`/api/admin/coupons/${id}/`, data);
   },
   async delete(id: number): Promise<void> {
