@@ -691,6 +691,21 @@ export function setAdminApiToken(getter: () => Promise<string | null>) {
   tokenGetter = getter;
 }
 
+/** Repite el JWT en un header de respaldo: algunos proxies quitan `Authorization` en POST multipart. */
+function applyBearerHeaders(headers: Record<string, string>, token: string | null) {
+  if (!token) return;
+  const v = `Bearer ${token}`;
+  headers.Authorization = v;
+  headers["X-Clerk-Authorization"] = v;
+}
+
+/** Para `fetch` puntuales que no usan authFetch (mismo criterio que applyBearerHeaders). */
+function clerkAuthHeaders(token: string | null): Record<string, string> {
+  const h: Record<string, string> = {};
+  applyBearerHeaders(h, token);
+  return h;
+}
+
 async function authFetch(path: string, options: RequestInit = {}) {
   const url = `${API_BASE.replace(/\/$/, "")}${path}`;
   const token = tokenGetter ? await tokenGetter() : null;
@@ -698,7 +713,7 @@ async function authFetch(path: string, options: RequestInit = {}) {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  applyBearerHeaders(headers, token);
   const res = await fetch(url, {
     ...options,
     headers,
@@ -733,7 +748,7 @@ async function authFetchMultipart(path: string, method: string, body: FormData) 
   const url = `${API_BASE.replace(/\/$/, "")}${path}`;
   const token = tokenGetter ? await tokenGetter() : null;
   const headers: Record<string, string> = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
+  applyBearerHeaders(headers, token);
   const res = await fetch(url, { method, body, headers, credentials: "include" });
   if (!res.ok) {
     if (res.status === 401 && typeof window !== "undefined") {
@@ -801,7 +816,7 @@ async function streamSSE(
   const url = `${API_BASE.replace(/\/$/, "")}${path}`;
   const token = tokenGetter ? await tokenGetter() : null;
   const headers: Record<string, string> = { Accept: "text/event-stream, application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  applyBearerHeaders(headers, token);
 
   const res = await fetch(url, {
     method: "GET",
@@ -2290,7 +2305,7 @@ export const agentWallets = {
   /** Super admin: listar billeteras de todos los agentes/personal */
   async list(token: string): Promise<AgentWallet[]> {
     const res = await fetch(`${API_BASE}/api/admin/agent-wallets/`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: clerkAuthHeaders(token),
     });
     if (!res.ok) throw new Error(`Error ${res.status}`);
     const data = await res.json();
@@ -2300,7 +2315,7 @@ export const agentWallets = {
   /** Ver billetera de un agente específico (super_admin o el propio agente) */
   async get(profileId: number, token: string): Promise<AgentWallet | null> {
     const res = await fetch(`${API_BASE}/api/admin/users/${profileId}/wallet/`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: clerkAuthHeaders(token),
     });
     if (!res.ok) return null;
     return res.json();
@@ -2314,7 +2329,7 @@ export const agentWallets = {
   ): Promise<AgentWallet> {
     const res = await fetch(`${API_BASE}/api/admin/users/${profileId}/wallet/`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { ...clerkAuthHeaders(token), "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
@@ -2327,7 +2342,7 @@ export const agentWallets = {
   /** El propio agente ve su billetera Newayzi Rewards */
   async getOwn(token: string): Promise<AgentWallet | null> {
     const res = await fetch(`${API_BASE}/api/agent/wallet/`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: clerkAuthHeaders(token),
     });
     if (!res.ok) return null;
     return res.json();
@@ -2371,7 +2386,7 @@ export const corporateCreditsApi = {
     if (params?.offset != null) q.set("offset", String(params.offset));
     const qs = q.toString();
     const url = `${API_BASE}/api/admin/corporate-credits/${qs ? `?${qs}` : ""}`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(url, { headers: clerkAuthHeaders(token) });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error((err as { detail?: string }).detail ?? `Error ${res.status}`);
@@ -2391,7 +2406,7 @@ export const corporateCreditsApi = {
     const res = await fetch(`${API_BASE}/api/admin/corporate-credits/`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        ...clerkAuthHeaders(token),
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
