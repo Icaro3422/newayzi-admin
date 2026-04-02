@@ -686,8 +686,11 @@ export interface AdminUserListItem {
   loyalty_points?: number;
 }
 
-let tokenGetter: (() => Promise<string | null>) | null = null;
-export function setAdminApiToken(getter: () => Promise<string | null>) {
+/** Alineado con Clerk `getToken` (p. ej. `{ skipCache: true }` antes de subidas). */
+export type AdminTokenGetter = (opts?: { skipCache?: boolean }) => Promise<string | null>;
+
+let tokenGetter: AdminTokenGetter | null = null;
+export function setAdminApiToken(getter: AdminTokenGetter) {
   tokenGetter = getter;
 }
 
@@ -746,10 +749,22 @@ async function getJson<T>(path: string): Promise<T | null> {
 
 async function authFetchMultipart(path: string, method: string, body: FormData) {
   const url = `${API_BASE.replace(/\/$/, "")}${path}`;
-  const token = tokenGetter ? await tokenGetter() : null;
+  // Token fresco: evita JWT caducado en POST grandes / multipart.
+  const token = tokenGetter ? await tokenGetter({ skipCache: true }) : null;
   const headers: Record<string, string> = {};
   applyBearerHeaders(headers, token);
-  const res = await fetch(url, { method, body, headers, credentials: "include" });
+  let res: Response;
+  try {
+    res = await fetch(url, { method, body, headers, credentials: "include" });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg === "Failed to fetch" || msg.includes("NetworkError")) {
+      throw new Error(
+        "No se pudo contactar la API (red, CORS o bloqueo del navegador). Abre Herramientas de desarrollador → Red y revisa el POST."
+      );
+    }
+    throw e;
+  }
   if (!res.ok) {
     if (res.status === 401 && typeof window !== "undefined") {
       window.location.href = "/sign-in?reason=session_expired";
