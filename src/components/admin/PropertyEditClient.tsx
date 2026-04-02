@@ -1032,6 +1032,13 @@ export function PropertyEditClient() {
           roomTypes={property.room_types ?? []}
           readOnly={readOnly}
           onRefresh={refreshProperty}
+          restrictPricingToManualWeeks={property.restrict_pricing_to_manual_weeks ?? false}
+          onRestrictPricingChange={async (v) => {
+            const updated = await adminApi.patchProperty(propertyId, {
+              restrict_pricing_to_manual_weeks: v,
+            });
+            setProperty(updated);
+          }}
         />
       </div>
 

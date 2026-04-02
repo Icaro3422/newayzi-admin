@@ -45,25 +45,29 @@ export function RoomTypeGalleryPanel({
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    const list = Array.from(files).slice(0, 50);
+    const truncated = files.length > 50;
     setUploading(true);
-    const errors: string[] = [];
-    for (const file of Array.from(files)) {
-      try {
-        await adminApi.uploadRoomTypePicture(propertyId, roomTypeId, file, pics.length === 0);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Error al subir imagen";
-        errors.push(`${file.name}: ${msg}`);
+    try {
+      await adminApi.uploadRoomTypePicturesBatch(propertyId, roomTypeId, list, pics.length === 0);
+      await refreshPics();
+      if (truncated) {
+        addToast({
+          title: "Solo se subieron las primeras 50 imágenes",
+          description: `Seleccionaste ${files.length} archivos; el máximo por carga es 50.`,
+          color: "warning",
+        });
+      } else {
+        addToast({
+          title: `${list.length} imagen${list.length > 1 ? "es" : ""} subida${list.length > 1 ? "s" : ""}`,
+          color: "success",
+        });
       }
-    }
-    await refreshPics();
-    setUploading(false);
-    if (errors.length > 0) {
-      addToast({ title: "Algunas imágenes no se subieron", description: errors.join(" | "), color: "warning" });
-    } else {
-      addToast({
-        title: `${files.length} imagen${files.length > 1 ? "es" : ""} subida${files.length > 1 ? "s" : ""}`,
-        color: "success",
-      });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Error al subir imágenes";
+      addToast({ title: "Error al subir", description: msg, color: "danger" });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -129,7 +133,7 @@ export function RoomTypeGalleryPanel({
                 <p className="text-sm font-medium text-white/80">
                   Arrastra imágenes aquí o <span className="text-[#9b74ff]">haz clic para seleccionar</span>
                 </p>
-                <p className="text-xs text-white/40 mt-1">JPG, PNG, WebP · Máx. 15 MB por imagen</p>
+                <p className="text-xs text-white/40 mt-1">Hasta 50 imágenes a la vez · JPG, PNG, WebP · Máx. 15 MB por imagen</p>
               </div>
               <Button
                 size="sm"

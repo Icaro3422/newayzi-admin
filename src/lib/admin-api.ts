@@ -217,6 +217,10 @@ export interface PropertyDetail extends PropertyListItem {
   description?: string;
   /** URL pública del hotel en Booking.com (sincronización de habitaciones). */
   booking_com_listing_url?: string;
+  /**
+   * Solo cotizar noches cubiertas por el Excel de inventario manual (sin rellenar con tarifa base fuera de esas semanas).
+   */
+  restrict_pricing_to_manual_weeks?: boolean;
   // Contacto y ubicación
   address?: string;
   phone?: string;
@@ -732,12 +736,35 @@ async function authFetchMultipart(path: string, method: string, body: FormData) 
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(url, { method, body, headers, credentials: "include" });
   if (!res.ok) {
+    if (res.status === 401 && typeof window !== "undefined") {
+      window.location.href = "/sign-in?reason=session_expired";
+    }
     const text = await res.text();
     let detail = text;
-    try { detail = JSON.parse(text).detail ?? text; } catch { /* keep raw text */ }
+    try {
+      detail = JSON.parse(text).detail ?? text;
+    } catch {
+      /* keep raw text */
+    }
     throw new Error(detail || `Error ${res.status}`);
   }
   return res;
+}
+
+/** Normaliza respuesta POST de fotos: objeto único, `{ pictures }`, o array. */
+async function parseAdminPictureBatchResponse<T extends { id: number }>(
+  res: Response
+): Promise<T[]> {
+  const data = (await res.json()) as unknown;
+  if (Array.isArray(data)) return data as T[];
+  if (data && typeof data === "object" && "pictures" in data) {
+    const pics = (data as { pictures: unknown }).pictures;
+    if (Array.isArray(pics)) return pics as T[];
+  }
+  if (data && typeof data === "object" && data !== null && "id" in data) {
+    return [data as T];
+  }
+  return [];
 }
 
 async function patchJson<T>(path: string, body: unknown): Promise<T> {
@@ -1012,6 +1039,7 @@ export const adminApi = {
       important_info: string[];
       faqs: { question: string; answer: string }[];
       booking_com_listing_url: string;
+      restrict_pricing_to_manual_weeks: boolean;
     }>
   ): Promise<PropertyDetail> {
     return patchJson<PropertyDetail>(`/api/admin/properties/${id}/`, data);
@@ -1099,6 +1127,23 @@ export const adminApi = {
     return res.json() as Promise<PropertyPicture>;
   },
 
+  /** Sube hasta 50 imágenes en una sola petición (campo multipart `images`). */
+  async uploadPropertyPicturesBatch(
+    propertyId: number,
+    files: File[],
+    isPrimary = false
+  ): Promise<PropertyPicture[]> {
+    const slice = files.slice(0, 50);
+    if (slice.length === 0) return [];
+    const fd = new FormData();
+    for (const f of slice) {
+      fd.append("images", f);
+    }
+    if (isPrimary) fd.append("is_primary", "true");
+    const res = await authFetchMultipart(`/api/admin/properties/${propertyId}/pictures/`, "POST", fd);
+    return parseAdminPictureBatchResponse<PropertyPicture>(res);
+  },
+
   async setPropertyPicturePrimary(propertyId: number, picId: number): Promise<PropertyPicture> {
     const fd = new FormData();
     fd.append("is_primary", "true");
@@ -1158,6 +1203,28 @@ export const adminApi = {
       fd
     );
     return res.json() as Promise<RoomTypePicture>;
+  },
+
+  /** Sube hasta 50 imágenes en una sola petición (campo multipart `images`). */
+  async uploadRoomTypePicturesBatch(
+    propertyId: number,
+    roomTypeId: number,
+    files: File[],
+    isPrimary = false
+  ): Promise<RoomTypePicture[]> {
+    const slice = files.slice(0, 50);
+    if (slice.length === 0) return [];
+    const fd = new FormData();
+    for (const f of slice) {
+      fd.append("images", f);
+    }
+    if (isPrimary) fd.append("is_primary", "true");
+    const res = await authFetchMultipart(
+      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/`,
+      "POST",
+      fd
+    );
+    return parseAdminPictureBatchResponse<RoomTypePicture>(res);
   },
 
   async setRoomTypePicturePrimary(

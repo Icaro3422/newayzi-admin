@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Input, Spinner, addToast } from "@heroui/react";
+import { Button, Input, Spinner, Switch, addToast } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import {
   adminApi,
@@ -17,11 +17,16 @@ export function ManualInventoryPanel({
   roomTypes,
   readOnly,
   onRefresh,
+  restrictPricingToManualWeeks,
+  onRestrictPricingChange,
 }: {
   propertyId: number;
   roomTypes: RoomTypeAdminSummary[];
   readOnly: boolean;
   onRefresh?: () => void;
+  /** Si true, no se cotizan fechas fuera de las semanas definidas en el Excel (no relleno con tarifa base). */
+  restrictPricingToManualWeeks: boolean;
+  onRestrictPricingChange: (value: boolean) => Promise<void>;
 }) {
   const [imports, setImports] = useState<ManualInventoryImportRow[]>([]);
   const [loadingImports, setLoadingImports] = useState(true);
@@ -29,6 +34,7 @@ export function ManualInventoryPanel({
   const [lastResult, setLastResult] = useState<ManualInventoryImportRow | null>(null);
   const [ensureCounts, setEnsureCounts] = useState<Record<number, string>>({});
   const [ensuringId, setEnsuringId] = useState<number | null>(null);
+  const [restrictSaving, setRestrictSaving] = useState(false);
 
   const loadImports = useCallback(() => {
     setLoadingImports(true);
@@ -132,6 +138,39 @@ export function ManualInventoryPanel({
           Para propiedades <strong className="text-white/85">sin PMS</strong>: sube el Excel de semanas (precio total
           por semana por unidad). Las fotos se gestionan en la galería de abajo. El formato está descrito en la plantilla.
         </p>
+      </div>
+
+      <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-white/90">Cotizar solo semanas del Excel</p>
+          <p className="text-xs text-white/50 mt-1">
+            Actívalo para no mostrar precios en fechas que no aparecen en el archivo (evita abril u otros meses si no
+            están en el Excel). Requiere volver a importar o tener reglas manuales por cada semana publicada.
+          </p>
+        </div>
+        <Switch
+          isSelected={restrictPricingToManualWeeks}
+          isDisabled={readOnly || restrictSaving}
+          classNames={{ base: "flex-shrink-0" }}
+          onValueChange={async (v) => {
+            setRestrictSaving(true);
+            try {
+              await onRestrictPricingChange(v);
+              addToast({
+                title: v ? "Solo tarifas del inventario manual" : "Tarifa base permitida fuera del Excel",
+                color: "success",
+              });
+            } catch (e) {
+              addToast({
+                title: "No se pudo guardar",
+                description: e instanceof Error ? e.message : "Error",
+                color: "danger",
+              });
+            } finally {
+              setRestrictSaving(false);
+            }
+          }}
+        />
       </div>
 
       <div className="flex flex-wrap gap-2">
