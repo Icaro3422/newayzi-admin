@@ -30,23 +30,32 @@ function inferApiBaseFromHostname(hostname: string): string {
   return "https://api.production.newayzi.com";
 }
 
+/** Normaliza cualquier URL de API: si viene sin protocolo (ej. "api.production.newayzi.com") añade "https://". */
+function normalizeApiUrl(raw: string): string {
+  const trimmed = raw.replace(/\/$/, "");
+  if (!trimmed) return "";
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  return `https://${trimmed}`;
+}
+
 /** URL real del backend (sin proxy). SSR y WebSockets siempre usan esto. */
 function getDirectApiBase(): string {
   const env = process.env.NEXT_PUBLIC_API_URL?.trim();
 
   if (env) {
+    const normalized = normalizeApiUrl(env);
     const isLocalhostUrl =
-      env.includes("localhost") || env.includes("127.0.0.1");
+      normalized.includes("localhost") || normalized.includes("127.0.0.1");
 
     if (typeof window === "undefined") {
-      return env.replace(/\/$/, "");
+      return normalized;
     }
 
     const h = window.location.hostname;
     const isLocalBrowser = h === "localhost" || h === "127.0.0.1";
 
     if (!isLocalhostUrl || isLocalBrowser) {
-      return env.replace(/\/$/, "");
+      return normalized;
     }
   }
 
