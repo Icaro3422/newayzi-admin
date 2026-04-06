@@ -3,7 +3,8 @@
  * Alineado con el plan: GET /api/admin/me/, properties, connections, operators, etc.
  */
 
-function getApiBase(): string {
+/** URL real del backend (sin proxy). SSR y WebSockets siempre usan esto. */
+function getDirectApiBase(): string {
   const env = process.env.NEXT_PUBLIC_API_URL?.trim();
 
   if (env) {
@@ -11,7 +12,6 @@ function getApiBase(): string {
       env.includes("localhost") || env.includes("127.0.0.1");
 
     if (typeof window === "undefined") {
-      // Server-side (SSR): usar env tal cual
       return env.replace(/\/$/, "");
     }
 
@@ -19,14 +19,10 @@ function getApiBase(): string {
     const isLocalBrowser = h === "localhost" || h === "127.0.0.1";
 
     if (!isLocalhostUrl || isLocalBrowser) {
-      // URL apunta a producción, o estamos en local → usar env
       return env.replace(/\/$/, "");
     }
-    // env apunta a localhost pero el browser está en un host real
-    // → ignorar env y usar detección por hostname
   }
 
-  // Detección automática por hostname del browser
   if (typeof window !== "undefined") {
     const h = window.location.hostname;
     if (h === "portal.newayzi.com") return "https://api.newayzi.com";
@@ -39,15 +35,40 @@ function getApiBase(): string {
   return "";
 }
 
+/**
+ * Base URL para fetch en el navegador. Si el admin corre en otro origen que el API
+ * (p. ej. portal.newayzi.com → api.production.newayzi.com), usa ruta same-origin
+ * `/proxy-api` (rewrite en next.config) para evitar CORS y 403 sin cabeceras CORS.
+ */
+function getApiBase(): string {
+  const direct = getDirectApiBase();
+  if (typeof window === "undefined") {
+    return direct;
+  }
+  if (!direct) {
+    return "";
+  }
+  try {
+    const apiOrigin = new URL(direct.startsWith("http") ? direct : `https://${direct}`).origin;
+    if (window.location.origin === apiOrigin) {
+      return direct;
+    }
+    return `${window.location.origin}/proxy-api`;
+  } catch {
+    return direct;
+  }
+}
+
 // Nota: se evalúa una vez en el browser al cargar el módulo.
 // En SSR nunca se hacen llamadas a la API (todo está en useEffect/useCallback).
 const API_BASE = getApiBase();
 
 function getWsBase(): string {
   if (typeof window === "undefined") return "";
-  if (!API_BASE) return "";
+  const direct = getDirectApiBase();
+  if (!direct) return "";
   try {
-    const api = new URL(API_BASE);
+    const api = new URL(direct.startsWith("http") ? direct : `https://${direct}`);
     api.protocol = api.protocol === "https:" ? "wss:" : "ws:";
     return api.toString().replace(/\/$/, "");
   } catch {
