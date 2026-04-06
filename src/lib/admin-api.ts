@@ -885,15 +885,41 @@ async function getJson<T>(path: string): Promise<T | null> {
   return res.json() as Promise<T>;
 }
 
+/**
+ * URL de proxy server-side para peticiones multipart en dominios *.newayzi.com.
+ * El proxy corre en Vercel como serverless function → llama al backend server-to-server
+ * evitando el problema de CORS con CloudFront/WAF para subida de archivos.
+ */
+function getMultipartUrl(path: string): string {
+  if (typeof window === "undefined") {
+    return `${resolvedApiBase().replace(/\/$/, "")}${path}`;
+  }
+  const hostname = window.location.hostname;
+  // Para dominios propios, usar el proxy server-side (evita CORS en multipart)
+  if (hostname === "newayzi.com" || hostname.endsWith(".newayzi.com")) {
+    const proxyBase = window.location.origin;
+    return `${proxyBase}/api/multipart-proxy${path}`;
+  }
+  // Para otros dominios (localhost, preview Vercel) → llamar directo al API
+  return `${resolvedApiBase().replace(/\/$/, "")}${path}`;
+}
+
 async function authFetchMultipart(path: string, method: string, body: FormData) {
-  const url = `${resolvedApiBase().replace(/\/$/, "")}${path}`;
+  const url = getMultipartUrl(path);
   // Token fresco: evita JWT caducado en POST grandes / multipart.
   const token = tokenGetter ? await tokenGetter({ skipCache: true }) : null;
   const headers: Record<string, string> = {};
   applyBearerHeaders(headers, token);
   let res: Response;
   try {
-    res = await fetch(url, { method, body, headers, credentials: "include" });
+    // En el proxy server-side (mismo origen) no se necesita credentials:"include" ni CORS.
+    const isProxyRoute = url.includes("/api/multipart-proxy/");
+    res = await fetch(url, {
+      method,
+      body,
+      headers,
+      ...(isProxyRoute ? {} : { credentials: "include" }),
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg === "Failed to fetch" || msg.includes("NetworkError")) {
