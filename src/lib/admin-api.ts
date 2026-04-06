@@ -66,11 +66,12 @@ function getDirectApiBase(): string {
 }
 
 /**
- * Base URL para fetch en el navegador. Si el admin corre en otro origen que el API,
- * puede usar `/proxy-api` (rewrite en next.config) para evitar CORS.
+ * Base URL para fetch en el navegador.
  *
- * Solo se usa el proxy si existe NEXT_PUBLIC_API_URL (mismo valor que en el build del rewrite).
- * Desactivar: NEXT_PUBLIC_USE_SAME_ORIGIN_API_PROXY=false
+ * Estrategia:
+ * - Dominios *.newayzi.com y newayzi.com → llamada directa al API (CORS configurado en Django).
+ * - Otros (preview .vercel.app, localhost etc.) → proxy same-origin /proxy-api si está disponible.
+ * - Desactivar proxy forzado: NEXT_PUBLIC_USE_SAME_ORIGIN_API_PROXY=false
  */
 function getApiBase(): string {
   const direct = getDirectApiBase();
@@ -80,20 +81,34 @@ function getApiBase(): string {
   if (!direct) {
     return "";
   }
+
+  // Para dominios propios (*.newayzi.com), CORS está configurado en Django → llamar directo.
+  // Esto evita dependencia del proxy rewrite de Next.js (frágil en Vercel para URLs externas).
+  const hostname = window.location.hostname;
+  if (
+    hostname === "newayzi.com" ||
+    hostname.endsWith(".newayzi.com") ||
+    hostname === "localhost" ||
+    hostname === "127.0.0.1"
+  ) {
+    return normalizeApiUrl(direct);
+  }
+
   const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   const proxyDisabled = process.env.NEXT_PUBLIC_USE_SAME_ORIGIN_API_PROXY === "false";
-  // Sin URL en el bundle no hay rewrite fiable → llamar directo al API (comportamiento previo).
+  // Sin URL en el bundle no hay rewrite fiable → llamar directo al API.
   if (proxyDisabled || !envUrl) {
-    return direct;
+    return normalizeApiUrl(direct);
   }
   try {
-    const apiOrigin = new URL(direct.startsWith("http") ? direct : `https://${direct}`).origin;
+    const apiOrigin = new URL(normalizeApiUrl(direct)).origin;
     if (window.location.origin === apiOrigin) {
-      return direct;
+      return normalizeApiUrl(direct);
     }
+    // Para origins no-newayzi (ej. preview de Vercel), usar el proxy same-origin.
     return `${window.location.origin}/proxy-api`;
   } catch {
-    return direct;
+    return normalizeApiUrl(direct);
   }
 }
 
@@ -858,11 +873,12 @@ async function authFetch(path: string, options: RequestInit = {}) {
 }
 
 async function getJson<T>(path: string): Promise<T | null> {
+  const base = resolvedApiBase().replace(/\/$/, "");
   const res = await authFetch(path);
   if (res.status === 404) {
-    logAdminSessionIssue("GET devolvió 404 (ruta no existe en API)", {
-      path,
-      apiBase: resolvedApiBase().replace(/\/$/, "") || "(vacío)",
+    logAdminSessionIssue("GET devolvió 404 (ruta no existe en API — comprueba que la URL apunta al backend Django)", {
+      fullUrl: `${base}${path}`,
+      apiBase: base || "(vacío)",
     });
     return null;
   }
