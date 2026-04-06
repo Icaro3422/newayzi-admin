@@ -3,6 +3,33 @@
  * Alineado con el plan: GET /api/admin/me/, properties, connections, operators, etc.
  */
 
+function inferApiBaseFromHostname(hostname: string): string {
+  const h = hostname.trim().toLowerCase();
+  if (!h) return "";
+  if (h === "localhost" || h === "127.0.0.1") {
+    return "http://localhost:8000";
+  }
+  if (
+    h === "portal.staging.newayzi.com" ||
+    h === "admin.staging.newayzi.com" ||
+    h.includes("staging")
+  ) {
+    return "https://api.staging.newayzi.com";
+  }
+  if (
+    h === "portal.newayzi.com" ||
+    h === "admin.production.newayzi.com" ||
+    h === "newayzi.com" ||
+    h.endsWith(".newayzi.com") ||
+    h.endsWith(".vercel.app")
+  ) {
+    return "https://api.production.newayzi.com";
+  }
+  // Fallback defensivo: si el admin corre en un host no contemplado (p. ej. preview de Vercel)
+  // es preferible usar el API productivo a caer en rutas relativas /api/admin/* del propio Next.
+  return "https://api.production.newayzi.com";
+}
+
 /** URL real del backend (sin proxy). SSR y WebSockets siempre usan esto. */
 function getDirectApiBase(): string {
   const env = process.env.NEXT_PUBLIC_API_URL?.trim();
@@ -24,14 +51,7 @@ function getDirectApiBase(): string {
   }
 
   if (typeof window !== "undefined") {
-    const h = window.location.hostname;
-    // portal.newayzi.com carga el admin en prod → mismo API que admin.production (evita /api/* contra Next).
-    if (h === "portal.newayzi.com") return "https://api.production.newayzi.com";
-    if (h === "admin.production.newayzi.com") return "https://api.production.newayzi.com";
-    if (h === "portal.staging.newayzi.com")
-      return "https://api.staging.newayzi.com";
-    if (h === "admin.staging.newayzi.com") return "https://api.staging.newayzi.com";
-    if (h === "localhost" || h === "127.0.0.1") return "http://localhost:8000";
+    return inferApiBaseFromHostname(window.location.hostname);
   }
   return "";
 }
