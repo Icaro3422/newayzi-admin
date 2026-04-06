@@ -764,33 +764,85 @@ function clerkAuthHeaders(token: string | null): Record<string, string> {
   return h;
 }
 
+/** Logs en consola del navegador para diagnosticar fallos de sesión / API (filtrar por "newayzi-admin"). */
+function logAdminSessionIssue(
+  phase: string,
+  detail: Record<string, unknown>
+): void {
+  if (typeof window === "undefined") return;
+  console.error(`[newayzi-admin] ${phase}`, detail);
+}
+
 async function authFetch(path: string, options: RequestInit = {}) {
-  const url = `${resolvedApiBase().replace(/\/$/, "")}${path}`;
+  const base = resolvedApiBase().replace(/\/$/, "");
+  const url = `${base}${path}`;
   const token = tokenGetter ? await tokenGetter() : null;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
   applyBearerHeaders(headers, token);
-  const res = await fetch(url, {
-    ...options,
-    headers,
-    credentials: "include",
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers,
+      credentials: "include",
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    logAdminSessionIssue("fetch de API falló (red/CORS/bloqueo)", {
+      path,
+      apiBase: base || "(vacío)",
+      message: msg,
+    });
+    if (msg === "Failed to fetch" || msg.includes("NetworkError")) {
+      throw new Error(
+        "No se pudo contactar la API (red, CORS o bloqueo del navegador). Revisa la consola [newayzi-admin] y la pestaña Red."
+      );
+    }
+    throw e instanceof Error ? e : new Error(msg);
+  }
   if (!res.ok) {
+    const text = await res.text();
+    let parsedDetail: string | undefined;
+    try {
+      const j = JSON.parse(text) as { detail?: unknown };
+      if (typeof j.detail === "string") parsedDetail = j.detail;
+      else if (Array.isArray(j.detail)) parsedDetail = JSON.stringify(j.detail);
+    } catch {
+      /* cuerpo no JSON */
+    }
     if (res.status === 401) {
+      logAdminSessionIssue("401 en API admin", {
+        path,
+        apiBase: base || "(vacío)",
+        detail: parsedDetail ?? text.slice(0, 400),
+      });
       // Sesión expirada: redirigir al login
       if (typeof window !== "undefined") {
         window.location.href = "/sign-in?reason=session_expired";
       }
-      throw new Error("Sesión expirada. Redirigiendo al inicio de sesión...");
+      throw new Error(
+        parsedDetail ?? "Sesión expirada o token inválido. Redirigiendo al inicio de sesión…"
+      );
     }
     if (res.status === 403) {
-      throw new Error("No tienes permisos para realizar esta acción.");
+      logAdminSessionIssue("403 en API admin", {
+        path,
+        detail: parsedDetail ?? text.slice(0, 400),
+      });
+      throw new Error(parsedDetail ?? "No tienes permisos para realizar esta acción.");
     }
     if (res.status !== 404) {
-      const text = await res.text();
-      throw new Error(`API ${res.status}: ${text || res.statusText}`);
+      logAdminSessionIssue(`HTTP ${res.status} en API admin`, {
+        path,
+        apiBase: base || "(vacío)",
+        bodyPreview: text.slice(0, 600),
+      });
+      throw new Error(
+        parsedDetail ?? `API ${res.status}: ${text || res.statusText}`
+      );
     }
   }
   return res;
@@ -798,7 +850,13 @@ async function authFetch(path: string, options: RequestInit = {}) {
 
 async function getJson<T>(path: string): Promise<T | null> {
   const res = await authFetch(path);
-  if (res.status === 404) return null;
+  if (res.status === 404) {
+    logAdminSessionIssue("GET devolvió 404 (ruta no existe en API)", {
+      path,
+      apiBase: resolvedApiBase().replace(/\/$/, "") || "(vacío)",
+    });
+    return null;
+  }
   return res.json() as Promise<T>;
 }
 

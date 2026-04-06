@@ -120,11 +120,21 @@ function AccessDeniedView({
           <h1 className="font-sora font-bold text-xl text-white mb-3">
             {isPermissionDenied ? "Acceso restringido" : "No se pudo verificar tu acceso"}
           </h1>
-          <p className="text-white/70 text-[0.9375rem] leading-relaxed mb-6">
+          <p className="text-white/70 text-[0.9375rem] leading-relaxed mb-3">
             {isPermissionDenied
               ? "No tienes permisos para acceder al administrador. Si crees que deberías tener acceso, comunícate con el equipo de Newayzi."
               : "Hubo un problema al cargar tu sesión. Si el problema persiste, contacta al equipo de Newayzi."}
           </p>
+          {error.trim() ? (
+            <div className="mb-6 rounded-xl border border-white/[0.12] bg-black/25 px-3 py-2.5 text-left">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-white/40 mb-1">
+                Detalle (consola del navegador: filtra <span className="text-white/60">newayzi-admin</span>)
+              </p>
+              <p className="text-white/85 text-[0.8125rem] font-mono leading-snug break-words whitespace-pre-wrap">
+                {error}
+              </p>
+            </div>
+          ) : null}
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               type="button"
@@ -331,7 +341,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     const isPermissionDenied =
       error.includes("permisos") ||
       error.includes("No tienes permisos") ||
-      error.includes("403");
+      error.includes("403") ||
+      error.includes("perfil de administrador") ||
+      error.includes("administrador asignado");
     return (
       <AccessDeniedView
         error={error}

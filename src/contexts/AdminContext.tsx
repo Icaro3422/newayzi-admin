@@ -25,7 +25,8 @@ interface AdminContextValue {
   me: AdminMe | null;
   loading: boolean;
   error: string | null;
-  refetchMe: () => Promise<void>;
+  /** `retryOn401`: si es true, reintenta una vez tras 401 (race tras login Clerk). */
+  refetchMe: (retryOn401?: boolean) => Promise<void>;
   canAccess: (module: string) => boolean;
   canEditProperty: boolean;
   canEditConnections: boolean;
@@ -66,12 +67,22 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         setMe(data);
       } else {
         setMe(null);
-        setError("No se pudo cargar la sesión. Verifica que el backend esté activo y que tengas un perfil asignado.");
+        const fallback =
+          "No se pudo cargar la sesión (GET /api/admin/me/ devolvió vacío o 404). Verifica NEXT_PUBLIC_API_URL, el backend y que tengas perfil admin.";
+        if (typeof window !== "undefined") {
+          console.error("[newayzi-admin] getMe sin datos", {
+            hint: "Revisa consola por entradas [newayzi-admin] de authFetch y la pestaña Red.",
+          });
+        }
+        setError(fallback);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al cargar sesión";
+      if (typeof window !== "undefined") {
+        console.error("[newayzi-admin] getMe error", { message: msg, cause: e });
+      }
       // 401 tras login puede ser race condition de Clerk: reintentar una vez
-      if (retryOn401 && msg.includes("401")) {
+      if (retryOn401 === true && msg.includes("401")) {
         await new Promise((r) => setTimeout(r, 800));
         return refetchMe(false);
       }
@@ -93,7 +104,15 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       const token = await waitForToken(getToken);
       if (cancelled || !token) {
         if (!token && isSignedIn) {
-          setError("No se pudo obtener el token de sesión. Intenta recargar la página.");
+          if (typeof window !== "undefined") {
+            console.error(
+              "[newayzi-admin] Clerk isSignedIn pero getToken sigue null tras esperar",
+              { hint: "Revisa dominios autorizados en Clerk y cookies del navegador." }
+            );
+          }
+          setError(
+            "No se pudo obtener el token de sesión de Clerk. Abre la consola (filtra newayzi-admin) o recarga la página."
+          );
         }
         setLoading(false);
         return;
