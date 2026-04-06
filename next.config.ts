@@ -1,11 +1,13 @@
 import type { NextConfig } from "next";
 
-/** Destino del proxy same-origin (debe coincidir con getDirectApiBase / NEXT_PUBLIC_API_URL). */
+/** Solo si está definido en build; sin esto no registrar rewrite (evita 404 en /proxy-api). */
 const apiUpstream = (
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.API_PROXY_TARGET ||
-  "https://api.production.newayzi.com"
-).replace(/\/$/, "");
+  ""
+)
+  .trim()
+  .replace(/\/$/, "");
 
 const nextConfig: NextConfig = {
   images: {
@@ -15,10 +17,11 @@ const nextConfig: NextConfig = {
     ],
   },
   /**
-   * El navegador llama a /proxy-api/* en el mismo host que el admin (sin CORS).
-   * Next reenvía al API real; imprescindible cuando el panel vive en portal.* y el API en api.production.*.
+   * El navegador llama a /proxy-api/* same-origin; Next reenvía al API (misma URL que NEXT_PUBLIC_API_URL).
+   * Requiere NEXT_PUBLIC_API_URL en el build; si no hay, admin-api no usa /proxy-api.
    */
   async rewrites() {
+    if (!apiUpstream) return [];
     return [
       {
         source: "/proxy-api/:path*",

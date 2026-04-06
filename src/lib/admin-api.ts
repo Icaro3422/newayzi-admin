@@ -36,9 +36,11 @@ function getDirectApiBase(): string {
 }
 
 /**
- * Base URL para fetch en el navegador. Si el admin corre en otro origen que el API
- * (p. ej. portal.newayzi.com → api.production.newayzi.com), usa ruta same-origin
- * `/proxy-api` (rewrite en next.config) para evitar CORS y 403 sin cabeceras CORS.
+ * Base URL para fetch en el navegador. Si el admin corre en otro origen que el API,
+ * puede usar `/proxy-api` (rewrite en next.config) para evitar CORS.
+ *
+ * Solo se usa el proxy si existe NEXT_PUBLIC_API_URL (mismo valor que en el build del rewrite).
+ * Desactivar: NEXT_PUBLIC_USE_SAME_ORIGIN_API_PROXY=false
  */
 function getApiBase(): string {
   const direct = getDirectApiBase();
@@ -47,6 +49,12 @@ function getApiBase(): string {
   }
   if (!direct) {
     return "";
+  }
+  const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  const proxyDisabled = process.env.NEXT_PUBLIC_USE_SAME_ORIGIN_API_PROXY === "false";
+  // Sin URL en el bundle no hay rewrite fiable → llamar directo al API (comportamiento previo).
+  if (proxyDisabled || !envUrl) {
+    return direct;
   }
   try {
     const apiOrigin = new URL(direct.startsWith("http") ? direct : `https://${direct}`).origin;

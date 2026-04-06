@@ -21,10 +21,14 @@ export default clerkMiddleware(async (auth, req) => {
   }
 });
 
+/**
+ * Excluir /proxy-api: es el túnel same-origin hacia Django; si Clerk corre aquí,
+ * puede romper fetch (auth/me, etc.) aunque no llames a auth.protect.
+ */
 export const config = {
   matcher: [
     "/",
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ico|woff2?|map)).*)",
+    "/((?!_next|proxy-api/|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ico|woff2?|map)).*)",
     "/(api|trpc)(.*)",
   ],
 };
