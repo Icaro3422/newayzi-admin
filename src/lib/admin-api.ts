@@ -25,7 +25,8 @@ function getDirectApiBase(): string {
 
   if (typeof window !== "undefined") {
     const h = window.location.hostname;
-    if (h === "portal.newayzi.com") return "https://api.newayzi.com";
+    // portal.newayzi.com carga el admin en prod → mismo API que admin.production (evita /api/* contra Next).
+    if (h === "portal.newayzi.com") return "https://api.production.newayzi.com";
     if (h === "admin.production.newayzi.com") return "https://api.production.newayzi.com";
     if (h === "portal.staging.newayzi.com")
       return "https://api.staging.newayzi.com";
@@ -67,9 +68,14 @@ function getApiBase(): string {
   }
 }
 
-// Nota: se evalúa una vez en el browser al cargar el módulo.
-// En SSR nunca se hacen llamadas a la API (todo está en useEffect/useCallback).
-const API_BASE = getApiBase();
+/**
+ * Resolver en cada fetch: no usar `const` a nivel de módulo con `getApiBase()`.
+ * Si el chunk se evalúa en SSR sin window ni env, quedaba "" y las rutas `/api/admin/*`
+ * se pedían al mismo Next (portal) → 404.
+ */
+function resolvedApiBase(): string {
+  return getApiBase();
+}
 
 function getWsBase(): string {
   if (typeof window === "undefined") return "";
@@ -739,7 +745,7 @@ function clerkAuthHeaders(token: string | null): Record<string, string> {
 }
 
 async function authFetch(path: string, options: RequestInit = {}) {
-  const url = `${API_BASE.replace(/\/$/, "")}${path}`;
+  const url = `${resolvedApiBase().replace(/\/$/, "")}${path}`;
   const token = tokenGetter ? await tokenGetter() : null;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -777,7 +783,7 @@ async function getJson<T>(path: string): Promise<T | null> {
 }
 
 async function authFetchMultipart(path: string, method: string, body: FormData) {
-  const url = `${API_BASE.replace(/\/$/, "")}${path}`;
+  const url = `${resolvedApiBase().replace(/\/$/, "")}${path}`;
   // Token fresco: evita JWT caducado en POST grandes / multipart.
   const token = tokenGetter ? await tokenGetter({ skipCache: true }) : null;
   const headers: Record<string, string> = {};
@@ -857,7 +863,7 @@ async function streamSSE(
   onEvent?: (event: ConnectionSyncStreamEvent) => void,
   signal?: AbortSignal
 ): Promise<ConnectionSyncNowResponse> {
-  const url = `${API_BASE.replace(/\/$/, "")}${path}`;
+  const url = `${resolvedApiBase().replace(/\/$/, "")}${path}`;
   const token = tokenGetter ? await tokenGetter() : null;
   const headers: Record<string, string> = { Accept: "text/event-stream, application/json" };
   applyBearerHeaders(headers, token);
@@ -2275,7 +2281,7 @@ export interface PlatformStats {
 }
 
 export async function fetchPlatformStats(): Promise<PlatformStats | null> {
-  const base = getApiBase();
+  const base = resolvedApiBase();
   if (!base) return null;
   try {
     const res = await fetch(`${base}/api/catalog/stats/`);
@@ -2348,7 +2354,7 @@ export const WALLET_REASON_OPTIONS: { value: WalletMovementReason; label: string
 export const agentWallets = {
   /** Super admin: listar billeteras de todos los agentes/personal */
   async list(token: string): Promise<AgentWallet[]> {
-    const res = await fetch(`${API_BASE}/api/admin/agent-wallets/`, {
+    const res = await fetch(`${resolvedApiBase()}/api/admin/agent-wallets/`, {
       headers: clerkAuthHeaders(token),
     });
     if (!res.ok) throw new Error(`Error ${res.status}`);
@@ -2358,7 +2364,7 @@ export const agentWallets = {
 
   /** Ver billetera de un agente específico (super_admin o el propio agente) */
   async get(profileId: number, token: string): Promise<AgentWallet | null> {
-    const res = await fetch(`${API_BASE}/api/admin/users/${profileId}/wallet/`, {
+    const res = await fetch(`${resolvedApiBase()}/api/admin/users/${profileId}/wallet/`, {
       headers: clerkAuthHeaders(token),
     });
     if (!res.ok) return null;
@@ -2371,7 +2377,7 @@ export const agentWallets = {
     token: string,
     payload: { amount?: number; reason?: WalletMovementReason; note?: string; level?: LoyaltyLevelValue }
   ): Promise<AgentWallet> {
-    const res = await fetch(`${API_BASE}/api/admin/users/${profileId}/wallet/`, {
+    const res = await fetch(`${resolvedApiBase()}/api/admin/users/${profileId}/wallet/`, {
       method: "POST",
       headers: { ...clerkAuthHeaders(token), "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -2385,7 +2391,7 @@ export const agentWallets = {
 
   /** El propio agente ve su billetera Newayzi Rewards */
   async getOwn(token: string): Promise<AgentWallet | null> {
-    const res = await fetch(`${API_BASE}/api/agent/wallet/`, {
+    const res = await fetch(`${resolvedApiBase()}/api/agent/wallet/`, {
       headers: clerkAuthHeaders(token),
     });
     if (!res.ok) return null;
@@ -2429,7 +2435,7 @@ export const corporateCreditsApi = {
     if (params?.limit != null) q.set("limit", String(params.limit));
     if (params?.offset != null) q.set("offset", String(params.offset));
     const qs = q.toString();
-    const url = `${API_BASE}/api/admin/corporate-credits/${qs ? `?${qs}` : ""}`;
+    const url = `${resolvedApiBase()}/api/admin/corporate-credits/${qs ? `?${qs}` : ""}`;
     const res = await fetch(url, { headers: clerkAuthHeaders(token) });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -2447,7 +2453,7 @@ export const corporateCreditsApi = {
       note?: string;
     }
   ): Promise<CorporateCreditPostResponse> {
-    const res = await fetch(`${API_BASE}/api/admin/corporate-credits/`, {
+    const res = await fetch(`${resolvedApiBase()}/api/admin/corporate-credits/`, {
       method: "POST",
       headers: {
         ...clerkAuthHeaders(token),
