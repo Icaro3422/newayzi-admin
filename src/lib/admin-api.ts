@@ -1313,15 +1313,12 @@ export const adminApi = {
     return result ?? [];
   },
 
+  /** Sube imágenes vía pre-signed S3 URL, sin pasar por CloudFront. */
   async uploadPropertyPicture(propertyId: number, file: File, isPrimary = false): Promise<PropertyPicture> {
-    const fd = new FormData();
-    fd.append("image", file);
-    if (isPrimary) fd.append("is_primary", "true");
-    const res = await authFetchMultipart(`/api/admin/properties/${propertyId}/pictures/`, "POST", fd);
-    return res.json() as Promise<PropertyPicture>;
+    return (await adminApi.uploadPropertyPicturesBatch(propertyId, [file], isPrimary))[0];
   },
 
-  /** Sube hasta 50 imágenes en una sola petición (campo multipart `images`). */
+  /** Sube hasta 50 imágenes usando pre-signed S3 URLs (sin pasar por CloudFront). */
   async uploadPropertyPicturesBatch(
     propertyId: number,
     files: File[],
@@ -1329,20 +1326,41 @@ export const adminApi = {
   ): Promise<PropertyPicture[]> {
     const slice = files.slice(0, 50);
     if (slice.length === 0) return [];
-    const fd = new FormData();
-    for (const f of slice) {
-      fd.append("images", f);
+
+    // Step 1: Obtener URLs pre-firmadas de Django
+    const presignResult = await postJson<{
+      presigned: Array<{ index: number; rel_key: string; upload_url: string; fields: Record<string, string> }>;
+    }>(`/api/admin/properties/${propertyId}/pictures/presign/`, {
+      files: slice.map((f) => ({ filename: f.name, content_type: f.type || "image/jpeg" })),
+    });
+
+    // Step 2: Subir directamente a S3 (browser → S3, sin CloudFront)
+    const relKeys: string[] = [];
+    for (const { index, rel_key, upload_url, fields } of presignResult.presigned) {
+      const fd = new FormData();
+      for (const [key, value] of Object.entries(fields)) fd.append(key, value);
+      fd.append("file", slice[index]);
+      const s3Res = await fetch(upload_url, { method: "POST", body: fd });
+      if (!s3Res.ok && s3Res.status !== 204) {
+        const txt = await s3Res.text().catch(() => "");
+        throw new Error(`Error al subir imagen ${index + 1} a S3: ${txt || s3Res.status}`);
+      }
+      relKeys.push(rel_key);
     }
-    if (isPrimary) fd.append("is_primary", "true");
-    const res = await authFetchMultipart(`/api/admin/properties/${propertyId}/pictures/`, "POST", fd);
-    return parseAdminPictureBatchResponse<PropertyPicture>(res);
+
+    // Step 3: Confirmar con Django para crear los registros
+    const confirmed = await postJson<{ pictures?: PropertyPicture[] } | PropertyPicture>(
+      `/api/admin/properties/${propertyId}/pictures/confirm/`,
+      { rel_keys: relKeys, is_primary: isPrimary }
+    );
+    if (confirmed && typeof confirmed === "object" && "pictures" in confirmed && Array.isArray((confirmed as { pictures: PropertyPicture[] }).pictures)) {
+      return (confirmed as { pictures: PropertyPicture[] }).pictures;
+    }
+    return [confirmed as PropertyPicture];
   },
 
   async setPropertyPicturePrimary(propertyId: number, picId: number): Promise<PropertyPicture> {
-    const fd = new FormData();
-    fd.append("is_primary", "true");
-    const res = await authFetchMultipart(`/api/admin/properties/${propertyId}/pictures/${picId}/`, "PATCH", fd);
-    return res.json() as Promise<PropertyPicture>;
+    return patchJson<PropertyPicture>(`/api/admin/properties/${propertyId}/pictures/${picId}/`, { is_primary: true });
   },
 
   async deletePropertyPicture(propertyId: number, picId: number): Promise<void> {
@@ -1388,18 +1406,10 @@ export const adminApi = {
     file: File,
     isPrimary = false
   ): Promise<RoomTypePicture> {
-    const fd = new FormData();
-    fd.append("image", file);
-    if (isPrimary) fd.append("is_primary", "true");
-    const res = await authFetchMultipart(
-      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/`,
-      "POST",
-      fd
-    );
-    return res.json() as Promise<RoomTypePicture>;
+    return (await adminApi.uploadRoomTypePicturesBatch(propertyId, roomTypeId, [file], isPrimary))[0];
   },
 
-  /** Sube hasta 50 imágenes en una sola petición (campo multipart `images`). */
+  /** Sube hasta 50 imágenes usando pre-signed S3 URLs (sin pasar por CloudFront). */
   async uploadRoomTypePicturesBatch(
     propertyId: number,
     roomTypeId: number,
@@ -1408,17 +1418,37 @@ export const adminApi = {
   ): Promise<RoomTypePicture[]> {
     const slice = files.slice(0, 50);
     if (slice.length === 0) return [];
-    const fd = new FormData();
-    for (const f of slice) {
-      fd.append("images", f);
+
+    // Step 1: Obtener URLs pre-firmadas de Django
+    const presignResult = await postJson<{
+      presigned: Array<{ index: number; rel_key: string; upload_url: string; fields: Record<string, string> }>;
+    }>(`/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/presign/`, {
+      files: slice.map((f) => ({ filename: f.name, content_type: f.type || "image/jpeg" })),
+    });
+
+    // Step 2: Subir directamente a S3
+    const relKeys: string[] = [];
+    for (const { index, rel_key, upload_url, fields } of presignResult.presigned) {
+      const fd = new FormData();
+      for (const [key, value] of Object.entries(fields)) fd.append(key, value);
+      fd.append("file", slice[index]);
+      const s3Res = await fetch(upload_url, { method: "POST", body: fd });
+      if (!s3Res.ok && s3Res.status !== 204) {
+        const txt = await s3Res.text().catch(() => "");
+        throw new Error(`Error al subir imagen ${index + 1} a S3: ${txt || s3Res.status}`);
+      }
+      relKeys.push(rel_key);
     }
-    if (isPrimary) fd.append("is_primary", "true");
-    const res = await authFetchMultipart(
-      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/`,
-      "POST",
-      fd
+
+    // Step 3: Confirmar con Django
+    const confirmed = await postJson<{ pictures?: RoomTypePicture[] } | RoomTypePicture>(
+      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/confirm/`,
+      { rel_keys: relKeys, is_primary: isPrimary }
     );
-    return parseAdminPictureBatchResponse<RoomTypePicture>(res);
+    if (confirmed && typeof confirmed === "object" && "pictures" in confirmed && Array.isArray((confirmed as { pictures: RoomTypePicture[] }).pictures)) {
+      return (confirmed as { pictures: RoomTypePicture[] }).pictures;
+    }
+    return [confirmed as RoomTypePicture];
   },
 
   async setRoomTypePicturePrimary(
@@ -1426,14 +1456,10 @@ export const adminApi = {
     roomTypeId: number,
     picId: number
   ): Promise<RoomTypePicture> {
-    const fd = new FormData();
-    fd.append("is_primary", "true");
-    const res = await authFetchMultipart(
+    return patchJson<RoomTypePicture>(
       `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/${picId}/`,
-      "PATCH",
-      fd
+      { is_primary: true }
     );
-    return res.json() as Promise<RoomTypePicture>;
   },
 
   async deleteRoomTypePicture(propertyId: number, roomTypeId: number, picId: number): Promise<void> {
