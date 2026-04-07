@@ -28,7 +28,7 @@ import {
 } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 
-type ViewMode = "calendar" | "table" | "blocks";
+type ViewMode = "calendar" | "table" | "blocks" | "cities";
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 
@@ -759,6 +759,315 @@ function SlotDetailModal({
   );
 }
 
+/* ─── AvailabilityKPIs ─────────────────────────────────────── */
+
+function AvailabilityKPIs({
+  uniqueProperties,
+  uniqueCities,
+  totalAvailable,
+  totalRooms,
+  totalLocked,
+  globalPct,
+  loading,
+}: {
+  uniqueProperties: number;
+  uniqueCities: number;
+  totalAvailable: number;
+  totalRooms: number;
+  totalLocked: number;
+  globalPct: number;
+  loading: boolean;
+}) {
+  const kpis = [
+    {
+      label: "Alojamientos",
+      value: loading ? "—" : String(uniqueProperties),
+      icon: "solar:buildings-3-bold-duotone",
+      color: "text-violet-300",
+      bg: "bg-violet-500/15 border-violet-500/25",
+    },
+    {
+      label: "Ciudades",
+      value: loading ? "—" : String(uniqueCities),
+      icon: "solar:city-bold-duotone",
+      color: "text-cyan-300",
+      bg: "bg-cyan-500/15 border-cyan-500/25",
+    },
+    {
+      label: "Unidades disponibles",
+      value: loading ? "—" : String(totalAvailable),
+      icon: "solar:check-circle-bold-duotone",
+      color: "text-emerald-300",
+      bg: "bg-emerald-500/15 border-emerald-500/25",
+    },
+    {
+      label: "Unidades bloqueadas",
+      value: loading ? "—" : String(totalLocked),
+      icon: "solar:lock-bold-duotone",
+      color: "text-red-300",
+      bg: "bg-red-500/15 border-red-500/25",
+    },
+    {
+      label: "% Disponibilidad",
+      value: loading ? "—" : totalRooms > 0 ? `${globalPct}%` : "—",
+      icon: "solar:chart-bold-duotone",
+      color: globalPct >= 50 ? "text-emerald-300" : globalPct >= 25 ? "text-amber-300" : "text-red-300",
+      bg: globalPct >= 50 ? "bg-emerald-500/15 border-emerald-500/25" : globalPct >= 25 ? "bg-amber-500/15 border-amber-500/25" : "bg-red-500/15 border-red-500/25",
+    },
+    {
+      label: "Total capacidad",
+      value: loading ? "—" : String(totalRooms),
+      icon: "solar:bed-bold-duotone",
+      color: "text-blue-300",
+      bg: "bg-blue-500/15 border-blue-500/25",
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {kpis.map((k) => (
+        <div
+          key={k.label}
+          className={`rounded-2xl border ${k.bg} px-4 py-3 flex flex-col gap-1`}
+        >
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <Icon icon={k.icon} className={`${k.color} text-base shrink-0`} />
+            <p className="text-[0.6rem] uppercase tracking-[0.1em] font-semibold text-white/40 leading-tight">
+              {k.label}
+            </p>
+          </div>
+          {loading ? (
+            <div className="h-6 w-12 rounded bg-white/10 animate-pulse" />
+          ) : (
+            <p className={`font-sora font-bold text-xl leading-none ${k.color}`}>
+              {k.value}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── CityBreakdownPanel ───────────────────────────────────── */
+
+type CityStatEntry = {
+  city: string;
+  propertiesCount: number;
+  propertyIds: Set<number>;
+  totalAvailable: number;
+  totalRooms: number;
+  totalLocked: number;
+  avgAvailPct: number;
+  minPrice: number | null;
+  maxPrice: number | null;
+  currency: string;
+  daysCount: number;
+};
+
+function CityBreakdownPanel({
+  cityStats,
+  loading,
+}: {
+  cityStats: CityStatEntry[];
+  loading: boolean;
+}) {
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<"city" | "available" | "pct" | "props">("available");
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let arr = q ? cityStats.filter((c) => c.city.toLowerCase().includes(q)) : [...cityStats];
+    arr.sort((a, b) => {
+      if (sortKey === "city") return a.city.localeCompare(b.city);
+      if (sortKey === "available") return b.totalAvailable - a.totalAvailable;
+      if (sortKey === "pct") return b.avgAvailPct - a.avgAvailPct;
+      if (sortKey === "props") return b.propertiesCount - a.propertiesCount;
+      return 0;
+    });
+    return arr;
+  }, [cityStats, search, sortKey]);
+
+  if (loading) {
+    return (
+      <GlassCard>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 animate-pulse">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="rounded-2xl border border-white/[0.08] bg-white/[0.04] h-32" />
+          ))}
+        </div>
+      </GlassCard>
+    );
+  }
+
+  if (cityStats.length === 0) {
+    return (
+      <GlassCard>
+        <div className="py-16 text-center text-white/50">
+          No hay datos de disponibilidad por ciudad. Ajusta los filtros o espera sincronización PMS.
+        </div>
+      </GlassCard>
+    );
+  }
+
+  const sortOptions: { key: typeof sortKey; label: string }[] = [
+    { key: "available", label: "Más disponibles" },
+    { key: "pct", label: "Mayor %" },
+    { key: "props", label: "Más alojamientos" },
+    { key: "city", label: "A-Z" },
+  ];
+
+  return (
+    <GlassCard className="space-y-5">
+      {/* Header + controls */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-[180px]">
+          <Input
+            placeholder="Buscar ciudad…"
+            size="sm"
+            value={search}
+            onValueChange={setSearch}
+            startContent={<Icon icon="solar:magnifer-outline" className="text-white/40" width={16} />}
+            classNames={{ inputWrapper: inputDark, input: "!text-white/90 placeholder:!text-white/35", label: "!text-white/65" }}
+          />
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          {sortOptions.map((o) => (
+            <button
+              key={o.key}
+              onClick={() => setSortKey(o.key)}
+              className={`text-[0.65rem] font-semibold uppercase tracking-[0.09em] rounded-full px-3 py-1.5 border transition-colors ${
+                sortKey === o.key
+                  ? "bg-[#5e2cec]/30 border-[#5e2cec]/50 text-violet-200"
+                  : "bg-white/[0.06] border-white/[0.1] text-white/50 hover:text-white/70"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-white/35 ml-auto">{filtered.length} ciudad{filtered.length !== 1 ? "es" : ""}</span>
+      </div>
+
+      {/* City cards grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        {filtered.map((c) => {
+          const isExpanded = expanded === c.city;
+          const availColor =
+            c.avgAvailPct === 0
+              ? "text-red-300 border-red-500/30 bg-red-500/10"
+              : c.avgAvailPct >= 50
+              ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10"
+              : c.avgAvailPct >= 25
+              ? "text-amber-300 border-amber-500/30 bg-amber-500/10"
+              : "text-orange-300 border-orange-500/30 bg-orange-500/10";
+          const barColor =
+            c.avgAvailPct === 0 ? "bg-red-500" : c.avgAvailPct >= 50 ? "bg-emerald-500" : c.avgAvailPct >= 25 ? "bg-amber-500" : "bg-orange-500";
+
+          return (
+            <div
+              key={c.city}
+              className="rounded-2xl border border-white/[0.1] bg-white/[0.035] hover:border-[#5e2cec]/35 hover:bg-white/[0.06] transition-all overflow-hidden"
+            >
+              {/* Card header */}
+              <div className="px-4 pt-4 pb-3">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-[#5e2cec]/20 flex items-center justify-center shrink-0">
+                      <Icon icon="solar:city-bold-duotone" className="text-violet-300 text-base" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-sora font-bold text-white text-sm leading-tight truncate">{c.city}</p>
+                      <p className="text-[0.6rem] text-white/45 mt-0.5">
+                        {c.propertiesCount} alojamiento{c.propertiesCount !== 1 ? "s" : ""} · {c.daysCount} día{c.daysCount !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`shrink-0 text-[0.7rem] font-bold rounded-full px-2.5 py-1 border ${availColor}`}>
+                    {c.avgAvailPct}%
+                  </span>
+                </div>
+
+                {/* Availability bar */}
+                <div className="w-full h-1.5 rounded-full bg-white/10 mb-3">
+                  <div
+                    className={`h-full rounded-full ${barColor} transition-all`}
+                    style={{ width: `${Math.max(2, c.avgAvailPct)}%` }}
+                  />
+                </div>
+
+                {/* Stats row */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-xl border border-white/[0.07] bg-white/[0.04] px-2 py-1.5 text-center">
+                    <p className="text-[0.55rem] uppercase tracking-[0.08em] text-white/35 mb-0.5">Disponibles</p>
+                    <p className="font-bold text-emerald-300 text-base leading-none">{c.totalAvailable}</p>
+                  </div>
+                  <div className="rounded-xl border border-white/[0.07] bg-white/[0.04] px-2 py-1.5 text-center">
+                    <p className="text-[0.55rem] uppercase tracking-[0.08em] text-white/35 mb-0.5">Capacidad</p>
+                    <p className="font-bold text-white/75 text-base leading-none">{c.totalRooms || "—"}</p>
+                  </div>
+                  <div className="rounded-xl border border-white/[0.07] bg-white/[0.04] px-2 py-1.5 text-center">
+                    <p className="text-[0.55rem] uppercase tracking-[0.08em] text-white/35 mb-0.5">Bloqueadas</p>
+                    <p className={`font-bold text-base leading-none ${c.totalLocked > 0 ? "text-red-300" : "text-white/35"}`}>{c.totalLocked}</p>
+                  </div>
+                </div>
+
+                {/* Price range */}
+                {c.minPrice != null && (
+                  <div className="mt-2.5 flex items-center gap-1.5">
+                    <Icon icon="solar:tag-price-bold-duotone" className="text-violet-300 shrink-0" width={14} />
+                    <p className="text-[0.68rem] text-white/60">
+                      Precio/noche:{" "}
+                      <span className="text-white/85 font-semibold">
+                        {c.minPrice === c.maxPrice
+                          ? formatPrice(c.minPrice, c.currency)
+                          : `${formatPrice(c.minPrice!, c.currency)} – ${formatPrice(c.maxPrice!, c.currency)}`}
+                      </span>
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Expand toggle */}
+              <button
+                onClick={() => setExpanded(isExpanded ? null : c.city)}
+                className="w-full flex items-center justify-center gap-1.5 py-2 border-t border-white/[0.07] text-[0.6rem] uppercase tracking-[0.1em] text-white/35 hover:text-white/60 hover:bg-white/[0.03] transition-colors"
+              >
+                <Icon icon={isExpanded ? "solar:alt-arrow-up-outline" : "solar:alt-arrow-down-outline"} width={12} />
+                {isExpanded ? "Ocultar" : "Ver propiedades"}
+              </button>
+
+              {/* Expanded property list */}
+              {isExpanded && (
+                <div className="border-t border-white/[0.06] bg-white/[0.02] px-4 py-3 space-y-2">
+                  <p className="text-[0.6rem] uppercase tracking-[0.1em] text-white/35 mb-2">Alojamientos en {c.city}</p>
+                  {/* We'll list the property IDs we collected */}
+                  <p className="text-xs text-white/55">
+                    {c.propertiesCount} alojamiento{c.propertiesCount !== 1 ? "s" : ""} activo{c.propertiesCount !== 1 ? "s" : ""} en el período
+                  </p>
+                  <div className="text-[0.65rem] text-white/40 leading-relaxed">
+                    {c.totalAvailable} unidades disponibles de {c.totalRooms || "?"} totales
+                    {c.totalLocked > 0 && ` · ${c.totalLocked} bloqueadas`}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-white/[0.06] text-xs text-white/40">
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500/60" /> Alta ≥50%</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500/60" /> Media 25–49%</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-orange-500/60" /> Baja &lt;25%</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-500/60" /> Sin disponibilidad</span>
+      </div>
+    </GlassCard>
+  );
+}
+
 /* ─── BlocksPanel ──────────────────────────────────────────── */
 
 function BlocksPanel({
@@ -1166,6 +1475,77 @@ export function AvailabilityList() {
 
   const hasAvailability = useMemo(() => list.some((a) => a.available > 0), [list]);
 
+  /* City-level aggregations */
+  const cityStats = useMemo((): CityStatEntry[] => {
+    const propCity = new Map<number, string>();
+    for (const p of properties) {
+      propCity.set(p.id, p.city_name ?? "Sin ciudad");
+    }
+    const byCity = new Map<
+      string,
+      {
+        city: string;
+        propertyIds: Set<number>;
+        totalAvailable: number;
+        totalRooms: number;
+        totalLocked: number;
+        prices: number[];
+        currency: string;
+        datesSet: Set<string>;
+      }
+    >();
+    for (const a of list) {
+      const city = propCity.get(a.property_id) ?? "Sin ciudad";
+      if (!byCity.has(city)) {
+        byCity.set(city, {
+          city,
+          propertyIds: new Set(),
+          totalAvailable: 0,
+          totalRooms: 0,
+          totalLocked: 0,
+          prices: [],
+          currency: a.currency ?? "COP",
+          datesSet: new Set(),
+        });
+      }
+      const entry = byCity.get(city)!;
+      entry.propertyIds.add(a.property_id);
+      entry.totalAvailable += a.available;
+      entry.totalRooms += a.total_rooms ?? 0;
+      entry.totalLocked += a.locked ?? 0;
+      if (a.price_per_night) {
+        const p = parseFloat(a.price_per_night);
+        if (!Number.isNaN(p) && p > 0) entry.prices.push(p);
+      }
+      if (a.currency) entry.currency = a.currency;
+      entry.datesSet.add(a.date);
+    }
+    return Array.from(byCity.values()).map((e) => ({
+      city: e.city,
+      propertyIds: e.propertyIds,
+      propertiesCount: e.propertyIds.size,
+      totalAvailable: e.totalAvailable,
+      totalRooms: e.totalRooms,
+      totalLocked: e.totalLocked,
+      avgAvailPct: e.totalRooms > 0 ? Math.round((e.totalAvailable / e.totalRooms) * 100) : 0,
+      minPrice: e.prices.length > 0 ? Math.min(...e.prices) : null,
+      maxPrice: e.prices.length > 0 ? Math.max(...e.prices) : null,
+      currency: e.currency,
+      daysCount: e.datesSet.size,
+    }));
+  }, [list, properties]);
+
+  /* Platform KPIs */
+  const kpis = useMemo(() => {
+    const uniqueProperties = new Set(list.map((a) => a.property_id)).size;
+    const totalAvailable = list.reduce((s, a) => s + a.available, 0);
+    const totalRooms = list.reduce((s, a) => s + (a.total_rooms ?? 0), 0);
+    const totalLocked = list.reduce((s, a) => s + (a.locked ?? 0), 0);
+    const globalPct = totalRooms > 0 ? Math.round((totalAvailable / totalRooms) * 100) : 0;
+    const uniqueCities = cityStats.length;
+    return { uniqueProperties, totalAvailable, totalRooms, totalLocked, globalPct, uniqueCities };
+  }, [list, cityStats]);
+
   function handleBlocksChanged() {
     setBlocksRefreshKey((k) => k + 1);
     load();
@@ -1263,6 +1643,30 @@ export function AvailabilityList() {
         )}
       </GlassCard>
 
+      {/* KPIs */}
+      {!loading && list.length > 0 && (
+        <AvailabilityKPIs
+          uniqueProperties={kpis.uniqueProperties}
+          uniqueCities={kpis.uniqueCities}
+          totalAvailable={kpis.totalAvailable}
+          totalRooms={kpis.totalRooms}
+          totalLocked={kpis.totalLocked}
+          globalPct={kpis.globalPct}
+          loading={loading}
+        />
+      )}
+      {loading && (
+        <AvailabilityKPIs
+          uniqueProperties={0}
+          uniqueCities={0}
+          totalAvailable={0}
+          totalRooms={0}
+          totalLocked={0}
+          globalPct={0}
+          loading={true}
+        />
+      )}
+
       {/* Tabs */}
       <Tabs
         selectedKey={viewMode}
@@ -1277,10 +1681,13 @@ export function AvailabilityList() {
       >
         <Tab key="calendar" title={<span className="flex items-center gap-2"><Icon icon="solar:calendar-outline" width={18} />Mapa calendario</span>} />
         <Tab key="table" title={<span className="flex items-center gap-2"><Icon icon="solar:list-outline" width={18} />Lista detallada</span>} />
+        <Tab key="cities" title={<span className="flex items-center gap-2"><Icon icon="solar:city-bold-duotone" width={18} />Por ciudad</span>} />
         <Tab key="blocks" title={<span className="flex items-center gap-2"><Icon icon="solar:lock-outline" width={18} />Bloqueos</span>} />
       </Tabs>
 
-      {viewMode === "blocks" ? (
+      {viewMode === "cities" ? (
+        <CityBreakdownPanel cityStats={cityStats} loading={loading} />
+      ) : viewMode === "blocks" ? (
         <BlocksPanel
           properties={properties}
           operators={operators}
