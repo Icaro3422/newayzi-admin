@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import {
   Input,
   Button,
@@ -1262,6 +1262,9 @@ export function AvailabilityList() {
   const [properties, setProperties] = useState<PropertyListItem[]>([]);
   const [operators, setOperators] = useState<Operator[]>([]);
   const [loading, setLoading] = useState(true);
+  /** Progreso de carga granular: null = sin progreso activo, {loaded,total} = cargando por propiedad */
+  const [loadProgress, setLoadProgress] = useState<{ loaded: number; total: number } | null>(null);
+  const loadAbortRef = useRef<AbortController | null>(null);
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10);
   });
@@ -1290,13 +1293,16 @@ export function AvailabilityList() {
   }, [agency]);
 
   const load = useCallback(() => {
-    setLoading(true);
-    const params: { date_from?: string; date_to?: string; property_id?: number; operator_id?: number } = {};
-    if (dateFrom) params.date_from = dateFrom;
-    if (dateTo) params.date_to = dateTo;
-    const pid = parseInt(propertyId, 10);
-    if (!Number.isNaN(pid)) params.property_id = pid;
+    // Cancela cualquier carga previa
+    loadAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    loadAbortRef.current = ctrl;
 
+    setList([]);
+    setLoadProgress(null);
+    setLoading(true);
+
+    // Calcula el operador efectivo (misma lógica que antes)
     let effectiveOperatorId: number | undefined;
     if (isOperador && myOperatorId) {
       effectiveOperatorId = myOperatorId;
@@ -1316,21 +1322,76 @@ export function AvailabilityList() {
       const n = parseInt(operatorId, 10);
       if (!Number.isNaN(n) && n > 0) effectiveOperatorId = n;
     }
-    if (effectiveOperatorId !== undefined && effectiveOperatorId > 0) {
-      params.operator_id = effectiveOperatorId;
+
+    const baseDates: { date_from?: string; date_to?: string } = {};
+    if (dateFrom) baseDates.date_from = dateFrom;
+    if (dateTo) baseDates.date_to = dateTo;
+
+    const specificPid = parseInt(propertyId, 10);
+    const hasFilter =
+      (!Number.isNaN(specificPid) && specificPid > 0) ||
+      effectiveOperatorId !== undefined;
+
+    // ── Caso 1: filtro específico (operador, propiedad fija o roles acotados) ──
+    // Request único y pequeño → no hay riesgo de 401 por token expirado.
+    if (hasFilter) {
+      const params: { date_from?: string; date_to?: string; property_id?: number; operator_id?: number } = {
+        ...baseDates,
+      };
+      if (!Number.isNaN(specificPid) && specificPid > 0) params.property_id = specificPid;
+      if (effectiveOperatorId !== undefined) params.operator_id = effectiveOperatorId;
+
+      adminApi
+        .getAvailability(params)
+        .then((res) => {
+          if (ctrl.signal.aborted) return;
+          setList(res?.results ?? []);
+        })
+        .catch(() => { if (!ctrl.signal.aborted) setList([]); })
+        .finally(() => { if (!ctrl.signal.aborted) { setLoading(false); setLoadProgress(null); } });
+      return;
     }
 
-    adminApi
-      .getAvailability(params)
-      .then((res) => {
-        setList(res?.results ?? []);
-      })
-      .catch(() => {
-        setList([]);
-      })
-      .finally(() => {
+    // ── Caso 2: super_admin sin filtro → carga granular por propiedad ──
+    // Espera a que la lista de propiedades esté disponible. Cuando properties
+    // cambie, `load` se recrea y este efecto se vuelve a disparar.
+    if (properties.length === 0) {
+      // Sigue en loading, se re-disparará cuando properties cargue
+      return;
+    }
+
+    const total = properties.length;
+    setLoadProgress({ loaded: 0, total });
+
+    // Worker pool: 4 requests concurrentes, cada uno toma la siguiente propiedad del queue
+    const queue = [...properties];
+    let done = 0;
+
+    async function worker() {
+      while (queue.length > 0 && !ctrl.signal.aborted) {
+        const prop = queue.shift();
+        if (!prop) break;
+        try {
+          const res = await adminApi.getAvailability({ ...baseDates, property_id: prop.id });
+          if (!ctrl.signal.aborted && res?.results?.length) {
+            setList((prev) => [...prev, ...res.results]);
+          }
+        } catch {
+          // Propiedad falló — continúa con la siguiente
+        }
+        done++;
+        if (!ctrl.signal.aborted) {
+          setLoadProgress({ loaded: done, total });
+        }
+      }
+    }
+
+    Promise.all([worker(), worker(), worker(), worker()]).finally(() => {
+      if (!ctrl.signal.aborted) {
         setLoading(false);
-      });
+        setLoadProgress(null);
+      }
+    });
   }, [
     dateFrom,
     dateTo,
@@ -1340,6 +1401,7 @@ export function AvailabilityList() {
     isAgente,
     myOperatorId,
     agency,
+    properties,
   ]);
 
   useEffect(() => {
@@ -1643,8 +1705,31 @@ export function AvailabilityList() {
         )}
       </GlassCard>
 
+      {/* Barra de progreso de carga granular (visible cuando ya hay datos parciales) */}
+      {loading && list.length > 0 && loadProgress && (
+        <div className="rounded-2xl border border-[#5e2cec]/25 bg-[#5e2cec]/10 px-5 py-3 flex items-center gap-4">
+          <Spinner size="sm" classNames={{ circle1: "border-b-[#9b74ff]", circle2: "border-b-[#9b74ff]" }} />
+          <div className="flex-1 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[0.75rem] text-[#b89eff] font-medium">
+                Cargando disponibilidad…
+              </span>
+              <span className="text-[0.7rem] text-white/45 tabular-nums">
+                {loadProgress.loaded} / {loadProgress.total} propiedades
+              </span>
+            </div>
+            <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#5e2cec] to-[#9b74ff] transition-all duration-300"
+                style={{ width: `${loadProgress.total > 0 ? Math.round((loadProgress.loaded / loadProgress.total) * 100) : 0}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* KPIs */}
-      {!loading && list.length > 0 && (
+      {list.length > 0 && (
         <AvailabilityKPIs
           uniqueProperties={kpis.uniqueProperties}
           uniqueCities={kpis.uniqueCities}
@@ -1652,10 +1737,10 @@ export function AvailabilityList() {
           totalRooms={kpis.totalRooms}
           totalLocked={kpis.totalLocked}
           globalPct={kpis.globalPct}
-          loading={loading}
+          loading={loading && list.length === 0}
         />
       )}
-      {loading && (
+      {loading && list.length === 0 && !loadProgress && (
         <AvailabilityKPIs
           uniqueProperties={0}
           uniqueCities={0}
@@ -1686,7 +1771,7 @@ export function AvailabilityList() {
       </Tabs>
 
       {viewMode === "cities" ? (
-        <CityBreakdownPanel cityStats={cityStats} loading={loading} />
+        <CityBreakdownPanel cityStats={cityStats} loading={loading && list.length === 0} />
       ) : viewMode === "blocks" ? (
         <BlocksPanel
           properties={properties}
@@ -1697,9 +1782,24 @@ export function AvailabilityList() {
           refreshKey={blocksRefreshKey}
           onBlocksChanged={handleBlocksChanged}
         />
-      ) : loading ? (
-        <GlassCard className="flex justify-center items-center py-16">
+      ) : loading && list.length === 0 ? (
+        /* Spinner solo cuando no hay ningún dato aún */
+        <GlassCard className="flex flex-col items-center justify-center py-16 gap-5">
           <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+          {loadProgress && (
+            <div className="w-full max-w-xs space-y-2 px-2">
+              <div className="flex items-center justify-between text-xs text-white/50">
+                <span>Cargando disponibilidad…</span>
+                <span className="tabular-nums">{loadProgress.loaded} / {loadProgress.total}</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[#5e2cec] to-[#9b74ff] transition-all duration-300"
+                  style={{ width: `${loadProgress.total > 0 ? Math.round((loadProgress.loaded / loadProgress.total) * 100) : 0}%` }}
+                />
+              </div>
+            </div>
+          )}
         </GlassCard>
       ) : viewMode === "calendar" ? (
         /* Vista calendario */
