@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -57,13 +58,21 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<AdminMe | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Ref para saber si ya completamos la primera carga (evita desmontar hijos en re-fetchs).
+  const hasDataRef = useRef(false);
 
   const refetchMe = useCallback(async (retryOn401 = false) => {
-    setLoading(true);
+    // Solo activar el loading "pesado" (que desmonta hijos en AdminShell) en la carga inicial.
+    // Si ya tenemos datos previos, no ponemos loading=true para no interrumpir páginas
+    // que tienen peticiones largas en vuelo (ej: página de disponibilidad).
+    if (!hasDataRef.current) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const data = await adminApi.getMe();
       if (data) {
+        hasDataRef.current = true;
         setMe(data);
       } else {
         setMe(null);
@@ -86,8 +95,11 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         await new Promise((r) => setTimeout(r, 800));
         return refetchMe(false);
       }
-      setError(msg);
-      setMe(null);
+      // Si ya teníamos datos, no borramos me ni mostramos error para no interrumpir al usuario.
+      if (!hasDataRef.current) {
+        setError(msg);
+        setMe(null);
+      }
     } finally {
       setLoading(false);
     }

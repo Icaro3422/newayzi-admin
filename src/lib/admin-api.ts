@@ -800,19 +800,24 @@ function logAdminSessionIssue(
 async function authFetch(path: string, options: RequestInit = {}) {
   const base = resolvedApiBase().replace(/\/$/, "");
   const url = `${base}${path}`;
+
+  function buildHeaders(tok: string | null): Record<string, string> {
+    const h: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(options.headers as Record<string, string>),
+    };
+    applyBearerHeaders(h, tok);
+    return h;
+  }
+
+  async function execFetch(tok: string | null): Promise<Response> {
+    return fetch(url, { ...options, headers: buildHeaders(tok), credentials: "include" });
+  }
+
   const token = tokenGetter ? await tokenGetter() : null;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
-  };
-  applyBearerHeaders(headers, token);
   let res: Response;
   try {
-    res = await fetch(url, {
-      ...options,
-      headers,
-      credentials: "include",
-    });
+    res = await execFetch(token);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     logAdminSessionIssue("fetch de API falló (red/CORS/bloqueo)", {
@@ -827,6 +832,25 @@ async function authFetch(path: string, options: RequestInit = {}) {
     }
     throw e instanceof Error ? e : new Error(msg);
   }
+
+  // Token Clerk cacheado puede estar expirado. Antes de redirigir al login,
+  // intenta obtener un token fresco (skipCache) y reintenta la petición una vez.
+  if (res.status === 401 && tokenGetter) {
+    try {
+      const freshToken = await (
+        tokenGetter as (o: { skipCache: boolean }) => Promise<string | null>
+      )({ skipCache: true });
+      if (freshToken && freshToken !== token) {
+        const retried = await execFetch(freshToken).catch(() => null);
+        if (retried && retried.status !== 401) {
+          res = retried;
+        }
+      }
+    } catch {
+      /* refresco falló — continúa con la respuesta 401 original */
+    }
+  }
+
   if (!res.ok) {
     const text = await res.text();
     let parsedDetail: string | undefined;
@@ -838,12 +862,12 @@ async function authFetch(path: string, options: RequestInit = {}) {
       /* cuerpo no JSON */
     }
     if (res.status === 401) {
-      logAdminSessionIssue("401 en API admin", {
+      logAdminSessionIssue("401 en API admin (tras reintento con token fresco)", {
         path,
         apiBase: base || "(vacío)",
         detail: parsedDetail ?? text.slice(0, 400),
       });
-      // Sesión expirada: redirigir al login
+      // Sesión realmente expirada o inválida: redirigir al login
       if (typeof window !== "undefined") {
         window.location.href = "/sign-in?reason=session_expired";
       }

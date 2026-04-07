@@ -292,7 +292,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const router   = useRouter();
   const { signOut } = useClerk();
   const { user } = useUser();
-  const { canAccess, loading, error, mustChangePassword, clearMustChangePassword, role, refetchMe } = useAdmin();
+  const { me, canAccess, loading, error, mustChangePassword, clearMustChangePassword, role, refetchMe } = useAdmin();
 
   // Aplicar overrides de label según el rol actual
   const roleOverrides = role ? (ROLE_NAV_OVERRIDES[role] ?? {}) : {};
@@ -324,7 +324,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 
-  if (loading) {
+  // Pantalla completa de carga SOLO en la carga inicial (cuando aún no hay datos de sesión).
+  // En re-fetchs (refresco de token Clerk, etc.) ya tenemos `me`, así que mostramos
+  // el contenido normal para evitar desmontar páginas con carga larga (ej: disponibilidad).
+  if (loading && !me) {
     return (
       <div className="flex h-screen items-center justify-center font-sora" style={{ background: BG_GRADIENT }}>
         {shellBg}
