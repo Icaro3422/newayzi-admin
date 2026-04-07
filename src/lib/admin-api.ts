@@ -797,6 +797,33 @@ function logAdminSessionIssue(
   console.error(`[newayzi-admin] ${phase}`, detail);
 }
 
+/**
+ * Decodifica el payload de un JWT sin verificar firma para leer el campo `exp`.
+ * Devuelve true si el token está expirado o expirará en los próximos `bufferSeconds`.
+ */
+function isTokenExpiringShortly(token: string | null, bufferSeconds = 30): boolean {
+  if (!token) return true;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return false;
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))
+    ) as { exp?: number };
+    if (!payload.exp) return false;
+    return Date.now() / 1000 + bufferSeconds >= payload.exp;
+  } catch {
+    return false;
+  }
+}
+
+/** Getter con skipCache, tipado correctamente para Clerk's getToken. */
+async function getFreshToken(): Promise<string | null> {
+  if (!tokenGetter) return null;
+  return (tokenGetter as (o: { skipCache: boolean }) => Promise<string | null>)({
+    skipCache: true,
+  }).catch(() => null);
+}
+
 async function authFetch(path: string, options: RequestInit = {}) {
   const base = resolvedApiBase().replace(/\/$/, "");
   const url = `${base}${path}`;
@@ -814,7 +841,14 @@ async function authFetch(path: string, options: RequestInit = {}) {
     return fetch(url, { ...options, headers: buildHeaders(tok), credentials: "include" });
   }
 
-  const token = tokenGetter ? await tokenGetter() : null;
+  // Obtiene el token cacheado y, si está por expirar (< 30s de vida) o ya expiró,
+  // fuerza un refresco antes de enviar el request — evita el 401 proactivamente.
+  let token = tokenGetter ? await tokenGetter() : null;
+  if (isTokenExpiringShortly(token)) {
+    const refreshed = await getFreshToken();
+    if (refreshed) token = refreshed;
+  }
+
   let res: Response;
   try {
     res = await execFetch(token);
@@ -833,23 +867,16 @@ async function authFetch(path: string, options: RequestInit = {}) {
     throw e instanceof Error ? e : new Error(msg);
   }
 
-  // Token Clerk cacheado puede estar expirado (JWT TTL es 60s por defecto).
-  // Antes de redirigir al login, obtiene un token fresco forzando skipCache y reintenta UNA vez.
-  // Esto cubre el caso donde el token expira justo entre la carga de la página y el request
-  // (común en páginas con múltiples requests concurrentes como la de disponibilidad).
+  // Segunda línea de defensa: si el backend devuelve 401 (p.ej. skew de reloj
+  // o el token expiró exactamente entre el chequeo y la llegada al servidor),
+  // forzar un refresco y reintentar UNA sola vez antes de redirigir al login.
   if (res.status === 401 && tokenGetter) {
-    try {
-      const freshToken = await (
-        tokenGetter as (o: { skipCache: boolean }) => Promise<string | null>
-      )({ skipCache: true });
-      if (freshToken) {
-        const retried = await execFetch(freshToken).catch(() => null);
-        if (retried && retried.status !== 401) {
-          res = retried;
-        }
+    const freshToken = await getFreshToken();
+    if (freshToken) {
+      const retried = await execFetch(freshToken).catch(() => null);
+      if (retried && retried.status !== 401) {
+        res = retried;
       }
-    } catch {
-      /* refresco falló — continúa con la respuesta 401 original */
     }
   }
 
