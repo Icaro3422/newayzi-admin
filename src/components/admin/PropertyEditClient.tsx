@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import Link from "next/link";
 import {
   Button,
@@ -24,6 +24,7 @@ import {
   type PropertyDetail,
   type PropertyFaq,
   type PropertyPicture,
+  type RoomTypeAdminSummary,
 } from "@/lib/admin-api";
 import { normalizeImageUrl } from "@/lib/normalize-image-url";
 import { useAdmin } from "@/contexts/AdminContext";
@@ -43,19 +44,35 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
   );
 }
 
-function SectionHeader({ icon, title, subtitle, iconBg = "from-[#5e2cec]/20 to-[#9b74ff]/20", iconColor = "text-[#9b74ff]" }: {
-  icon: string; title: string; subtitle?: string;
-  iconBg?: string; iconColor?: string;
+function SectionHeader({
+  icon,
+  title,
+  subtitle,
+  iconBg = "from-[#5e2cec]/20 to-[#9b74ff]/20",
+  iconColor = "text-[#9b74ff]",
+  action,
+}: {
+  icon: string;
+  title: string;
+  subtitle?: string;
+  iconBg?: string;
+  iconColor?: string;
+  action?: ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 mb-5">
-      <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${iconBg} border border-white/10 flex items-center justify-center flex-shrink-0`}>
-        <Icon icon={icon} className={`${iconColor} text-lg`} />
+    <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div
+          className={`w-9 h-9 rounded-xl bg-gradient-to-br ${iconBg} border border-white/10 flex items-center justify-center flex-shrink-0`}
+        >
+          <Icon icon={icon} className={`${iconColor} text-lg`} />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-base font-bold text-white/90">{title}</h2>
+          {subtitle && <p className="text-xs text-white/50">{subtitle}</p>}
+        </div>
       </div>
-      <div>
-        <h2 className="text-base font-bold text-white/90">{title}</h2>
-        {subtitle && <p className="text-xs text-white/50">{subtitle}</p>}
-      </div>
+      {action ? <div className="shrink-0 flex items-center gap-2">{action}</div> : null}
     </div>
   );
 }
@@ -89,6 +106,21 @@ function formatPmsMoney(amount: string | number, currencyCode: string): string {
   }
 }
 
+/** Mensaje legible si el backend devolvió JSON `{ detail: "..." }` en el body del error. */
+function formatAdminApiError(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  const raw = e.message.trim();
+  if (raw.startsWith("{")) {
+    try {
+      const j = JSON.parse(raw) as { detail?: unknown };
+      if (typeof j.detail === "string") return j.detail;
+    } catch {
+      /* ignore */
+    }
+  }
+  return raw;
+}
+
 /* ─── Componente principal ─────────────────────────────── */
 export function PropertyEditClient() {
   const router = useRouter();
@@ -102,6 +134,10 @@ export function PropertyEditClient() {
   const [saving, setSaving] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [roomTypeToDelete, setRoomTypeToDelete] = useState<RoomTypeAdminSummary | null>(null);
+  const [deletingRoomTypeId, setDeletingRoomTypeId] = useState<number | null>(null);
+  const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // ── Campos editables: contenido principal
   const [name, setName] = useState("");
@@ -430,6 +466,50 @@ export function PropertyEditClient() {
     }
   }
 
+  async function handleDeleteRoomType() {
+    if (!canEditProperty || !roomTypeToDelete) return;
+    setDeletingRoomTypeId(roomTypeToDelete.id);
+    try {
+      await adminApi.deleteRoomTypeAdmin(propertyId, roomTypeToDelete.id);
+      addToast({ title: "Tipo de habitación eliminado", color: "success" });
+      setRoomTypeToDelete(null);
+      refreshProperty();
+      router.refresh();
+    } catch (e: unknown) {
+      addToast({
+        title: "No se pudo eliminar",
+        description: formatAdminApiError(e),
+        color: "danger",
+      });
+    } finally {
+      setDeletingRoomTypeId(null);
+    }
+  }
+
+  async function handleDeleteAllRoomTypes() {
+    if (!canEditProperty) return;
+    setBulkDeleting(true);
+    try {
+      const r = await adminApi.deleteAllRoomTypesForProperty(propertyId);
+      addToast({
+        title: "Tipos de habitación eliminados",
+        description: r.deleted > 0 ? `Se eliminaron ${r.deleted} tipo(s).` : undefined,
+        color: "success",
+      });
+      setBulkDeleteModalOpen(false);
+      refreshProperty();
+      router.refresh();
+    } catch (e: unknown) {
+      addToast({
+        title: "No se pudieron eliminar todos",
+        description: formatAdminApiError(e),
+        color: "danger",
+      });
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
   if (loading) {
     return (
       <GlassCard className="flex justify-center items-center py-16">
@@ -496,6 +576,50 @@ export function PropertyEditClient() {
             <Button variant="flat" onPress={() => setDeleteModalOpen(false)}>Cancelar</Button>
             <Button color="danger" onPress={handleDelete} isLoading={deleting} startContent={!deleting ? <Icon icon="solar:trash-bin-trash-outline" width={18} /> : undefined}>
               Eliminar
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={!!roomTypeToDelete} onOpenChange={(open) => !open && setRoomTypeToDelete(null)} placement="center">
+        <ModalContent>
+          <ModalHeader>Eliminar tipo de habitación</ModalHeader>
+          <ModalBody>
+            <p>
+              ¿Eliminar &quot;{roomTypeToDelete?.name}&quot; ({roomTypeToDelete?.code})? Se borrarán tarifas, bloqueos e imágenes asociados. No es posible si hay reservas vinculadas.
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={() => setRoomTypeToDelete(null)}>Cancelar</Button>
+            <Button
+              color="danger"
+              onPress={handleDeleteRoomType}
+              isLoading={deletingRoomTypeId != null}
+              startContent={deletingRoomTypeId == null ? <Icon icon="solar:trash-bin-trash-outline" width={18} /> : undefined}
+            >
+              Eliminar
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={bulkDeleteModalOpen} onOpenChange={setBulkDeleteModalOpen} placement="center">
+        <ModalContent>
+          <ModalHeader>Eliminar todos los tipos de habitación</ModalHeader>
+          <ModalBody>
+            <p>
+              Se eliminarán los {property?.room_types?.length ?? 0} tipos de habitación de esta propiedad (tarifas, bloqueos, imágenes y mapeos PMS incluidos). Esta acción no se puede deshacer. Si algún tipo tiene reservas, la operación fallará por completo.
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={() => setBulkDeleteModalOpen(false)}>Cancelar</Button>
+            <Button
+              color="danger"
+              onPress={handleDeleteAllRoomTypes}
+              isLoading={bulkDeleting}
+              startContent={!bulkDeleting ? <Icon icon="solar:trash-bin-trash-outline" width={18} /> : undefined}
+            >
+              Eliminar todos
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -934,6 +1058,20 @@ export function PropertyEditClient() {
             subtitle="Todos los tipos sincronizados; abre cada uno para editar texto, datos y galería."
             iconBg="from-teal-500/20 to-green-600/20"
             iconColor="text-teal-400"
+            action={
+              !readOnly && (property.room_types?.length ?? 0) > 0 ? (
+                <Button
+                  size="sm"
+                  color="danger"
+                  variant="flat"
+                  className="font-medium"
+                  startContent={<Icon icon="solar:trash-bin-trash-outline" width={16} />}
+                  onPress={() => setBulkDeleteModalOpen(true)}
+                >
+                  Eliminar todos
+                </Button>
+              ) : undefined
+            }
           />
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {property.room_types.map((rt) => (
@@ -980,7 +1118,7 @@ export function PropertyEditClient() {
                       </span>
                     )}
                   </div>
-                  <div className="mt-auto pt-3">
+                  <div className="mt-auto pt-3 flex flex-col gap-2">
                     <Button
                       as={Link}
                       href={`/admin/properties/${propertyId}/room-types/${rt.id}`}
@@ -990,6 +1128,19 @@ export function PropertyEditClient() {
                     >
                       Ver y editar
                     </Button>
+                    {!readOnly && (
+                      <Button
+                        size="sm"
+                        color="danger"
+                        variant="flat"
+                        className="w-full font-medium"
+                        startContent={<Icon icon="solar:trash-bin-trash-outline" width={16} />}
+                        isLoading={deletingRoomTypeId === rt.id}
+                        onPress={() => setRoomTypeToDelete(rt)}
+                      >
+                        Eliminar
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>

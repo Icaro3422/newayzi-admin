@@ -1529,6 +1529,25 @@ export const adminApi = {
     );
   },
 
+  /** Elimina un tipo de habitación (409 si hay reservas u otros registros protegidos). */
+  async deleteRoomTypeAdmin(propertyId: number, roomTypeId: number): Promise<void> {
+    await deleteVoid(`/api/admin/properties/${propertyId}/room-types/${roomTypeId}/`);
+  },
+
+  /** Elimina todos los tipos de habitación de la propiedad (409 si alguno está protegido). */
+  async deleteAllRoomTypesForProperty(propertyId: number): Promise<{ deleted: number }> {
+    const res = await authFetch(`/api/admin/properties/${propertyId}/room-types/`, { method: "DELETE" });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || res.statusText);
+    }
+    try {
+      return (await res.json()) as { deleted: number };
+    } catch {
+      return { deleted: 0 };
+    }
+  },
+
   async getRoomTypePictures(propertyId: number, roomTypeId: number): Promise<RoomTypePicture[]> {
     const r = await getJson<RoomTypePicture[]>(
       `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/`
