@@ -1394,19 +1394,46 @@ export const adminApi = {
     return res.blob();
   },
 
+  /**
+   * Importa Excel vía presign → S3 → confirm (mismo patrón que imágenes).
+   * Evita POST multipart al portal/API/CloudFront (403 WAF).
+   */
   async importManualInventory(
     propertyId: number,
     file: File,
     replace = true
   ): Promise<ManualInventoryImportRow> {
+    const contentType =
+      file.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const presign = await postJson<{
+      presigned: Array<{
+        index: number;
+        rel_key: string;
+        upload_url: string;
+        fields: Record<string, string>;
+      }>;
+    }>(`/api/admin/properties/${propertyId}/manual-inventory/presign/`, {
+      filename: file.name,
+      content_type: contentType,
+    });
+    const p = presign.presigned[0];
+    if (!p?.upload_url || !p.rel_key) {
+      throw new Error("Respuesta inválida del servidor (presign).");
+    }
     const fd = new FormData();
+    for (const [k, v] of Object.entries(p.fields)) {
+      fd.append(k, v);
+    }
     fd.append("file", file);
-    fd.append("replace", replace ? "true" : "false");
-    const res = await authFetchMultipart(
-      `/api/admin/properties/${propertyId}/manual-inventory/import/`,
-      "POST",
-      fd
-    );
+    await uploadToS3PresignedPost(p.upload_url, fd);
+    const res = await authFetch(`/api/admin/properties/${propertyId}/manual-inventory/confirm/`, {
+      method: "POST",
+      body: JSON.stringify({
+        rel_key: p.rel_key,
+        replace,
+        original_filename: file.name,
+      }),
+    });
     return res.json() as Promise<ManualInventoryImportRow>;
   },
 
