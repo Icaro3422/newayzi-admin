@@ -204,21 +204,57 @@ export function ManualInventoryPanel({
       </div>
 
       {lastResult && (
-        <div className="rounded-2xl border border-white/[0.1] bg-white/[0.04] backdrop-blur-sm p-4 text-sm space-y-2">
-          <p className="font-sora font-semibold text-white/90">Última importación</p>
-          <p className="text-white/60">
-            Estado: <span className="text-white/90">{lastResult.status}</span> — filas: {lastResult.rows_processed}{" "}
-            (errores parseo: {lastResult.rows_failed})
-          </p>
-          {lastResult.stats && Object.keys(lastResult.stats).length > 0 && (
-            <pre className="text-xs text-white/50 overflow-x-auto whitespace-pre-wrap">
-              {JSON.stringify(lastResult.stats, null, 2)}
-            </pre>
+        <div className={`rounded-2xl border p-4 text-sm space-y-3 ${
+          lastResult.status === "success"
+            ? "border-emerald-500/25 bg-emerald-500/[0.06]"
+            : "border-amber-500/25 bg-amber-500/[0.06]"
+        }`}>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
+              lastResult.status === "success"
+                ? "bg-emerald-500/20 text-emerald-300"
+                : "bg-amber-500/20 text-amber-300"
+            }`}>
+              {lastResult.status === "success" ? "Completado" : lastResult.status}
+            </span>
+            <span className="text-white/60 text-xs">{lastResult.original_filename}</span>
+          </div>
+
+          {/* Estadísticas clave */}
+          {lastResult.stats && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {[
+                { label: "Filas procesadas", key: "rows_processed", value: lastResult.rows_processed, color: "text-white/90" },
+                { label: "Tipos de hab.", key: "room_types_touched", value: (lastResult.stats as Record<string, number>).room_types_touched, color: "text-blue-300" },
+                { label: "Slots de semana", key: "week_slots_created", value: (lastResult.stats as Record<string, number>).week_slots_created, color: "text-purple-300" },
+                { label: "Reglas de precio", key: "pricing_rules_created", value: (lastResult.stats as Record<string, number>).pricing_rules_created, color: "text-emerald-300" },
+                { label: "Sin precio (slots)", key: "no_price_chunks", value: (lastResult.stats as Record<string, number>).no_price_chunks, color: "text-amber-300" },
+                { label: "Bloqueos (arrendado)", key: "blocks_created", value: (lastResult.stats as Record<string, number>).blocks_created, color: "text-red-300" },
+              ].filter(s => s.value !== undefined && s.value !== null).map(s => (
+                <div key={s.key} className="rounded-xl bg-white/[0.05] px-3 py-2">
+                  <p className={`text-lg font-black ${s.color}`}>{s.value ?? 0}</p>
+                  <p className="text-[10px] text-white/45">{s.label}</p>
+                </div>
+              ))}
+            </div>
           )}
+
+          {/* Avisos de filas sin precio */}
+          {((lastResult.stats as Record<string, number>)?.no_price_chunks ?? 0) > 0 && (
+            <p className="text-xs text-amber-300/80 bg-amber-500/[0.08] rounded-xl px-3 py-2">
+              ⚠️ {(lastResult.stats as Record<string, number>).no_price_chunks} periodos importados sin precio de arriendo.
+              Las semanas y habitaciones están registradas, pero no aparecerán con tarifa hasta que se asignen precios manualmente o se reimporte el Excel con precios completos.
+            </p>
+          )}
+
+          {/* Errores de parseo */}
           {Array.isArray(lastResult.error_summary) && lastResult.error_summary.length > 0 && (
-            <pre className="text-xs text-amber-200/90 overflow-x-auto max-h-40 whitespace-pre-wrap">
-              {JSON.stringify(lastResult.error_summary.slice(0, 30), null, 2)}
-            </pre>
+            <div>
+              <p className="text-xs font-semibold text-amber-300 mb-1">Errores de parseo ({lastResult.error_summary.length}):</p>
+              <pre className="text-xs text-amber-200/80 overflow-x-auto max-h-40 whitespace-pre-wrap rounded-xl bg-amber-500/[0.06] px-3 py-2">
+                {JSON.stringify(lastResult.error_summary.slice(0, 30), null, 2)}
+              </pre>
+            </div>
           )}
         </div>
       )}

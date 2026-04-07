@@ -281,21 +281,8 @@ export interface AdminCitySearchRow {
   center?: { lat: number; lng: number } | null;
 }
 
-export interface BookingComSyncRunRow {
-  id: number;
-  booking_url: string;
-  status: string;
-  summary: Record<string, unknown>;
-  error_message: string;
-  celery_task_id: string;
-  created_at: string | null;
-  finished_at: string | null;
-}
-
 export interface PropertyDetail extends PropertyListItem {
   description?: string;
-  /** URL pública del hotel en Booking.com (sincronización de habitaciones). */
-  booking_com_listing_url?: string;
   /** Solo cotizar noches cubiertas por el Excel de inventario manual. */
   restrict_pricing_to_manual_weeks?: boolean;
   /** Solo mostrar la propiedad cuando las fechas coincidan exactamente con un PropertyFixedWeekSlot. */
@@ -1345,7 +1332,6 @@ export const adminApi = {
       amenities: string[] | Record<string, unknown>[];
       important_info: string[];
       faqs: { question: string; answer: string }[];
-      booking_com_listing_url: string;
       restrict_pricing_to_manual_weeks: boolean;
     }>
   ): Promise<PropertyDetail> {
@@ -1442,26 +1428,6 @@ export const adminApi = {
   async deleteAllWeekSlots(propertyId: number): Promise<{ deleted: number }> {
     const res = await authFetch(`/api/admin/properties/${propertyId}/week-slots/`, { method: "DELETE" });
     return res.json() as Promise<{ deleted: number }>;
-  },
-
-  async startBookingComSync(
-    propertyId: number,
-    body: { booking_url?: string; save_url_on_property?: boolean }
-  ): Promise<{ run: BookingComSyncRunRow; message?: string }> {
-    return postJson<{ run: BookingComSyncRunRow; message?: string }>(
-      `/api/admin/properties/${propertyId}/booking-sync/`,
-      body
-    );
-  },
-
-  async getBookingComSyncRuns(
-    propertyId: number,
-    limit = 20
-  ): Promise<{ results: BookingComSyncRunRow[] } | null> {
-    const q = limit ? `?limit=${encodeURIComponent(String(limit))}` : "";
-    return getJson<{ results: BookingComSyncRunRow[] }>(
-      `/api/admin/properties/${propertyId}/booking-sync/runs/${q}`
-    );
   },
 
   async ensureRoomTypePhysicalRooms(
