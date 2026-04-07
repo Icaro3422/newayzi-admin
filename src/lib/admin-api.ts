@@ -833,14 +833,16 @@ async function authFetch(path: string, options: RequestInit = {}) {
     throw e instanceof Error ? e : new Error(msg);
   }
 
-  // Token Clerk cacheado puede estar expirado. Antes de redirigir al login,
-  // intenta obtener un token fresco (skipCache) y reintenta la petición una vez.
+  // Token Clerk cacheado puede estar expirado (JWT TTL es 60s por defecto).
+  // Antes de redirigir al login, obtiene un token fresco forzando skipCache y reintenta UNA vez.
+  // Esto cubre el caso donde el token expira justo entre la carga de la página y el request
+  // (común en páginas con múltiples requests concurrentes como la de disponibilidad).
   if (res.status === 401 && tokenGetter) {
     try {
       const freshToken = await (
         tokenGetter as (o: { skipCache: boolean }) => Promise<string | null>
       )({ skipCache: true });
-      if (freshToken && freshToken !== token) {
+      if (freshToken) {
         const retried = await execFetch(freshToken).catch(() => null);
         if (retried && retried.status !== 401) {
           res = retried;
