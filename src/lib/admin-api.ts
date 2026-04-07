@@ -959,42 +959,28 @@ async function getJson<T>(path: string): Promise<T | null> {
 }
 
 /**
- * URL de proxy server-side para multipart en *.newayzi.com.
- * Usa /mpx/... (no /api/...) porque WAF/CloudFront del portal a menudo bloquea POST
- * multipart a /api/* con 403 antes de llegar a Next.js.
+ * Multipart al mismo host que `authFetch` (resolvedApiBase).
+ * No usar proxy en portal.newayzi.com: CloudFront/WAF del portal bloquea POST con cuerpo
+ * grande al mismo origen; el API (api.*.newayzi.com) ya acepta CORS + JWT como el resto.
  */
 function getMultipartUrl(path: string): string {
-  if (typeof window === "undefined") {
-    return `${resolvedApiBase().replace(/\/$/, "")}${path}`;
-  }
-  const hostname = window.location.hostname;
-  if (hostname === "newayzi.com" || hostname.endsWith(".newayzi.com")) {
-    const proxyBase = window.location.origin;
-    return `${proxyBase}/mpx${path.startsWith("/") ? path : `/${path}`}`;
-  }
-  return `${resolvedApiBase().replace(/\/$/, "")}${path}`;
+  const base = resolvedApiBase().replace(/\/$/, "");
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${p}`;
 }
 
 async function authFetchMultipart(path: string, method: string, body: FormData) {
   const url = getMultipartUrl(path);
-  // Token fresco: evita JWT caducado en POST grandes / multipart.
   const token = tokenGetter ? await tokenGetter({ skipCache: true }) : null;
   const headers: Record<string, string> = {};
   applyBearerHeaders(headers, token);
   let res: Response;
   try {
-    // En el proxy server-side (mismo origen) no se necesita credentials:"include" ni CORS.
-    let isProxyRoute = false;
-    try {
-      isProxyRoute = new URL(url).pathname.startsWith("/mpx/");
-    } catch {
-      /* ignore */
-    }
     res = await fetch(url, {
       method,
       body,
       headers,
-      ...(isProxyRoute ? {} : { credentials: "include" }),
+      credentials: "include",
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -1393,7 +1379,7 @@ export const adminApi = {
     return result ?? [];
   },
 
-  /** POST multipart a Django (`images` + opcional `is_primary`); en *.newayzi.com pasa por proxy server-side. */
+  /** POST multipart directo al API (`images` + opcional `is_primary`), misma base que el resto del admin. */
   async uploadPropertyPicture(propertyId: number, file: File, isPrimary = false): Promise<PropertyPicture> {
     return (await adminApi.uploadPropertyPicturesBatch(propertyId, [file], isPrimary))[0];
   },

@@ -22,14 +22,12 @@ export default clerkMiddleware(async (auth, req) => {
 });
 
 /**
- * Excluir túneles hacia Django del matcher principal: /mpx (multipart proxy),
- * /proxy-api y /api/multipart-proxy (legacy). Así no entran en el mismo pipeline
- * que /api/* y Clerk no interfiere con fetch same-origin a esas rutas.
+ * Excluir /proxy-api y /api/multipart-proxy (legacy): túneles same-origin hacia Django.
  */
 export const config = {
   matcher: [
     "/",
-    "/((?!_next|proxy-api/|api/multipart-proxy/|mpx/|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ico|woff2?|map)).*)",
+    "/((?!_next|proxy-api/|api/multipart-proxy/|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ico|woff2?|map)).*)",
     "/(api|trpc)(.*)",
   ],
 };
