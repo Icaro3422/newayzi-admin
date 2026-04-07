@@ -1018,6 +1018,45 @@ async function authFetchMultipart(path: string, method: string, body: FormData) 
   return res;
 }
 
+/**
+ * POST multipart al endpoint de S3 devuelto por generate_presigned_post.
+ * Requiere CORS en el bucket (AllowedOrigin del portal, POST, AllowedHeaders *).
+ * Si S3 responde 204 pero el navegador muestra "Failed to fetch", falta CORS en el bucket.
+ */
+async function uploadToS3PresignedPost(uploadUrl: string, formData: FormData): Promise<void> {
+  try {
+    const s3Res = await fetch(uploadUrl, {
+      method: "POST",
+      body: formData,
+      mode: "cors",
+      credentials: "omit",
+      cache: "no-store",
+    });
+    if (!s3Res.ok && s3Res.status !== 204) {
+      const txt = await s3Res.text().catch(() => "");
+      throw new Error(`S3 respondió ${s3Res.status}: ${txt || s3Res.statusText}`);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("S3 respondió")) {
+      throw e;
+    }
+    const msg = e instanceof Error ? e.message : String(e);
+    if (
+      msg === "Failed to fetch" ||
+      msg.includes("Failed to fetch") ||
+      msg.includes("Load failed") ||
+      msg.includes("NetworkError")
+    ) {
+      throw new Error(
+        "El navegador bloqueó la respuesta de S3 (CORS). Si en Red ves 204 en el POST al bucket, " +
+          "aplica CORS en el bucket: en el servidor del backend ejecuta `python manage.py configure_s3_cors` " +
+          "(bucket de AWS_STORAGE_BUCKET_NAME) y vuelve a intentar."
+      );
+    }
+    throw e;
+  }
+}
+
 /** Normaliza respuesta POST de fotos: objeto único, `{ pictures }`, o array. */
 async function parseAdminPictureBatchResponse<T extends { id: number }>(
   res: Response
@@ -1417,10 +1456,11 @@ export const adminApi = {
       const fd = new FormData();
       for (const [key, value] of Object.entries(fields)) fd.append(key, value);
       fd.append("file", slice[index]);
-      const s3Res = await fetch(upload_url, { method: "POST", body: fd });
-      if (!s3Res.ok && s3Res.status !== 204) {
-        const txt = await s3Res.text().catch(() => "");
-        throw new Error(`Error al subir imagen ${index + 1} a S3: ${txt || s3Res.status}`);
+      try {
+        await uploadToS3PresignedPost(upload_url, fd);
+      } catch (err) {
+        const m = err instanceof Error ? err.message : String(err);
+        throw new Error(`Error al subir imagen ${index + 1}: ${m}`);
       }
       relKeys.push(rel_key);
     }
@@ -1509,10 +1549,11 @@ export const adminApi = {
       const fd = new FormData();
       for (const [key, value] of Object.entries(fields)) fd.append(key, value);
       fd.append("file", slice[index]);
-      const s3Res = await fetch(upload_url, { method: "POST", body: fd });
-      if (!s3Res.ok && s3Res.status !== 204) {
-        const txt = await s3Res.text().catch(() => "");
-        throw new Error(`Error al subir imagen ${index + 1} a S3: ${txt || s3Res.status}`);
+      try {
+        await uploadToS3PresignedPost(upload_url, fd);
+      } catch (err) {
+        const m = err instanceof Error ? err.message : String(err);
+        throw new Error(`Error al subir imagen ${index + 1}: ${m}`);
       }
       relKeys.push(rel_key);
     }
