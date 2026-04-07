@@ -1212,12 +1212,16 @@ export const adminApi = {
   async getProperties(params?: {
     operator_id?: number;
     city?: string;
+    /** Búsqueda parcial por nombre (backend: translations__name__icontains) */
+    name?: string;
     is_active?: boolean;
     pms_connection_id?: number;
   }): Promise<{ results: PropertyListItem[] } | null> {
     const q = new URLSearchParams();
     if (params?.operator_id != null) q.set("operator_id", String(params.operator_id));
     if (params?.city) q.set("city", params.city);
+    const nameTrim = params?.name?.trim();
+    if (nameTrim) q.set("name", nameTrim);
     if (params?.is_active != null) q.set("is_active", String(params.is_active));
     if (params?.pms_connection_id != null)
       q.set("pms_connection_id", String(params.pms_connection_id));
