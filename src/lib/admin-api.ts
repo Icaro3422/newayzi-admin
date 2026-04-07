@@ -970,12 +970,51 @@ async function getJson<T>(path: string): Promise<T | null> {
 }
 
 /**
- * Multipart al mismo host que `authFetch` (resolvedApiBase).
- * No usar proxy en portal.newayzi.com: CloudFront/WAF del portal bloquea POST con cuerpo
- * grande al mismo origen; el API (api.*.newayzi.com) ya acepta CORS + JWT como el resto.
+ * Base URL para POST multipart (Excel, etc.).
+ *
+ * En producción, el fetch directo a `api.*.newayzi.com` puede fallar con "Failed to fetch"
+ * por CORS opacos, WAF o límites en el borde, aunque JSON vaya bien. El mismo origen
+ * `/proxy-api` (rewrite en next.config → upstream) evita CORS y suele ser más fiable.
+ *
+ * Localhost sigue yendo directo al API para desarrollo sin depender del rewrite.
  */
+function getMultipartApiBase(): string {
+  const direct = getDirectApiBase().replace(/\/$/, "");
+  if (typeof window === "undefined") {
+    return direct;
+  }
+  if (!direct) {
+    return "";
+  }
+
+  const hostname = window.location.hostname;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return direct;
+  }
+
+  const proxyDisabled = process.env.NEXT_PUBLIC_USE_SAME_ORIGIN_API_PROXY === "false";
+  if (proxyDisabled) {
+    return direct;
+  }
+
+  const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!envUrl) {
+    return direct;
+  }
+
+  try {
+    const apiOrigin = new URL(normalizeApiUrl(direct)).origin;
+    if (window.location.origin === apiOrigin) {
+      return direct;
+    }
+    return `${window.location.origin}/proxy-api`.replace(/\/$/, "");
+  } catch {
+    return direct;
+  }
+}
+
 function getMultipartUrl(path: string): string {
-  const base = resolvedApiBase().replace(/\/$/, "");
+  const base = getMultipartApiBase().replace(/\/$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${base}${p}`;
 }
