@@ -209,7 +209,102 @@ export function SuperAdminPriceAnalyticsCharts({
     };
   }, [details, currency]);
 
-  const onOperatorClick = (params: unknown) => {
+  const periodComparisonOption = useMemo(() => {
+    if (!details) return null;
+    const periods = ["Noche", "Semana (×7)", "Mes (×30)"];
+    const multipliers = [1, 7, 30];
+
+    const makeData = (base: number, colorTop: string, colorBottom: string) =>
+      multipliers.map((m) => ({
+        value: base * m,
+        itemStyle: { color: barGradient(colorTop, colorBottom) },
+      }));
+
+    return {
+      backgroundColor: "transparent",
+      tooltip: {
+        ...tooltipBase,
+        trigger: "axis" as const,
+        axisPointer: { type: "shadow" as const },
+        formatter: (params: unknown) => {
+          const items = Array.isArray(params) ? params : [params];
+          const period = (items[0] as { axisValue?: string })?.axisValue ?? "";
+          const lines = items
+            .map((it) => {
+              const p = it as { seriesName?: string; value?: number };
+              return `<div style="display:flex;justify-content:space-between;gap:16px"><span style="opacity:0.75">${p.seriesName}</span><strong>${fmtMoney(Number(p.value), currency)}</strong></div>`;
+            })
+            .join("");
+          return `<div style="font-weight:600;margin-bottom:6px">${period}</div>${lines}`;
+        },
+      },
+      legend: {
+        data: ["Mín", "P25", "Mediana", "Media global", "P75", "Máx"],
+        textStyle: { color: "rgba(255,255,255,0.5)", fontSize: 10 },
+        bottom: 0,
+        itemWidth: 10,
+        itemHeight: 10,
+      },
+      grid: { left: "3%", right: "3%", bottom: "20%", top: "10%", containLabel: true },
+      xAxis: {
+        type: "category" as const,
+        data: periods,
+        axisLine: { lineStyle: { color: "rgba(255,255,255,0.12)" } },
+        axisTick: { show: false },
+        axisLabel: { color: "rgba(255,255,255,0.55)", fontSize: 11 },
+      },
+      yAxis: {
+        type: "value" as const,
+        splitLine: { lineStyle: { color: "rgba(255,255,255,0.06)" } },
+        axisLabel: {
+          color: "rgba(255,255,255,0.35)",
+          fontSize: 10,
+          formatter: (v: number) =>
+            v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(0)}k` : String(v),
+        },
+      },
+      series: [
+        {
+          name: "Mín",
+          type: "bar" as const,
+          barMaxWidth: 22,
+          data: makeData(details.min, "#c4b5fd", "#5b21b6"),
+        },
+        {
+          name: "P25",
+          type: "bar" as const,
+          barMaxWidth: 22,
+          data: makeData(details.p25, "#a78bfa", "#6d28d9"),
+        },
+        {
+          name: "Mediana",
+          type: "bar" as const,
+          barMaxWidth: 22,
+          data: makeData(details.median, "#818cf8", "#3730a3"),
+        },
+        {
+          name: "Media global",
+          type: "bar" as const,
+          barMaxWidth: 22,
+          data: makeData(globalAverage ?? details.median, "#67e8f9", "#0891b2"),
+        },
+        {
+          name: "P75",
+          type: "bar" as const,
+          barMaxWidth: 22,
+          data: makeData(details.p75, "#34d399", "#065f46"),
+        },
+        {
+          name: "Máx",
+          type: "bar" as const,
+          barMaxWidth: 22,
+          data: makeData(details.max, "#fcd34d", "#92400e"),
+        },
+      ],
+    };
+  }, [details, currency, globalAverage]);
+
+    const onOperatorClick = (params: unknown) => {
     const p = params as { componentType?: string; data?: { operatorId?: number } };
     if (p?.componentType === "series" && p?.data?.operatorId != null) {
       router.push(`/admin/operators/${p.data.operatorId}`);
@@ -253,6 +348,22 @@ export function SuperAdminPriceAnalyticsCharts({
           . En la gráfica por operador, <span className="text-violet-200">haz clic</span> para ver la ficha del operador.
         </p>
       </div>
+
+      {periodComparisonOption ? (
+        <div className="min-w-0">
+          <p className="text-white/45 text-[0.62rem] uppercase tracking-[0.12em] font-semibold mb-1">
+            Precio promedio por período — noche · semana · mes
+          </p>
+          <p className="text-white/30 text-[0.65rem] mb-2">
+            Proyección acumulada para cada métrica estadística de la plataforma (sync).
+          </p>
+          <ReactECharts
+            option={periodComparisonOption}
+            style={{ height: 320, width: "100%" }}
+            opts={{ renderer: "svg" }}
+          />
+        </div>
+      ) : null}
 
       {quartilesOption ? (
         <div className="min-w-0">
