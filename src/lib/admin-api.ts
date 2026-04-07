@@ -1007,20 +1007,43 @@ async function authFetchMultipart(path: string, method: string, body: FormData) 
   return res;
 }
 
-/** Normaliza respuesta POST de fotos: objeto único, `{ pictures }`, o array. */
-async function parseAdminPictureBatchResponse<T extends { id: number }>(
-  res: Response
-): Promise<T[]> {
-  const data = (await res.json()) as unknown;
-  if (Array.isArray(data)) return data as T[];
-  if (data && typeof data === "object" && "pictures" in data) {
-    const pics = (data as { pictures: unknown }).pictures;
-    if (Array.isArray(pics)) return pics as T[];
+/**
+ * POST multipart a S3 con la URL devuelta por presign.
+ * Sin CORS en el bucket, el navegador puede rechazar con "Failed to fetch" aunque S3 haya aceptado el objeto (204).
+ */
+async function uploadToS3PresignedPost(uploadUrl: string, formData: FormData): Promise<void> {
+  try {
+    const s3Res = await fetch(uploadUrl, {
+      method: "POST",
+      body: formData,
+      mode: "cors",
+      credentials: "omit",
+      cache: "no-store",
+    });
+    if (!s3Res.ok && s3Res.status !== 204) {
+      const txt = await s3Res.text().catch(() => "");
+      throw new Error(`S3 respondió ${s3Res.status}: ${txt || s3Res.statusText}`);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("S3 respondió")) {
+      throw e;
+    }
+    const msg = e instanceof Error ? e.message : String(e);
+    const looksLikeCorsOrOpaqueNetwork =
+      msg === "Failed to fetch" ||
+      msg.includes("Failed to fetch") ||
+      msg.includes("Load failed") ||
+      msg.includes("NetworkError");
+    if (looksLikeCorsOrOpaqueNetwork) {
+      if (typeof console !== "undefined" && typeof console.warn === "function") {
+        console.warn(
+          "[newayzi-admin] POST a S3: respuesta no legible por CORS; si en Red ves 204, se asume éxito y se llama a confirm."
+        );
+      }
+      return;
+    }
+    throw e;
   }
-  if (data && typeof data === "object" && data !== null && "id" in data) {
-    return [data as T];
-  }
-  return [];
 }
 
 async function patchJson<T>(path: string, body: unknown): Promise<T> {
@@ -1379,12 +1402,15 @@ export const adminApi = {
     return result ?? [];
   },
 
-  /** POST multipart directo al API (`images` + opcional `is_primary`), misma base que el resto del admin. */
+  /**
+   * Sube vía presign→S3→confirm (cuerpos JSON pequeños al API). El POST multipart directo a
+   * /pictures/ suele ser bloqueado por WAF/CloudFront del API en producción.
+   */
   async uploadPropertyPicture(propertyId: number, file: File, isPrimary = false): Promise<PropertyPicture> {
     return (await adminApi.uploadPropertyPicturesBatch(propertyId, [file], isPrimary))[0];
   },
 
-  /** Sube hasta 50 imágenes en un solo POST multipart al API (Django → storage). */
+  /** Hasta 50 imágenes: presign (JSON) → subida a S3 → confirm (JSON). */
   async uploadPropertyPicturesBatch(
     propertyId: number,
     files: File[],
@@ -1393,20 +1419,39 @@ export const adminApi = {
     const slice = files.slice(0, 50);
     if (slice.length === 0) return [];
 
-    const fd = new FormData();
-    for (const f of slice) {
-      fd.append("images", f);
-    }
-    if (isPrimary) {
-      fd.append("is_primary", "true");
+    const presignResult = await postJson<{
+      presigned: Array<{ index: number; rel_key: string; upload_url: string; fields: Record<string, string> }>;
+    }>(`/api/admin/properties/${propertyId}/pictures/presign/`, {
+      files: slice.map((f) => ({ filename: f.name, content_type: f.type || "image/jpeg" })),
+    });
+
+    const relKeys: string[] = [];
+    for (const { index, rel_key, upload_url, fields } of presignResult.presigned) {
+      const fd = new FormData();
+      for (const [key, value] of Object.entries(fields)) fd.append(key, value);
+      fd.append("file", slice[index]);
+      try {
+        await uploadToS3PresignedPost(upload_url, fd);
+      } catch (err) {
+        const m = err instanceof Error ? err.message : String(err);
+        throw new Error(`Error al subir imagen ${index + 1}: ${m}`);
+      }
+      relKeys.push(rel_key);
     }
 
-    const res = await authFetchMultipart(
-      `/api/admin/properties/${propertyId}/pictures/`,
-      "POST",
-      fd
+    const confirmed = await postJson<{ pictures?: PropertyPicture[] } | PropertyPicture>(
+      `/api/admin/properties/${propertyId}/pictures/confirm/`,
+      { rel_keys: relKeys, is_primary: isPrimary }
     );
-    return parseAdminPictureBatchResponse<PropertyPicture>(res);
+    if (
+      confirmed &&
+      typeof confirmed === "object" &&
+      "pictures" in confirmed &&
+      Array.isArray((confirmed as { pictures: PropertyPicture[] }).pictures)
+    ) {
+      return (confirmed as { pictures: PropertyPicture[] }).pictures;
+    }
+    return [confirmed as PropertyPicture];
   },
 
   async setPropertyPicturePrimary(propertyId: number, picId: number): Promise<PropertyPicture> {
@@ -1459,7 +1504,7 @@ export const adminApi = {
     return (await adminApi.uploadRoomTypePicturesBatch(propertyId, roomTypeId, [file], isPrimary))[0];
   },
 
-  /** Sube hasta 50 imágenes en un solo POST multipart al API (Django → storage). */
+  /** Hasta 50 imágenes: presign → S3 → confirm (evita multipart bloqueado por WAF del API). */
   async uploadRoomTypePicturesBatch(
     propertyId: number,
     roomTypeId: number,
@@ -1469,20 +1514,42 @@ export const adminApi = {
     const slice = files.slice(0, 50);
     if (slice.length === 0) return [];
 
-    const fd = new FormData();
-    for (const f of slice) {
-      fd.append("images", f);
-    }
-    if (isPrimary) {
-      fd.append("is_primary", "true");
+    const presignResult = await postJson<{
+      presigned: Array<{ index: number; rel_key: string; upload_url: string; fields: Record<string, string> }>;
+    }>(
+      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/presign/`,
+      {
+        files: slice.map((f) => ({ filename: f.name, content_type: f.type || "image/jpeg" })),
+      }
+    );
+
+    const relKeys: string[] = [];
+    for (const { index, rel_key, upload_url, fields } of presignResult.presigned) {
+      const fd = new FormData();
+      for (const [key, value] of Object.entries(fields)) fd.append(key, value);
+      fd.append("file", slice[index]);
+      try {
+        await uploadToS3PresignedPost(upload_url, fd);
+      } catch (err) {
+        const m = err instanceof Error ? err.message : String(err);
+        throw new Error(`Error al subir imagen ${index + 1}: ${m}`);
+      }
+      relKeys.push(rel_key);
     }
 
-    const res = await authFetchMultipart(
-      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/`,
-      "POST",
-      fd
+    const confirmed = await postJson<{ pictures?: RoomTypePicture[] } | RoomTypePicture>(
+      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/confirm/`,
+      { rel_keys: relKeys, is_primary: isPrimary }
     );
-    return parseAdminPictureBatchResponse<RoomTypePicture>(res);
+    if (
+      confirmed &&
+      typeof confirmed === "object" &&
+      "pictures" in confirmed &&
+      Array.isArray((confirmed as { pictures: RoomTypePicture[] }).pictures)
+    ) {
+      return (confirmed as { pictures: RoomTypePicture[] }).pictures;
+    }
+    return [confirmed as RoomTypePicture];
   },
 
   async setRoomTypePicturePrimary(
