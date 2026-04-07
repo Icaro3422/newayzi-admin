@@ -2388,6 +2388,7 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
     case "users":
     case "corporate-credits":
     case "audit":
+    case "simulator":
       return false; // solo super_admin (ya retornó arriba)
     default:
       return false;

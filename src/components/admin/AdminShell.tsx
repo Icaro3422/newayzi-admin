@@ -52,6 +52,7 @@ const NAV_ITEMS_BASE: { href: string; label: string; icon: string; module: strin
   { href: "/admin/corporate-credits", label: "Créditos corporativos", icon: "solar:buildings-2-bold-duotone", module: "corporate-credits" },
   { href: "/admin/wallet",         label: "Mi Billetera",       icon: "solar:wallet-bold-duotone",           module: "wallet"         },
   { href: "/admin/communications", label: "Comunicaciones",     icon: "solar:letter-bold-duotone",           module: "communications" },
+  { href: "/admin/simulator",      label: "Simulador",          icon: "solar:calculator-bold-duotone",       module: "simulator"      },
 ];
 
 /** Labels específicos por rol — el operador ve "sus" recursos con etiquetas propias */
