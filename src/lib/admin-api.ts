@@ -296,10 +296,16 @@ export interface PropertyDetail extends PropertyListItem {
   description?: string;
   /** URL pública del hotel en Booking.com (sincronización de habitaciones). */
   booking_com_listing_url?: string;
-  /**
-   * Solo cotizar noches cubiertas por el Excel de inventario manual (sin rellenar con tarifa base fuera de esas semanas).
-   */
+  /** Solo cotizar noches cubiertas por el Excel de inventario manual. */
   restrict_pricing_to_manual_weeks?: boolean;
+  /** Solo mostrar la propiedad cuando las fechas coincidan exactamente con un PropertyFixedWeekSlot. */
+  enforce_fixed_week_slots?: boolean;
+  /** Multiplicador del precio "tachado" (original) que ve el huésped. Null = usa markup global. */
+  display_price_markup?: string | null;
+  /** Multiplicador del precio real cobrado. Null = usa display_price_markup. */
+  selling_price_markup?: string | null;
+  /** Las habitaciones se muestran solo con capacidad ("Para X personas"), sin nombre ni imagen. */
+  simple_room_display?: boolean;
   // Contacto y ubicación
   address?: string;
   phone?: string;
@@ -322,6 +328,24 @@ export interface PropertyDetail extends PropertyListItem {
   faqs?: PropertyFaq[];
   room_types: RoomTypeAdminSummary[];
   pictures?: PropertyPicture[];
+}
+
+export interface PropertyPricingConfig {
+  display_price_markup: string | null;
+  selling_price_markup: string | null;
+  enforce_fixed_week_slots: boolean;
+  restrict_pricing_to_manual_weeks: boolean;
+  simple_room_display: boolean;
+}
+
+export interface PropertyFixedWeekSlot {
+  id: number;
+  check_in: string;   // YYYY-MM-DD
+  check_out: string;  // YYYY-MM-DD
+  nights: number;
+  season: number | null;
+  note: string;
+  created: string;
 }
 
 export interface RoomTypeBaseRateRow {
@@ -1367,6 +1391,57 @@ export const adminApi = {
     return getJson<{ results: ManualInventoryImportRow[] }>(
       `/api/admin/properties/${propertyId}/manual-imports/`
     );
+  },
+
+  // ── Pricing config ─────────────────────────────────────────────────────────
+
+  async getPricingConfig(propertyId: number): Promise<PropertyPricingConfig | null> {
+    return getJson<PropertyPricingConfig>(`/api/admin/properties/${propertyId}/pricing-config/`);
+  },
+
+  async patchPricingConfig(
+    propertyId: number,
+    data: Partial<PropertyPricingConfig>
+  ): Promise<PropertyPricingConfig> {
+    const res = await authFetch(`/api/admin/properties/${propertyId}/pricing-config/`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+    return res.json() as Promise<PropertyPricingConfig>;
+  },
+
+  // ── Fixed Week Slots ────────────────────────────────────────────────────────
+
+  async getWeekSlots(propertyId: number): Promise<{ results: PropertyFixedWeekSlot[] } | null> {
+    return getJson<{ results: PropertyFixedWeekSlot[] }>(`/api/admin/properties/${propertyId}/week-slots/`);
+  },
+
+  async createWeekSlot(
+    propertyId: number,
+    data: { check_in: string; check_out: string; note?: string; season?: number | null }
+  ): Promise<PropertyFixedWeekSlot> {
+    return postJson<PropertyFixedWeekSlot>(`/api/admin/properties/${propertyId}/week-slots/`, data);
+  },
+
+  async patchWeekSlot(
+    propertyId: number,
+    slotId: number,
+    data: { note?: string; season?: number | null }
+  ): Promise<PropertyFixedWeekSlot> {
+    const res = await authFetch(`/api/admin/properties/${propertyId}/week-slots/${slotId}/`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+    return res.json() as Promise<PropertyFixedWeekSlot>;
+  },
+
+  async deleteWeekSlot(propertyId: number, slotId: number): Promise<void> {
+    await authFetch(`/api/admin/properties/${propertyId}/week-slots/${slotId}/`, { method: "DELETE" });
+  },
+
+  async deleteAllWeekSlots(propertyId: number): Promise<{ deleted: number }> {
+    const res = await authFetch(`/api/admin/properties/${propertyId}/week-slots/`, { method: "DELETE" });
+    return res.json() as Promise<{ deleted: number }>;
   },
 
   async startBookingComSync(

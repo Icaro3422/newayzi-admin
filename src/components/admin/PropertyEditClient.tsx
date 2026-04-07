@@ -33,6 +33,7 @@ import { PropertyCancellationPolicyPanel } from "./PropertyCancellationPolicyPan
 import { PropertyGalleryPanel } from "./PropertyGalleryPanel";
 import { ManualInventoryPanel } from "./ManualInventoryPanel";
 import { BookingComSyncPanel } from "./BookingComSyncPanel";
+import { PropertyPricingConfigPanel } from "./PropertyPricingConfigPanel";
 
 /* ─── Primitivos de UI ─────────────────────────────────── */
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -1057,6 +1058,9 @@ export function PropertyEditClient() {
         <SectionHeader icon="solar:shield-minimalistic-bold-duotone" title="Política de Cancelación" subtitle="Reglas de reembolso vinculadas al contrato del operador." iconBg="from-orange-500/20 to-red-500/20" iconColor="text-orange-400" />
         <PropertyCancellationPolicyPanel propertyId={propertyId} readOnly={readOnly} />
       </div>
+
+      {/* ── 11. Configuración de precio y semanas fijas ── */}
+      <PropertyPricingConfigPanel propertyId={propertyId} readOnly={readOnly} />
     </div>
   );
 }
