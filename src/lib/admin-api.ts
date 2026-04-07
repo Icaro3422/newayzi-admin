@@ -788,6 +788,18 @@ function clerkAuthHeaders(token: string | null): Record<string, string> {
   return h;
 }
 
+/**
+ * 404 del API: authFetch la lanza en lugar de devolver un Response con el body ya consumido.
+ * Evita "Failed to execute 'json' on 'Response': body stream already read" en postJson/patchJson.
+ */
+export class AdminApiNotFoundError extends Error {
+  readonly status = 404;
+  constructor(message: string) {
+    super(message);
+    this.name = "AdminApiNotFoundError";
+  }
+}
+
 /** Logs en consola del navegador para diagnosticar fallos de sesión / API (filtrar por "newayzi-admin"). */
 function logAdminSessionIssue(
   phase: string,
@@ -911,31 +923,39 @@ async function authFetch(path: string, options: RequestInit = {}) {
       });
       throw new Error(parsedDetail ?? "No tienes permisos para realizar esta acción.");
     }
-    if (res.status !== 404) {
-      logAdminSessionIssue(`HTTP ${res.status} en API admin`, {
+    if (res.status === 404) {
+      logAdminSessionIssue("404 en API admin (ruta o recurso inexistente)", {
         path,
         apiBase: base || "(vacío)",
-        bodyPreview: text.slice(0, 600),
+        detail: parsedDetail ?? text.slice(0, 400),
       });
-      throw new Error(
-        parsedDetail ?? `API ${res.status}: ${text || res.statusText}`
+      throw new AdminApiNotFoundError(
+        parsedDetail ??
+          "Recurso no encontrado (404). Si falla la subida de imágenes, el backend en producción debe incluir las rutas …/pictures/presign/ y …/pictures/confirm/ (despliega la última versión del API)."
       );
     }
+    logAdminSessionIssue(`HTTP ${res.status} en API admin`, {
+      path,
+      apiBase: base || "(vacío)",
+      bodyPreview: text.slice(0, 600),
+    });
+    throw new Error(
+      parsedDetail ?? `API ${res.status}: ${text || res.statusText}`
+    );
   }
   return res;
 }
 
 async function getJson<T>(path: string): Promise<T | null> {
-  const base = resolvedApiBase().replace(/\/$/, "");
-  const res = await authFetch(path);
-  if (res.status === 404) {
-    logAdminSessionIssue("GET devolvió 404 (ruta no existe en API — comprueba que la URL apunta al backend Django)", {
-      fullUrl: `${base}${path}`,
-      apiBase: base || "(vacío)",
-    });
-    return null;
+  try {
+    const res = await authFetch(path);
+    return (await res.json()) as T;
+  } catch (e) {
+    if (e instanceof AdminApiNotFoundError) {
+      return null;
+    }
+    throw e;
   }
-  return res.json() as Promise<T>;
 }
 
 /**
