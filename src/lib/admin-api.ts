@@ -931,7 +931,7 @@ async function authFetch(path: string, options: RequestInit = {}) {
       });
       throw new AdminApiNotFoundError(
         parsedDetail ??
-          "Recurso no encontrado (404). Si falla la subida de imágenes, el backend en producción debe incluir las rutas …/pictures/presign/ y …/pictures/confirm/ (despliega la última versión del API)."
+          "Recurso no encontrado (404). Comprueba la URL del API y que el backend desplegado incluya la ruta solicitada."
       );
     }
     logAdminSessionIssue(`HTTP ${res.status} en API admin`, {
@@ -1016,45 +1016,6 @@ async function authFetchMultipart(path: string, method: string, body: FormData) 
     throw new Error(detail || `Error ${res.status}`);
   }
   return res;
-}
-
-/**
- * POST multipart al endpoint de S3 devuelto por generate_presigned_post.
- * Requiere CORS en el bucket (AllowedOrigin del portal, POST, AllowedHeaders *).
- * Si S3 responde 204 pero el navegador muestra "Failed to fetch", falta CORS en el bucket.
- */
-async function uploadToS3PresignedPost(uploadUrl: string, formData: FormData): Promise<void> {
-  try {
-    const s3Res = await fetch(uploadUrl, {
-      method: "POST",
-      body: formData,
-      mode: "cors",
-      credentials: "omit",
-      cache: "no-store",
-    });
-    if (!s3Res.ok && s3Res.status !== 204) {
-      const txt = await s3Res.text().catch(() => "");
-      throw new Error(`S3 respondió ${s3Res.status}: ${txt || s3Res.statusText}`);
-    }
-  } catch (e) {
-    if (e instanceof Error && e.message.startsWith("S3 respondió")) {
-      throw e;
-    }
-    const msg = e instanceof Error ? e.message : String(e);
-    if (
-      msg === "Failed to fetch" ||
-      msg.includes("Failed to fetch") ||
-      msg.includes("Load failed") ||
-      msg.includes("NetworkError")
-    ) {
-      throw new Error(
-        "El navegador bloqueó la respuesta de S3 (CORS). Si en Red ves 204 en el POST al bucket, " +
-          "aplica CORS en el bucket: en el servidor del backend ejecuta `python manage.py configure_s3_cors` " +
-          "(bucket de AWS_STORAGE_BUCKET_NAME) y vuelve a intentar."
-      );
-    }
-    throw e;
-  }
 }
 
 /** Normaliza respuesta POST de fotos: objeto único, `{ pictures }`, o array. */
@@ -1429,12 +1390,12 @@ export const adminApi = {
     return result ?? [];
   },
 
-  /** Sube imágenes vía pre-signed S3 URL, sin pasar por CloudFront. */
+  /** POST multipart a Django (`images` + opcional `is_primary`); en *.newayzi.com pasa por proxy server-side. */
   async uploadPropertyPicture(propertyId: number, file: File, isPrimary = false): Promise<PropertyPicture> {
     return (await adminApi.uploadPropertyPicturesBatch(propertyId, [file], isPrimary))[0];
   },
 
-  /** Sube hasta 50 imágenes usando pre-signed S3 URLs (sin pasar por CloudFront). */
+  /** Sube hasta 50 imágenes en un solo POST multipart al API (Django → storage). */
   async uploadPropertyPicturesBatch(
     propertyId: number,
     files: File[],
@@ -1443,37 +1404,20 @@ export const adminApi = {
     const slice = files.slice(0, 50);
     if (slice.length === 0) return [];
 
-    // Step 1: Obtener URLs pre-firmadas de Django
-    const presignResult = await postJson<{
-      presigned: Array<{ index: number; rel_key: string; upload_url: string; fields: Record<string, string> }>;
-    }>(`/api/admin/properties/${propertyId}/pictures/presign/`, {
-      files: slice.map((f) => ({ filename: f.name, content_type: f.type || "image/jpeg" })),
-    });
-
-    // Step 2: Subir directamente a S3 (browser → S3, sin CloudFront)
-    const relKeys: string[] = [];
-    for (const { index, rel_key, upload_url, fields } of presignResult.presigned) {
-      const fd = new FormData();
-      for (const [key, value] of Object.entries(fields)) fd.append(key, value);
-      fd.append("file", slice[index]);
-      try {
-        await uploadToS3PresignedPost(upload_url, fd);
-      } catch (err) {
-        const m = err instanceof Error ? err.message : String(err);
-        throw new Error(`Error al subir imagen ${index + 1}: ${m}`);
-      }
-      relKeys.push(rel_key);
+    const fd = new FormData();
+    for (const f of slice) {
+      fd.append("images", f);
+    }
+    if (isPrimary) {
+      fd.append("is_primary", "true");
     }
 
-    // Step 3: Confirmar con Django para crear los registros
-    const confirmed = await postJson<{ pictures?: PropertyPicture[] } | PropertyPicture>(
-      `/api/admin/properties/${propertyId}/pictures/confirm/`,
-      { rel_keys: relKeys, is_primary: isPrimary }
+    const res = await authFetchMultipart(
+      `/api/admin/properties/${propertyId}/pictures/`,
+      "POST",
+      fd
     );
-    if (confirmed && typeof confirmed === "object" && "pictures" in confirmed && Array.isArray((confirmed as { pictures: PropertyPicture[] }).pictures)) {
-      return (confirmed as { pictures: PropertyPicture[] }).pictures;
-    }
-    return [confirmed as PropertyPicture];
+    return parseAdminPictureBatchResponse<PropertyPicture>(res);
   },
 
   async setPropertyPicturePrimary(propertyId: number, picId: number): Promise<PropertyPicture> {
@@ -1526,7 +1470,7 @@ export const adminApi = {
     return (await adminApi.uploadRoomTypePicturesBatch(propertyId, roomTypeId, [file], isPrimary))[0];
   },
 
-  /** Sube hasta 50 imágenes usando pre-signed S3 URLs (sin pasar por CloudFront). */
+  /** Sube hasta 50 imágenes en un solo POST multipart al API (Django → storage). */
   async uploadRoomTypePicturesBatch(
     propertyId: number,
     roomTypeId: number,
@@ -1536,37 +1480,20 @@ export const adminApi = {
     const slice = files.slice(0, 50);
     if (slice.length === 0) return [];
 
-    // Step 1: Obtener URLs pre-firmadas de Django
-    const presignResult = await postJson<{
-      presigned: Array<{ index: number; rel_key: string; upload_url: string; fields: Record<string, string> }>;
-    }>(`/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/presign/`, {
-      files: slice.map((f) => ({ filename: f.name, content_type: f.type || "image/jpeg" })),
-    });
-
-    // Step 2: Subir directamente a S3
-    const relKeys: string[] = [];
-    for (const { index, rel_key, upload_url, fields } of presignResult.presigned) {
-      const fd = new FormData();
-      for (const [key, value] of Object.entries(fields)) fd.append(key, value);
-      fd.append("file", slice[index]);
-      try {
-        await uploadToS3PresignedPost(upload_url, fd);
-      } catch (err) {
-        const m = err instanceof Error ? err.message : String(err);
-        throw new Error(`Error al subir imagen ${index + 1}: ${m}`);
-      }
-      relKeys.push(rel_key);
+    const fd = new FormData();
+    for (const f of slice) {
+      fd.append("images", f);
+    }
+    if (isPrimary) {
+      fd.append("is_primary", "true");
     }
 
-    // Step 3: Confirmar con Django
-    const confirmed = await postJson<{ pictures?: RoomTypePicture[] } | RoomTypePicture>(
-      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/confirm/`,
-      { rel_keys: relKeys, is_primary: isPrimary }
+    const res = await authFetchMultipart(
+      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/`,
+      "POST",
+      fd
     );
-    if (confirmed && typeof confirmed === "object" && "pictures" in confirmed && Array.isArray((confirmed as { pictures: RoomTypePicture[] }).pictures)) {
-      return (confirmed as { pictures: RoomTypePicture[] }).pictures;
-    }
-    return [confirmed as RoomTypePicture];
+    return parseAdminPictureBatchResponse<RoomTypePicture>(res);
   },
 
   async setRoomTypePicturePrimary(
