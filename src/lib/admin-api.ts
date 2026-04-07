@@ -959,21 +959,19 @@ async function getJson<T>(path: string): Promise<T | null> {
 }
 
 /**
- * URL de proxy server-side para peticiones multipart en dominios *.newayzi.com.
- * El proxy corre en Vercel como serverless function → llama al backend server-to-server
- * evitando el problema de CORS con CloudFront/WAF para subida de archivos.
+ * URL de proxy server-side para multipart en *.newayzi.com.
+ * Usa /mpx/... (no /api/...) porque WAF/CloudFront del portal a menudo bloquea POST
+ * multipart a /api/* con 403 antes de llegar a Next.js.
  */
 function getMultipartUrl(path: string): string {
   if (typeof window === "undefined") {
     return `${resolvedApiBase().replace(/\/$/, "")}${path}`;
   }
   const hostname = window.location.hostname;
-  // Para dominios propios, usar el proxy server-side (evita CORS en multipart)
   if (hostname === "newayzi.com" || hostname.endsWith(".newayzi.com")) {
     const proxyBase = window.location.origin;
-    return `${proxyBase}/api/multipart-proxy${path}`;
+    return `${proxyBase}/mpx${path.startsWith("/") ? path : `/${path}`}`;
   }
-  // Para otros dominios (localhost, preview Vercel) → llamar directo al API
   return `${resolvedApiBase().replace(/\/$/, "")}${path}`;
 }
 
@@ -986,7 +984,12 @@ async function authFetchMultipart(path: string, method: string, body: FormData) 
   let res: Response;
   try {
     // En el proxy server-side (mismo origen) no se necesita credentials:"include" ni CORS.
-    const isProxyRoute = url.includes("/api/multipart-proxy/");
+    let isProxyRoute = false;
+    try {
+      isProxyRoute = new URL(url).pathname.startsWith("/mpx/");
+    } catch {
+      /* ignore */
+    }
     res = await fetch(url, {
       method,
       body,

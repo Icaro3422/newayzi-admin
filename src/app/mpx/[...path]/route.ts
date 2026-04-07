@@ -1,12 +1,11 @@
 /**
- * Proxy server-side para peticiones multipart/form-data al backend Django.
+ * Proxy server-side para multipart/form-data hacia Django.
  *
- * Motivación: el browser llama a api.production.newayzi.com directamente (CORS configurado).
- * Para JSON esto funciona, pero para POST multipart (subida de imágenes) CloudFront/WAF puede
- * bloquear la solicitud antes de llegar a Django, devolviendo un error sin headers CORS.
- * Al hacer el multipart server-to-server (Vercel → Django), evitamos ese bloqueo.
+ * Vive bajo /mpx/ (no bajo /api/) porque CloudFront/WAF del portal suele bloquear
+ * POST grandes o multipart a rutas /api/* con 403 genérico, antes de llegar a Vercel.
  *
- * Rutas: /api/multipart-proxy/<path>  →  <BACKEND_URL>/<path>
+ * Rutas: /mpx/<path>  →  <BACKEND_URL>/<path>
+ * Ej.: /mpx/api/admin/properties/1/pictures/ → BACKEND/api/admin/properties/1/pictures/
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -20,14 +19,12 @@ function normalizeBackendUrl(raw: string): string {
   return `https://${trimmed}`;
 }
 
-/** URL del backend Django (server-side). Puede ser pública o interna (p. ej. dentro de VPC). */
 function getBackendUrl(): string {
   return normalizeBackendUrl(
     process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || ""
   );
 }
 
-/** Headers de autenticación que deben llegar al backend. */
 function buildAuthHeaders(req: NextRequest): Record<string, string> {
   const headers: Record<string, string> = {};
   const auth = req.headers.get("authorization");
@@ -44,7 +41,7 @@ async function proxyMultipart(
 ): Promise<NextResponse> {
   const backendBase = getBackendUrl();
   if (!backendBase) {
-    console.error("[multipart-proxy] BACKEND_API_URL / NEXT_PUBLIC_API_URL no configurado.");
+    console.error("[mpx] BACKEND_API_URL / NEXT_PUBLIC_API_URL no configurado.");
     return NextResponse.json(
       { detail: "Backend URL no configurada en el servidor del admin." },
       { status: 503 }
@@ -58,7 +55,7 @@ async function proxyMultipart(
   try {
     formData = await req.formData();
   } catch (e) {
-    console.error("[multipart-proxy] Error al parsear FormData:", e);
+    console.error("[mpx] Error al parsear FormData:", e);
     return NextResponse.json({ detail: "FormData inválido." }, { status: 400 });
   }
 
@@ -66,7 +63,6 @@ async function proxyMultipart(
 
   let upstream: Response;
   try {
-    // No incluir Content-Type manualmente: fetch lo establece automáticamente con el boundary.
     upstream = await fetch(targetUrl, {
       method,
       body: formData,
@@ -74,7 +70,7 @@ async function proxyMultipart(
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error(`[multipart-proxy] Error de red al llamar ${targetUrl}:`, msg);
+    console.error(`[mpx] Error de red al llamar ${targetUrl}:`, msg);
     return NextResponse.json(
       { detail: `No se pudo conectar al backend: ${msg}` },
       { status: 502 }
