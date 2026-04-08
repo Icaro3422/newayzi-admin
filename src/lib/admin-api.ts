@@ -1360,6 +1360,7 @@ export const adminApi = {
       important_info: string[];
       faqs: { question: string; answer: string }[];
       restrict_pricing_to_manual_weeks: boolean;
+      location: { lat: number; lng: number } | null;
     }>
   ): Promise<PropertyDetail> {
     return patchJson<PropertyDetail>(`/api/admin/properties/${id}/`, data);

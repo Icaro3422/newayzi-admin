@@ -35,6 +35,7 @@ import { PropertyCancellationPolicyPanel } from "./PropertyCancellationPolicyPan
 import { PropertyGalleryPanel } from "./PropertyGalleryPanel";
 import { ManualInventoryPanel } from "./ManualInventoryPanel";
 import { PropertyPricingConfigPanel } from "./PropertyPricingConfigPanel";
+import { PropertyLocationMapPicker } from "./PropertyLocationMapPicker";
 
 /* ─── Primitivos de UI ─────────────────────────────────── */
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -162,6 +163,12 @@ export function PropertyEditClient() {
   const [phone, setPhone] = useState("");
   const [timezone, setTimezone] = useState("");
 
+  // ── Coordenadas GPS (mapa picker)
+  const [locationLat, setLocationLat] = useState<number>(4.711);
+  const [locationLng, setLocationLng] = useState<number>(-74.0721);
+  const [locationChanged, setLocationChanged] = useState(false);
+  const [mapKey, setMapKey] = useState<number>(0);
+
   // ── Selector de ciudad
   const [cityId, setCityId] = useState<number | null>(null);
   const [cityDisplay, setCityDisplay] = useState<{ name: string; country: string; code: string } | null>(null);
@@ -275,6 +282,17 @@ export function PropertyEditClient() {
             code: p.city_country_code ?? "",
           });
         }
+        // Inicializar coordenadas GPS desde la propiedad
+        if (p.location?.lat != null && p.location?.lng != null) {
+          setLocationLat(p.location.lat);
+          setLocationLng(p.location.lng);
+        } else {
+          // Sin coords propias: centrar en Colombia por defecto
+          setLocationLat(4.711);
+          setLocationLng(-74.0721);
+        }
+        setLocationChanged(false);
+        setMapKey((k) => k + 1);
         const am = Array.isArray(p.amenities) ? p.amenities : [];
         setAmenities([...new Set(am.map((a) => (typeof a === "string" ? a : (a as { name?: string })?.name ?? "")).filter(Boolean))]);
         setImportantInfo(Array.isArray(p.important_info) ? p.important_info : []);
@@ -472,6 +490,8 @@ export function PropertyEditClient() {
         important_info: importantInfo,
         faqs,
         ...(cityId && cityId !== property?.city_id ? { city_id: cityId } : {}),
+        // Siempre guardar la ubicación del mapa (puede haberse movido el pin)
+        location: { lat: locationLat, lng: locationLng },
       });
       setProperty(updated);
       router.refresh();
@@ -956,6 +976,15 @@ export function PropertyEditClient() {
                             setCityDisplay({ name: c.name, country: c.country_name, code: c.country_code });
                             setCityOpen(false);
                             setCityQuery("");
+                            // Si la ciudad tiene centro y la propiedad no tiene coords propias, centrar el mapa
+                            if (c.center?.lat != null && c.center?.lng != null) {
+                              const propHasCoords = property?.location?.lat != null && property?.location?.lng != null;
+                              if (!propHasCoords || !locationChanged) {
+                                setLocationLat(c.center.lat);
+                                setLocationLng(c.center.lng);
+                                setMapKey((k) => k + 1);
+                              }
+                            }
                           }}
                           className="w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.06] transition"
                         >
@@ -1023,6 +1052,40 @@ export function PropertyEditClient() {
             classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/38", label: "!text-white/65" }}
           />
         </div>
+
+        {/* Mapa de ubicación exacta */}
+        <div className="mt-5">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-sm font-sora text-white/80 font-medium">Ubicación en el mapa</p>
+              <p className="text-xs text-white/40 mt-0.5">
+                {locationChanged
+                  ? `Pin en ${locationLat.toFixed(5)}, ${locationLng.toFixed(5)} — Se guardará al guardar cambios`
+                  : property?.location
+                  ? `Coordenadas actuales: ${locationLat.toFixed(5)}, ${locationLng.toFixed(5)}`
+                  : "Sin ubicación guardada — mueve el pin para establecerla"}
+              </p>
+            </div>
+            {locationChanged && !readOnly && (
+              <span className="text-[10px] bg-amber-500/15 text-amber-300 border border-amber-500/20 rounded-full px-2.5 py-1 font-medium">
+                Ubicación modificada
+              </span>
+            )}
+          </div>
+          <PropertyLocationMapPicker
+            mapKey={mapKey}
+            lat={locationLat}
+            lng={locationLng}
+            onChange={(lat, lng) => {
+              if (!readOnly) {
+                setLocationLat(lat);
+                setLocationLng(lng);
+                setLocationChanged(true);
+              }
+            }}
+          />
+        </div>
+
         {!readOnly && <div className="mt-5"><SaveButton /></div>}
       </GlassCard>
 
