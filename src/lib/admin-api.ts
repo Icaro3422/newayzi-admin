@@ -230,7 +230,10 @@ export interface PropertyRewardsInfo {
 export interface PropertyListItem {
   id: number;
   name: string;
+  city_id?: number | null;
   city_name?: string;
+  city_country_name?: string | null;
+  city_country_code?: string | null;
   is_active: boolean;
   is_published: boolean;
   pets_allowed: boolean;
@@ -279,6 +282,8 @@ export interface AdminCitySearchRow {
   country_code: string;
   /** Centro aproximado del punto de ciudad en el catálogo (WGS84), si existe */
   center?: { lat: number; lng: number } | null;
+  /** True si hay propiedades activas/publicadas en esta ciudad (aparecerá primero en la búsqueda). */
+  has_active_properties?: boolean;
 }
 
 export interface PropertyDetail extends PropertyListItem {
@@ -1328,6 +1333,7 @@ export const adminApi = {
       check_in_until: string | null;
       check_out_from: string | null;
       check_out_until: string | null;
+      city_id: number;
       amenities: string[] | Record<string, unknown>[];
       important_info: string[];
       faqs: { question: string; answer: string }[];

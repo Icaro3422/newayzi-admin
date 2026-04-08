@@ -19,6 +19,7 @@ import { Icon } from "@iconify/react";
 import {
   adminApi,
   LEVEL_OPTIONS,
+  type AdminCitySearchRow,
   type LoyaltyDealItem,
   type LoyaltyLevelValue,
   type PropertyDetail,
@@ -161,6 +162,14 @@ export function PropertyEditClient() {
   const [phone, setPhone] = useState("");
   const [timezone, setTimezone] = useState("");
 
+  // ── Selector de ciudad
+  const [cityId, setCityId] = useState<number | null>(null);
+  const [cityDisplay, setCityDisplay] = useState<{ name: string; country: string; code: string } | null>(null);
+  const [cityQuery, setCityQuery] = useState("");
+  const [cityResults, setCityResults] = useState<AdminCitySearchRow[]>([]);
+  const [citySearching, setCitySearching] = useState(false);
+  const [cityOpen, setCityOpen] = useState(false);
+
   // ── Campos editables: horarios
   const [check_in_from, setCheckInFrom] = useState("");
   const [check_in_until, setCheckInUntil] = useState("");
@@ -258,6 +267,14 @@ export function PropertyEditClient() {
         setCheckInUntil(p.check_in_until ?? "");
         setCheckOutFrom(p.check_out_from ?? "");
         setCheckOutUntil(p.check_out_until ?? "");
+        setCityId(p.city_id ?? null);
+        if (p.city_name) {
+          setCityDisplay({
+            name: p.city_name,
+            country: p.city_country_name ?? "",
+            code: p.city_country_code ?? "",
+          });
+        }
         const am = Array.isArray(p.amenities) ? p.amenities : [];
         setAmenities([...new Set(am.map((a) => (typeof a === "string" ? a : (a as { name?: string })?.name ?? "")).filter(Boolean))]);
         setImportantInfo(Array.isArray(p.important_info) ? p.important_info : []);
@@ -286,6 +303,23 @@ export function PropertyEditClient() {
     const a = newFaqA.trim();
     if (q && a) { setFaqs([...faqs, { question: q, answer: a }]); setNewFaqQ(""); setNewFaqA(""); }
   }
+
+  // ── Búsqueda de ciudades (debounced)
+  useEffect(() => {
+    if (cityQuery.length < 2) { setCityResults([]); return; }
+    let cancelled = false;
+    setCitySearching(true);
+    const t = setTimeout(() => {
+      adminApi.searchAdminCities(cityQuery).then((r) => {
+        if (!cancelled) setCityResults(r?.results ?? []);
+      }).catch(() => {
+        if (!cancelled) setCityResults([]);
+      }).finally(() => {
+        if (!cancelled) setCitySearching(false);
+      });
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [cityQuery]);
 
   useEffect(() => {
     let cancelled = false;
@@ -437,6 +471,7 @@ export function PropertyEditClient() {
         amenities,
         important_info: importantInfo,
         faqs,
+        ...(cityId && cityId !== property?.city_id ? { city_id: cityId } : {}),
       });
       setProperty(updated);
       router.refresh();
@@ -858,9 +893,86 @@ export function PropertyEditClient() {
       <GlassCard>
         <SectionHeader icon="solar:map-point-bold-duotone" title="Contacto y ubicación" subtitle="Dirección, teléfono, ciudad y zona horaria." iconBg="from-blue-500/20 to-cyan-600/20" iconColor="text-cyan-400" />
 
-        {/* Datos de solo lectura */}
+        {/* Datos de solo lectura + selector de ciudad */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07]">
-          <InfoRow label="Ciudad" value={property.city_name} />
+          {/* Ciudad — editable para corregir la asignación */}
+          <div className="col-span-full sm:col-span-1 flex flex-col gap-0.5 relative">
+            <span className="text-xs text-white/45 font-sora">Ciudad</span>
+            {readOnly ? (
+              <span className="text-sm text-white/90 font-sora">
+                {cityDisplay ? `${cityDisplay.name}${cityDisplay.country ? `, ${cityDisplay.country}` : ""}` : (property.city_name ?? "—")}
+              </span>
+            ) : (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => { setCityOpen((v) => !v); setCityQuery(""); setCityResults([]); }}
+                  className="w-full text-left text-sm text-white/90 font-sora bg-white/[0.06] border border-white/[0.12] rounded-xl px-3 py-2 hover:bg-white/[0.1] transition flex items-center gap-2"
+                >
+                  {cityDisplay ? (
+                    <>
+                      {cityDisplay.code && (
+                        <span className="text-xs bg-white/10 rounded px-1 py-0.5 uppercase font-mono">{cityDisplay.code}</span>
+                      )}
+                      <span>{cityDisplay.name}</span>
+                      {cityDisplay.country && <span className="text-white/40 text-xs">{cityDisplay.country}</span>}
+                    </>
+                  ) : (
+                    <span className="text-white/40">Seleccionar ciudad…</span>
+                  )}
+                  <Icon icon="solar:alt-arrow-down-bold" className="ml-auto text-white/40" width={14} />
+                </button>
+
+                {cityOpen && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#18122b] border border-white/[0.12] rounded-2xl shadow-2xl overflow-hidden">
+                    <div className="p-2 border-b border-white/[0.08]">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={cityQuery}
+                        onChange={(e) => setCityQuery(e.target.value)}
+                        placeholder="Buscar ciudad…"
+                        className="w-full bg-white/[0.06] rounded-xl px-3 py-2 text-sm text-white/90 outline-none placeholder:text-white/35 border border-white/[0.1] focus:border-[#5e2cec]/60"
+                      />
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                      {citySearching && (
+                        <div className="flex items-center justify-center py-4">
+                          <Spinner size="sm" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#9b74ff]" }} />
+                        </div>
+                      )}
+                      {!citySearching && cityQuery.length < 2 && (
+                        <p className="text-xs text-white/35 text-center py-4">Escribe al menos 2 caracteres</p>
+                      )}
+                      {!citySearching && cityQuery.length >= 2 && cityResults.length === 0 && (
+                        <p className="text-xs text-white/35 text-center py-4">Sin resultados</p>
+                      )}
+                      {cityResults.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setCityId(c.id);
+                            setCityDisplay({ name: c.name, country: c.country_name, code: c.country_code });
+                            setCityOpen(false);
+                            setCityQuery("");
+                          }}
+                          className="w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.06] transition"
+                        >
+                          <span className="text-xs bg-white/10 rounded px-1.5 py-0.5 uppercase font-mono shrink-0">{c.country_code || "??"}</span>
+                          <span className="text-sm text-white/90">{c.name}</span>
+                          <span className="text-xs text-white/40 ml-1">{c.country_name}</span>
+                          {c.has_active_properties && (
+                            <span className="ml-auto text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 rounded-full px-2 py-0.5 shrink-0">En catálogo</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <InfoRow label="Tipo de propiedad" value={property.property_type} />
           <InfoRow label="Moneda" value={property.currency} />
           {property.location && (
