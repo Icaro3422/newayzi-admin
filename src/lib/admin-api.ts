@@ -1355,29 +1355,59 @@ export const adminApi = {
   },
 
   /**
-   * Importa Excel de inventario manual.
-   * Codifica el archivo en base64 y lo envía como JSON normal (no multipart).
-   * Esto evita el bloqueo WAF/CloudFront que afecta a los POST multipart.
+   * Importa Excel de inventario manual usando presign → S3 → confirm.
+   *
+   * WAF bloquea cualquier POST con cuerpo grande (multipart o JSON) hacia el API.
+   * La solución: presign y confirm son JSON pequeños (pasan WAF); el upload del
+   * archivo va directo a S3 con mode:"no-cors", lo que bypassa S3 CORS
+   * completamente — S3 valida solo la firma del presigned POST, no el origen.
    */
   async importManualInventory(
     propertyId: number,
     file: File,
     replace = true
   ): Promise<ManualInventoryImportRow> {
-    const file_b64 = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        // result = "data:<mime>;base64,<datos>" → extraer solo los datos
-        resolve(result.split(",")[1] ?? result);
-      };
-      reader.onerror = () => reject(new Error("No se pudo leer el archivo."));
-      reader.readAsDataURL(file);
-    });
+    // 1. Obtener URL prefirmada de S3
+    const presignResp = await postJson<{
+      presigned: { index: number; rel_key: string; upload_url: string; fields: Record<string, string> }[];
+    }>(
+      `/api/admin/properties/${propertyId}/manual-inventory/presign/`,
+      { filename: file.name }
+    );
 
+    const slot = presignResp.presigned[0];
+    if (!slot) throw new Error("El backend no devolvió URL de subida.");
+
+    // 2. Subir el archivo directamente a S3 con mode:"no-cors"
+    //    Con no-cors, el navegador NO envía Origin → S3 no verifica CORS,
+    //    solo verifica la firma. La respuesta es opaca (no legible), pero S3
+    //    procesa el upload si la firma y los campos son correctos.
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(slot.fields)) {
+      fd.append(k, v);
+    }
+    // El archivo VA AL FINAL — requisito de S3 presigned POST
+    fd.append("file", file);
+
+    try {
+      await fetch(slot.upload_url, {
+        method: "POST",
+        body: fd,
+        mode: "no-cors",   // bypassa CORS de S3
+        credentials: "omit",
+        cache: "no-store",
+      });
+    } catch (e) {
+      // Con no-cors, fetch solo lanza si hay fallo de red real (sin conexión, etc.)
+      throw new Error(`No se pudo conectar con S3: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    // No podemos leer la respuesta opaca, pero si no lanzó, la petición se envió.
+    // El paso confirm verifica que S3 la recibió correctamente.
+
+    // 3. Confirmar: Django lee el archivo de S3, lo procesa y lo elimina
     return postJson<ManualInventoryImportRow>(
-      `/api/admin/properties/${propertyId}/manual-inventory/import/`,
-      { file_b64, filename: file.name, replace }
+      `/api/admin/properties/${propertyId}/manual-inventory/confirm/`,
+      { rel_key: slot.rel_key, original_filename: file.name, replace }
     );
   },
 
