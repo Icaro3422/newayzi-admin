@@ -1356,45 +1356,29 @@ export const adminApi = {
 
   /**
    * Importa Excel de inventario manual.
-   * El POST va al propio origen (mismo dominio → sin CORS) y un Route Handler de Next.js
-   * lo reenvía al API Django en el servidor, evitando el bloqueo WAF/CloudFront.
+   * Codifica el archivo en base64 y lo envía como JSON normal (no multipart).
+   * Esto evita el bloqueo WAF/CloudFront que afecta a los POST multipart.
    */
   async importManualInventory(
     propertyId: number,
     file: File,
     replace = true
   ): Promise<ManualInventoryImportRow> {
-    if (typeof window === "undefined") {
-      throw new Error("importManualInventory solo está disponible en el navegador.");
-    }
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("replace", replace ? "true" : "false");
-
-    const url = `${window.location.origin}/api/admin/properties/${propertyId}/manual-inventory/import`;
-    const token = tokenGetter ? await tokenGetter({ skipCache: true }) : null;
-    const headers: Record<string, string> = {};
-    applyBearerHeaders(headers, token);
-
-    const res = await fetch(url, {
-      method: "POST",
-      body: fd,
-      headers,
-      credentials: "include",
+    const file_b64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // result = "data:<mime>;base64,<datos>" → extraer solo los datos
+        resolve(result.split(",")[1] ?? result);
+      };
+      reader.onerror = () => reject(new Error("No se pudo leer el archivo."));
+      reader.readAsDataURL(file);
     });
 
-    const text = await res.text();
-    if (!res.ok) {
-      let detail = text;
-      try {
-        const j = JSON.parse(text) as { detail?: unknown };
-        if (typeof j.detail === "string") detail = j.detail;
-      } catch {
-        /* conservar texto crudo (HTML de error CDN, etc.) */
-      }
-      throw new Error(detail || `Error ${res.status}`);
-    }
-    return JSON.parse(text) as ManualInventoryImportRow;
+    return postJson<ManualInventoryImportRow>(
+      `/api/admin/properties/${propertyId}/manual-inventory/import/`,
+      { file_b64, filename: file.name, replace }
+    );
   },
 
   async getManualInventoryImports(
