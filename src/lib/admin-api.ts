@@ -1354,21 +1354,47 @@ export const adminApi = {
     return res.blob();
   },
 
-  /** Importa Excel: multipart POST al API (CORS permite portal.newayzi.com). */
+  /**
+   * Importa Excel de inventario manual.
+   * El POST va al propio origen (mismo dominio → sin CORS) y un Route Handler de Next.js
+   * lo reenvía al API Django en el servidor, evitando el bloqueo WAF/CloudFront.
+   */
   async importManualInventory(
     propertyId: number,
     file: File,
     replace = true
   ): Promise<ManualInventoryImportRow> {
+    if (typeof window === "undefined") {
+      throw new Error("importManualInventory solo está disponible en el navegador.");
+    }
     const fd = new FormData();
     fd.append("file", file);
     fd.append("replace", replace ? "true" : "false");
-    const res = await authFetchMultipart(
-      `/api/admin/properties/${propertyId}/manual-inventory/import/`,
-      "POST",
-      fd
-    );
-    return res.json() as Promise<ManualInventoryImportRow>;
+
+    const url = `${window.location.origin}/api/admin/properties/${propertyId}/manual-inventory/import`;
+    const token = tokenGetter ? await tokenGetter({ skipCache: true }) : null;
+    const headers: Record<string, string> = {};
+    applyBearerHeaders(headers, token);
+
+    const res = await fetch(url, {
+      method: "POST",
+      body: fd,
+      headers,
+      credentials: "include",
+    });
+
+    const text = await res.text();
+    if (!res.ok) {
+      let detail = text;
+      try {
+        const j = JSON.parse(text) as { detail?: unknown };
+        if (typeof j.detail === "string") detail = j.detail;
+      } catch {
+        /* conservar texto crudo (HTML de error CDN, etc.) */
+      }
+      throw new Error(detail || `Error ${res.status}`);
+    }
+    return JSON.parse(text) as ManualInventoryImportRow;
   },
 
   async getManualInventoryImports(
