@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Spinner } from "@heroui/react";
 import { useMapbox } from "@/hooks/useMapbox";
+import { MAPBOX_MAP_STYLE_URL } from "@/lib/mapbox-map-style";
 
 type Props = {
   /** Cambia al elegir otra ciudad para reinicializar el mapa centrado */
@@ -46,7 +47,7 @@ export function PropertyLocationMapPicker({ mapKey, lat, lng, onChange }: Props)
 
     const map = new mapboxgl.Map({
       container,
-      style: "mapbox://styles/mapbox/streets-v12",
+      style: MAPBOX_MAP_STYLE_URL,
       center: [lng, lat],
       zoom: 15,
       attributionControl: true,
