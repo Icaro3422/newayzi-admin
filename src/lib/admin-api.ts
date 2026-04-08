@@ -1285,6 +1285,28 @@ export const adminApi = {
     );
   },
 
+  async getAdminCityDuplicates(): Promise<{
+    duplicates: Array<{ cities: Array<AdminCitySearchRow & { property_count: number; is_active: boolean }> }>;
+    total_groups: number;
+  }> {
+    return getJson(`/api/admin/properties/cities/duplicates/`) as Promise<{
+      duplicates: Array<{ cities: Array<AdminCitySearchRow & { property_count: number; is_active: boolean }> }>;
+      total_groups: number;
+    }>;
+  },
+
+  async mergeAdminCities(canonicalId: number, fromIds: number[]): Promise<{
+    merged: boolean;
+    canonical_id: number;
+    from_ids: number[];
+    properties_moved: number;
+  }> {
+    return postJson(`/api/admin/properties/cities/duplicates/`, {
+      canonical_id: canonicalId,
+      from_ids: fromIds,
+    });
+  },
+
   async createProperty(data: {
     name: string;
     city_id: number;

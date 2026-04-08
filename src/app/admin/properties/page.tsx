@@ -1,6 +1,7 @@
 "use client";
 
 import { PropertiesList } from "@/components/admin/PropertiesList";
+import { CityDuplicatesPanel } from "@/components/admin/CityDuplicatesPanel";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { useAdmin } from "@/contexts/AdminContext";
 import { isModuleReadOnly } from "@/lib/admin-api";
@@ -30,6 +31,7 @@ export default function AdminPropertiesPage() {
           </p>
         </div>
       )}
+      {role === "super_admin" && <CityDuplicatesPanel />}
       <PropertiesList />
     </div>
   );
