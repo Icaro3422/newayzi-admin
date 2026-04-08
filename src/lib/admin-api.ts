@@ -970,51 +970,11 @@ async function getJson<T>(path: string): Promise<T | null> {
 }
 
 /**
- * Base URL para POST multipart (Excel, etc.).
- *
- * En producción, el fetch directo a `api.*.newayzi.com` puede fallar con "Failed to fetch"
- * por CORS opacos, WAF o límites en el borde, aunque JSON vaya bien. El mismo origen
- * `/proxy-api` (rewrite en next.config → upstream) evita CORS y suele ser más fiable.
- *
- * Localhost sigue yendo directo al API para desarrollo sin depender del rewrite.
+ * URL para POST multipart: usa el mismo base que el resto del API (CORS configurado en Django).
+ * El Excel de inventario manual es pequeño y pasa bien por la API directa.
  */
-function getMultipartApiBase(): string {
-  const direct = getDirectApiBase().replace(/\/$/, "");
-  if (typeof window === "undefined") {
-    return direct;
-  }
-  if (!direct) {
-    return "";
-  }
-
-  const hostname = window.location.hostname;
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return direct;
-  }
-
-  const proxyDisabled = process.env.NEXT_PUBLIC_USE_SAME_ORIGIN_API_PROXY === "false";
-  if (proxyDisabled) {
-    return direct;
-  }
-
-  const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (!envUrl) {
-    return direct;
-  }
-
-  try {
-    const apiOrigin = new URL(normalizeApiUrl(direct)).origin;
-    if (window.location.origin === apiOrigin) {
-      return direct;
-    }
-    return `${window.location.origin}/proxy-api`.replace(/\/$/, "");
-  } catch {
-    return direct;
-  }
-}
-
 function getMultipartUrl(path: string): string {
-  const base = getMultipartApiBase().replace(/\/$/, "");
+  const base = resolvedApiBase().replace(/\/$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${base}${p}`;
 }
@@ -1394,46 +1354,20 @@ export const adminApi = {
     return res.blob();
   },
 
-  /**
-   * Importa Excel vía presign → S3 → confirm (mismo patrón que imágenes).
-   * Evita POST multipart al portal/API/CloudFront (403 WAF).
-   */
+  /** Importa Excel: multipart POST al API (CORS permite portal.newayzi.com). */
   async importManualInventory(
     propertyId: number,
     file: File,
     replace = true
   ): Promise<ManualInventoryImportRow> {
-    const contentType =
-      file.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-    const presign = await postJson<{
-      presigned: Array<{
-        index: number;
-        rel_key: string;
-        upload_url: string;
-        fields: Record<string, string>;
-      }>;
-    }>(`/api/admin/properties/${propertyId}/manual-inventory/presign/`, {
-      filename: file.name,
-      content_type: contentType,
-    });
-    const p = presign.presigned[0];
-    if (!p?.upload_url || !p.rel_key) {
-      throw new Error("Respuesta inválida del servidor (presign).");
-    }
     const fd = new FormData();
-    for (const [k, v] of Object.entries(p.fields)) {
-      fd.append(k, v);
-    }
     fd.append("file", file);
-    await uploadToS3PresignedPost(p.upload_url, fd);
-    const res = await authFetch(`/api/admin/properties/${propertyId}/manual-inventory/confirm/`, {
-      method: "POST",
-      body: JSON.stringify({
-        rel_key: p.rel_key,
-        replace,
-        original_filename: file.name,
-      }),
-    });
+    fd.append("replace", replace ? "true" : "false");
+    const res = await authFetchMultipart(
+      `/api/admin/properties/${propertyId}/manual-inventory/import/`,
+      "POST",
+      fd
+    );
     return res.json() as Promise<ManualInventoryImportRow>;
   },
 
