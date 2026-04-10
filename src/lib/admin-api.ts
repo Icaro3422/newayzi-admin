@@ -811,6 +811,62 @@ export interface RegionPaymentMethod {
   payment_method?: PaymentMethod;
 }
 
+/** Respuesta de GET /api/admin/payment-gateway-analytics/ */
+export interface PaymentGatewayAnalytics {
+  period: { from: string; to: string; days: number };
+  filters: { gateway: string | null; include_internal: boolean };
+  totals: {
+    attempts: number;
+    approved: number;
+    rejected: number;
+    error: number;
+    pending: number;
+    cancelled: number;
+  };
+  rates: {
+    success_rate: number | null;
+    failure_rate: number | null;
+    note: string;
+  };
+  approved_amount_total: string;
+  by_day: Array<{
+    date: string;
+    approved: number;
+    rejected: number;
+    error: number;
+    pending: number;
+    cancelled: number;
+  }>;
+  failure_by_code: Array<{
+    gateway: string;
+    code: string;
+    count: number;
+    sample_message?: string;
+  }>;
+  failure_by_status_detail: Array<{
+    gateway: string;
+    status_detail: string;
+    count: number;
+  }>;
+  recent_attempts: PaymentGatewayAnalyticsAttempt[];
+  recent_failures: PaymentGatewayAnalyticsAttempt[];
+}
+
+export interface PaymentGatewayAnalyticsAttempt {
+  id: number;
+  created: string | null;
+  gateway: string;
+  status: string;
+  gateway_response_code: string;
+  gateway_response_message: string;
+  status_detail: string;
+  booking_id: number;
+  booking_reference: string;
+  property_name: string;
+  amount: string;
+  currency: string;
+}
+
 export interface AdminUserListItem {
   id: number;
   clerk_user_id: string;
@@ -2185,6 +2241,19 @@ export const adminApi = {
       `/api/admin/regions/${regionId}/payment-methods/`,
       { payment_method_id: paymentMethodId, is_active }
     );
+  },
+
+  async getPaymentGatewayAnalytics(params?: {
+    days?: number;
+    gateway?: string;
+    includeInternal?: boolean;
+  }): Promise<PaymentGatewayAnalytics | null> {
+    const q = new URLSearchParams();
+    if (params?.days != null && params.days > 0) q.set("days", String(params.days));
+    if (params?.gateway) q.set("gateway", params.gateway);
+    if (params?.includeInternal) q.set("include_internal", "1");
+    const suffix = q.toString() ? `?${q.toString()}` : "";
+    return getJson<PaymentGatewayAnalytics>(`/api/admin/payment-gateway-analytics/${suffix}`);
   },
 
   async getUsers(): Promise<{ results: AdminUserListItem[] } | null> {
