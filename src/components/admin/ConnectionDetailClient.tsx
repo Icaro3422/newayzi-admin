@@ -1279,8 +1279,8 @@ export function ConnectionDetailClient() {
                 <p className="text-white/70 text-sm">
                   Se eliminará la conexión{" "}
                   <strong className="text-white">{connection?.name || connection?.pms_type}</strong> y todas las
-                  propiedades sincronizadas desde ella. No hay reservas activas en catálogo que lo impidan. Esta acción
-                  no se puede deshacer.
+                  propiedades sincronizadas desde ella. No quedan reservas no canceladas en catálogo que bloqueen el
+                  borrado. Esta acción no se puede deshacer.
                 </p>
               )}
             </ModalBody>

@@ -2640,7 +2640,29 @@ export const adminBookings = {
   ): Promise<{ ok: boolean; refund_type: string; refund_pct: number; refund_amount: string; reason: string }> {
     return postJson(`/api/admin/bookings/${id}/cancel/`, data);
   },
+
+  /** Confirmar (pendiente → confirmada) o expirar (pendiente/confirmada → expirada). Operador, comercial, super_admin. */
+  async patchStatus(
+    id: number,
+    data: { status: "confirmed" | "expired" }
+  ): Promise<{ ok: boolean; status: string; updated: string }> {
+    return patchJson(`/api/admin/bookings/${id}/status/`, data);
+  },
 };
+
+/** Roles que pueden cancelar reservas por API admin. */
+export function canAdminCancelBooking(role: AdminRole | null): boolean {
+  if (!role) return false;
+  if (role === "super_admin") return true;
+  return role === "operador" || role === "agente" || role === "comercial";
+}
+
+/** Operador, comercial o super_admin: cambiar estado sin flujo de cancelación. */
+export function canAdminPatchBookingStatus(role: AdminRole | null): boolean {
+  if (!role) return false;
+  if (role === "super_admin") return true;
+  return role === "operador" || role === "comercial";
+}
 
 /** Metadatos visuales por rol — icono, color, label y descripción */
 export const ROLE_META: Record<AdminRole, { label: string; icon: string; color: string; description: string }> = {

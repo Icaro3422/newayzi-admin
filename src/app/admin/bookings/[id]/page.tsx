@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
-import { adminBookings, type AdminBookingDetail } from "@/lib/admin-api";
+import {
+  adminBookings,
+  canAdminCancelBooking,
+  canAdminPatchBookingStatus,
+  type AdminBookingDetail,
+} from "@/lib/admin-api";
+import { useAdmin } from "@/contexts/AdminContext";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -46,13 +52,43 @@ const PAYMENT_BADGE: Record<string, string> = {
 export default function AdminBookingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { role } = useAdmin();
   const [booking, setBooking] = useState<AdminBookingDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [adminReason, setAdminReason] = useState("");
+  const [hasJustification, setHasJustification] = useState(true);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelDone, setCancelDone] = useState(false);
+  const [refundResult, setRefundResult] = useState<{
+    refund_type: string;
+    refund_pct: number;
+    refund_amount: string;
+    reason: string;
+  } | null>(null);
+  const [statusPatching, setStatusPatching] = useState(false);
+
+  const showActions = canAdminCancelBooking(role) || canAdminPatchBookingStatus(role);
+
+  async function reloadBooking() {
+    if (!id) return;
+    const data = await adminBookings.get(Number(id));
+    if (data) setBooking(data);
+  }
+
   useEffect(() => {
     if (!id) return;
-    adminBookings.get(Number(id))
+    setCancelOpen(false);
+    setCancelDone(false);
+    setRefundResult(null);
+    setAdminReason("");
+    setHasJustification(true);
+    setCancelError(null);
+    adminBookings
+      .get(Number(id))
       .then((data) => {
         if (!data) setError("Reserva no encontrada.");
         else setBooking(data);
@@ -60,6 +96,43 @@ export default function AdminBookingDetailPage() {
       .catch(() => setError("Error al cargar la reserva."))
       .finally(() => setLoading(false));
   }, [id]);
+
+  async function confirmCancelBooking() {
+    if (!booking) return;
+    setCancelLoading(true);
+    setCancelError(null);
+    try {
+      const r = await adminBookings.cancel(booking.id, {
+        reason: adminReason.trim() || "Cancelación administrativa",
+        has_justification: hasJustification,
+      });
+      setRefundResult(r);
+      setCancelDone(true);
+      await reloadBooking();
+    } catch (e) {
+      setCancelError(e instanceof Error ? e.message : "Error al cancelar");
+    } finally {
+      setCancelLoading(false);
+    }
+  }
+
+  async function patchBookingStatus(next: "confirmed" | "expired") {
+    if (!booking) return;
+    const msg =
+      next === "confirmed"
+        ? "¿Confirmar esta reserva manualmente? Pasará de «Pago pendiente» a «Confirmada»."
+        : "¿Marcar como expirada? Seguirá bloqueando la eliminación de conexiones PMS hasta que canceles la reserva.";
+    if (!window.confirm(msg)) return;
+    setStatusPatching(true);
+    try {
+      await adminBookings.patchStatus(booking.id, { status: next });
+      await reloadBooking();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "No se pudo actualizar el estado.");
+    } finally {
+      setStatusPatching(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -100,7 +173,7 @@ export default function AdminBookingDetailPage() {
           <p className="text-xs text-white/40 uppercase tracking-widest font-semibold">Reserva</p>
           <h1 className="text-xl font-black text-white">#{booking.id} · {booking.reference}</h1>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
           <span className={`px-3 py-1 rounded-full text-xs font-bold border ${STATUS_BADGE[booking.status] ?? "bg-white/5 text-white/60 border-white/10"}`}>
             {STATUS_LABEL[booking.status] ?? booking.status}
           </span>
@@ -109,6 +182,58 @@ export default function AdminBookingDetailPage() {
           </span>
         </div>
       </div>
+
+      {showActions && (
+        <section className="bg-violet-500/10 border border-violet-500/20 rounded-2xl p-5 mb-4">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-violet-300 flex items-center gap-2 mb-3">
+            <Icon icon="solar:settings-bold-duotone" /> Acciones de gestión
+          </h2>
+          <p className="text-sm text-white/55 mb-4">
+            Para poder eliminar una conexión PMS, todas las reservas asociadas a esas propiedades deben estar en estado
+            «Cancelada». Las reservas confirmadas, pendientes o expiradas siguen bloqueando el borrado hasta cancelarlas.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {canAdminCancelBooking(role) && booking.status !== "cancelled" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCancelOpen(true);
+                  setCancelDone(false);
+                  setRefundResult(null);
+                  setCancelError(null);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/15 text-red-300 border border-red-500/30 hover:bg-red-500/25 text-sm font-semibold transition-colors"
+              >
+                <Icon icon="solar:close-circle-bold" width={18} />
+                Cancelar reserva
+              </button>
+            )}
+            {canAdminPatchBookingStatus(role) && booking.status === "pending_payment" && (
+              <button
+                type="button"
+                disabled={statusPatching}
+                onClick={() => patchBookingStatus("confirmed")}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 text-sm font-semibold transition-colors disabled:opacity-40"
+              >
+                <Icon icon="solar:check-circle-bold" width={18} />
+                Confirmar reserva
+              </button>
+            )}
+            {canAdminPatchBookingStatus(role) &&
+              (booking.status === "pending_payment" || booking.status === "confirmed") && (
+                <button
+                  type="button"
+                  disabled={statusPatching}
+                  onClick={() => patchBookingStatus("expired")}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 text-white/70 border border-white/15 hover:bg-white/10 text-sm font-semibold transition-colors disabled:opacity-40"
+                >
+                  <Icon icon="solar:clock-circle-bold" width={18} />
+                  Marcar como expirada
+                </button>
+              )}
+          </div>
+        </section>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* ─ Propiedad / Fechas ─────────────────────────────────────── */}
@@ -257,6 +382,95 @@ export default function AdminBookingDetailPage() {
           {booking.agency_id && <Row label="Agency ID" value={String(booking.agency_id)} mono />}
         </section>
       </div>
+
+      {cancelOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            {cancelDone ? (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                    <Icon icon="solar:check-circle-bold" className="text-emerald-400 text-xl" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white">Reserva cancelada</h3>
+                </div>
+                {refundResult && (
+                  <div className="p-4 bg-white/5 rounded-xl border border-white/10 mb-4">
+                    <p className="text-sm text-white/60 mb-1">Reembolso</p>
+                    <p className="text-xl font-black text-violet-300">
+                      {refundResult.refund_pct}% —{" "}
+                      {refundResult.refund_type === "cash"
+                        ? "Efectivo"
+                        : refundResult.refund_type === "credits"
+                          ? "Créditos"
+                          : "Sin reembolso"}
+                    </p>
+                    <p className="text-xs text-white/40 mt-1">{refundResult.reason}</p>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setCancelOpen(false)}
+                  className="w-full py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl transition-colors"
+                >
+                  Cerrar
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                    <Icon icon="solar:danger-triangle-bold-duotone" className="text-red-400 text-xl" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white">Cancelar reserva</h3>
+                </div>
+                <p className="text-sm text-white/60 mb-4">
+                  ¿Confirmas la cancelación de{" "}
+                  <span className="font-mono text-violet-300 font-bold">{booking.reference}</span>? Se aplicará la
+                  política de reembolso correspondiente.
+                </p>
+                <label className="block text-xs text-white/50 mb-1">Razón (opcional)</label>
+                <textarea
+                  value={adminReason}
+                  onChange={(e) => setAdminReason(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-xl bg-white/5 border border-white/10 text-white text-sm px-3 py-2 mb-3"
+                  placeholder="Motivo interno o para el huésped"
+                />
+                <label className="flex items-center gap-2 text-sm text-white/70 mb-4 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasJustification}
+                    onChange={(e) => setHasJustification(e.target.checked)}
+                    className="rounded border-white/30 bg-white/10 text-violet-500"
+                  />
+                  Aplicar reglas con justificación (mejor reembolso según política / términos)
+                </label>
+                {cancelError && (
+                  <p className="text-sm text-red-400 mb-3">{cancelError}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCancelOpen(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-white/15 text-white/70 hover:bg-white/5"
+                  >
+                    Volver
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmCancelBooking}
+                    disabled={cancelLoading}
+                    className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl disabled:opacity-50"
+                  >
+                    {cancelLoading ? "Cancelando…" : "Confirmar cancelación"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -304,7 +304,7 @@ export function BookingsList() {
                           <Icon icon="solar:eye-bold" />
                           Ver
                         </button>
-                        {b.status !== "cancelled" && b.status !== "expired" && (
+                        {b.status !== "cancelled" && (
                           <button
                             onClick={() => handleCancel(b)}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-500/15 text-red-400 border border-red-500/20 hover:bg-red-500/25 text-xs font-semibold transition-colors"
