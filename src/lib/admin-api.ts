@@ -481,6 +481,49 @@ export interface PMSConnectionDetail extends PMSConnectionListItem {
   sync_interval_minutes: number;
 }
 
+/** Reserva que impide borrar propiedades PMS (PROTECT en catálogo). */
+export interface PMSDeleteBlockedBooking {
+  id: number;
+  reference: string;
+  status: string;
+  check_in: string;
+  check_out: string;
+  property_id: number;
+  property_name: string;
+}
+
+/** GET delete-blockers: incluye can_delete y metadatos completos. */
+export interface PMSConnectionDeleteBlockersInfo {
+  can_delete: boolean;
+  booking_count: number;
+  bookings: PMSDeleteBlockedBooking[];
+  has_more_bookings: boolean;
+  bookings_preview_limit: number;
+  affected_property_count: number;
+  code?: string;
+  detail?: string;
+}
+
+/** Cuerpo JSON del 409 al DELETE (sin can_delete ni affected_property_count). */
+export type PMSDeleteBlockedPayload = {
+  detail: string;
+  code: string;
+  booking_count: number;
+  bookings: PMSDeleteBlockedBooking[];
+  has_more_bookings: boolean;
+  bookings_preview_limit: number;
+};
+
+export class PmsDeleteBlockedError extends Error {
+  readonly status = 409;
+  readonly payload: PMSDeleteBlockedPayload;
+  constructor(payload: PMSDeleteBlockedPayload) {
+    super(payload.detail);
+    this.name = "PmsDeleteBlockedError";
+    this.payload = payload;
+  }
+}
+
 export interface ConnectionSyncNowResponse {
   status: "queued" | "ok" | "partial" | "error";
   run_id?: string;
@@ -1728,6 +1771,16 @@ export const adminApi = {
     return getJson<PMSConnectionDetail>(`/api/admin/pms/connections/${id}/`);
   },
 
+  async getConnectionDeleteBlockers(id: number): Promise<PMSConnectionDeleteBlockersInfo> {
+    const data = await getJson<PMSConnectionDeleteBlockersInfo>(
+      `/api/admin/pms/connections/${id}/delete-blockers/`
+    );
+    if (!data) {
+      throw new Error("No se pudo comprobar si la conexión se puede eliminar.");
+    }
+    return data;
+  },
+
   async patchConnection(
     id: number,
     data: { is_active?: boolean; config?: Record<string, unknown> }
@@ -1915,10 +1968,27 @@ export const adminApi = {
 
   async deleteConnection(id: number): Promise<void> {
     const res = await authFetch(`/api/admin/pms/connections/${id}/`, { method: "DELETE" });
-    if (res.status !== 204) {
-      const text = await res.text();
-      throw new Error(text || "Error al eliminar conexión");
+    if (res.status === 204) return;
+    const text = await res.text();
+    if (res.status === 409) {
+      try {
+        const j = JSON.parse(text) as Record<string, unknown>;
+        if (typeof j.detail === "string" && typeof j.code === "string") {
+          throw new PmsDeleteBlockedError({
+            detail: j.detail,
+            code: j.code,
+            booking_count: typeof j.booking_count === "number" ? j.booking_count : 0,
+            bookings: Array.isArray(j.bookings) ? (j.bookings as PMSDeleteBlockedBooking[]) : [],
+            has_more_bookings: Boolean(j.has_more_bookings),
+            bookings_preview_limit:
+              typeof j.bookings_preview_limit === "number" ? j.bookings_preview_limit : 80,
+          });
+        }
+      } catch (e) {
+        if (e instanceof PmsDeleteBlockedError) throw e;
+      }
     }
+    throw new Error(text || "Error al eliminar conexión");
   },
 
   async getSyncedUnits(connectionId: number): Promise<SyncedUnit[] | null> {

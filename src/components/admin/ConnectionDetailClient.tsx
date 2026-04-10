@@ -8,7 +8,9 @@ import { Icon } from "@iconify/react";
 import { useParams } from "next/navigation";
 import {
   adminApi,
+  PmsDeleteBlockedError,
   type PMSConnectionDetail,
+  type PMSConnectionDeleteBlockersInfo,
   type UnitsSummary,
   type ConnectionSyncNowResponse,
   type ConnectionSyncStreamEvent,
@@ -38,6 +40,18 @@ function emptySyncCounters(): Record<SyncPhaseKey, PhaseCounter> {
     availability: { ...init },
     rates: { ...init },
   };
+}
+
+function bookingStatusLabel(status: string): string {
+  const m: Record<string, string> = {
+    confirmed: "Confirmada",
+    pending: "Pendiente",
+    cancelled: "Cancelada",
+    completed: "Completada",
+    checked_in: "Check-in",
+    checked_out: "Check-out",
+  };
+  return m[status] ?? status;
 }
 
 function phaseLabel(phase?: string): string {
@@ -105,6 +119,9 @@ export function ConnectionDetailClient() {
   const { canEditConnections, canSyncConnection } = useAdmin();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteBlockers, setDeleteBlockers] = useState<PMSConnectionDeleteBlockersInfo | null>(null);
+  const [deleteBlockersLoading, setDeleteBlockersLoading] = useState(false);
+  const [deleteBlockersError, setDeleteBlockersError] = useState<string | null>(null);
   const [connection, setConnection] = useState<PMSConnectionDetail | null>(null);
   const [unitsSummary, setUnitsSummary] = useState<UnitsSummary | null>(null);
   const [lastSyncSummary, setLastSyncSummary] = useState<LastSyncSummaryResponse | null>(null);
@@ -192,6 +209,31 @@ export function ConnectionDetailClient() {
       });
     return () => { cancelled = true; };
   }, [id]);
+
+  useEffect(() => {
+    if (!deleteModalOpen || Number.isNaN(id) || id <= 0) return;
+    let cancelled = false;
+    setDeleteBlockersLoading(true);
+    setDeleteBlockersError(null);
+    setDeleteBlockers(null);
+    adminApi
+      .getConnectionDeleteBlockers(id)
+      .then((info) => {
+        if (!cancelled) setDeleteBlockers(info);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setDeleteBlockers(null);
+          setDeleteBlockersError(err instanceof Error ? err.message : "No se pudo comprobar el estado.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDeleteBlockersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [deleteModalOpen, id]);
 
   useEffect(() => {
     if (Number.isNaN(id) || id <= 0) return;
@@ -897,6 +939,7 @@ export function ConnectionDetailClient() {
 
   async function handleDeleteConnection() {
     if (!connection || !canSyncConnection) return;
+    if (deleteBlockers && !deleteBlockers.can_delete) return;
     setDeleting(true);
     try {
       await adminApi.deleteConnection(id);
@@ -905,8 +948,28 @@ export function ConnectionDetailClient() {
         description: "La conexión y las propiedades sincronizadas desde ella fueron eliminadas.",
         color: "success",
       });
+      setDeleteModalOpen(false);
       router.push("/admin/connections");
     } catch (e) {
+      if (e instanceof PmsDeleteBlockedError) {
+        setDeleteBlockers((prev) => ({
+          can_delete: false,
+          affected_property_count: prev?.affected_property_count ?? 0,
+          booking_count: e.payload.booking_count,
+          bookings: e.payload.bookings,
+          has_more_bookings: e.payload.has_more_bookings,
+          bookings_preview_limit: e.payload.bookings_preview_limit,
+          code: e.payload.code,
+          detail: e.payload.detail,
+        }));
+        addToast({
+          title: "Aún hay reservas que bloquean el borrado",
+          description:
+            "El estado cambió desde la última comprobación. Resuélvelas en Reservas y vuelve a intentar.",
+          color: "warning",
+        });
+        return;
+      }
       addToast({
         title: "Error al eliminar",
         description: e instanceof Error ? e.message : "No se pudo eliminar la conexión.",
@@ -914,7 +977,6 @@ export function ConnectionDetailClient() {
       });
     } finally {
       setDeleting(false);
-      setDeleteModalOpen(false);
     }
   }
 
@@ -1131,20 +1193,116 @@ export function ConnectionDetailClient() {
           </div>
         </div>
 
-        <Modal isOpen={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
-          <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
+        <Modal
+          isOpen={deleteModalOpen}
+          onOpenChange={(open) => {
+            setDeleteModalOpen(open);
+            if (!open) {
+              setDeleteBlockers(null);
+              setDeleteBlockersError(null);
+            }
+          }}
+          size="2xl"
+          scrollBehavior="inside"
+        >
+          <ModalContent className="bg-[#0f1220] border border-white/[0.1] max-h-[85vh]">
             <ModalHeader className="text-white font-sora">Eliminar conexión</ModalHeader>
-            <ModalBody>
-              <p className="text-white/70 text-sm">
-                Se eliminará la conexión <strong className="text-white">{connection?.name || connection?.pms_type}</strong> y
-                todas las propiedades sincronizadas desde ella. Esta acción no se puede deshacer.
-              </p>
+            <ModalBody className="gap-4">
+              {deleteBlockersLoading && (
+                <div className="flex justify-center py-8">
+                  <Spinner color="secondary" />
+                </div>
+              )}
+              {deleteBlockersError && !deleteBlockersLoading && (
+                <p className="text-amber-300/90 text-sm">{deleteBlockersError}</p>
+              )}
+              {!deleteBlockersLoading && !deleteBlockersError && deleteBlockers && !deleteBlockers.can_delete && (
+                <>
+                  <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
+                    <p className="font-medium text-amber-200 mb-1">Resolución manual requerida</p>
+                    <p className="text-white/75 leading-relaxed">{deleteBlockers.detail}</p>
+                    <p className="mt-2 text-white/55 text-xs">
+                      Total: {deleteBlockers.booking_count} reserva{deleteBlockers.booking_count === 1 ? "" : "s"}
+                      {deleteBlockers.has_more_bookings
+                        ? ` (mostrando hasta ${deleteBlockers.bookings_preview_limit})`
+                        : ""}
+                      .
+                    </p>
+                  </div>
+                  {deleteBlockers.bookings.length > 0 && (
+                    <div className="overflow-x-auto rounded-xl border border-white/[0.08]">
+                      <table className="w-full text-left text-xs text-white/80">
+                        <thead className="bg-white/[0.06] text-white/50 uppercase tracking-wide">
+                          <tr>
+                            <th className="px-3 py-2 font-medium">Ref.</th>
+                            <th className="px-3 py-2 font-medium">Estado</th>
+                            <th className="px-3 py-2 font-medium">Propiedad</th>
+                            <th className="px-3 py-2 font-medium">Entrada</th>
+                            <th className="px-3 py-2 font-medium">Salida</th>
+                            <th className="px-3 py-2 font-medium w-24" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {deleteBlockers.bookings.map((b) => (
+                            <tr key={b.id} className="border-t border-white/[0.06] hover:bg-white/[0.03]">
+                              <td className="px-3 py-2 font-mono text-white/90">{b.reference}</td>
+                              <td className="px-3 py-2">{bookingStatusLabel(b.status)}</td>
+                              <td className="px-3 py-2 max-w-[200px] truncate" title={b.property_name}>
+                                {b.property_name}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                {new Date(b.check_in).toLocaleDateString("es")}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                {new Date(b.check_out).toLocaleDateString("es")}
+                              </td>
+                              <td className="px-3 py-2">
+                                <Button
+                                  as={Link}
+                                  href={`/admin/bookings/${b.id}`}
+                                  size="sm"
+                                  variant="flat"
+                                  className="!text-violet-300 min-w-0 h-7 text-xs"
+                                >
+                                  Abrir
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+              {!deleteBlockersLoading && !deleteBlockersError && deleteBlockers?.can_delete && (
+                <p className="text-white/70 text-sm">
+                  Se eliminará la conexión{" "}
+                  <strong className="text-white">{connection?.name || connection?.pms_type}</strong> y todas las
+                  propiedades sincronizadas desde ella. No hay reservas activas en catálogo que lo impidan. Esta acción
+                  no se puede deshacer.
+                </p>
+              )}
             </ModalBody>
             <ModalFooter>
-              <Button variant="flat" onPress={() => setDeleteModalOpen(false)} className="!text-white/70">
-                Cancelar
+              <Button
+                variant="flat"
+                onPress={() => setDeleteModalOpen(false)}
+                className="!text-white/70"
+              >
+                {deleteBlockers && !deleteBlockers.can_delete ? "Cerrar" : "Cancelar"}
               </Button>
-              <Button color="danger" onPress={handleDeleteConnection} isLoading={deleting}>
+              <Button
+                color="danger"
+                onPress={handleDeleteConnection}
+                isLoading={deleting}
+                isDisabled={
+                  deleteBlockersLoading ||
+                  !!deleteBlockersError ||
+                  !deleteBlockers ||
+                  !deleteBlockers.can_delete
+                }
+              >
                 Eliminar
               </Button>
             </ModalFooter>
