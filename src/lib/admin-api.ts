@@ -2476,6 +2476,84 @@ export const couponsApi = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────── //
+//  SEO: guías generadas (OpenAI) — solo plataforma admin en backend
+// ─────────────────────────────────────────────────────────────────────────── //
+
+export interface AdminSeoArticle {
+  id: number;
+  slug: string;
+  locale: string;
+  title: string;
+  meta_description: string;
+  hero_title: string;
+  hero_subtitle: string;
+  keywords: string[];
+  content: Record<string, unknown>;
+  article_type: string;
+  property: number | null;
+  city: number | null;
+  status: string;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+  openai_model: string;
+  generation_notes: string;
+}
+
+export interface AdminSeoArticlesListResponse {
+  results: AdminSeoArticle[];
+  count: number;
+}
+
+export interface AdminSeoGenerateResponse {
+  created: number;
+  skipped: number;
+  failed: number;
+  execution_time_ms: number;
+  log_id: number;
+  errors: string[];
+}
+
+export const seoArticlesApi = {
+  async list(params?: { status?: string; limit?: number }): Promise<AdminSeoArticlesListResponse> {
+    const q = new URLSearchParams();
+    if (params?.status) q.set("status", params.status);
+    if (params?.limit != null) q.set("limit", String(params.limit));
+    const qs = q.toString();
+    const res = await authFetch(`/api/admin/seo-articles/${qs ? `?${qs}` : ""}`);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`API ${res.status}: ${text}`);
+    }
+    return (await res.json()) as AdminSeoArticlesListResponse;
+  },
+
+  async patch(
+    id: number,
+    data: Partial<{
+      status: string;
+      generation_notes: string;
+      title: string;
+      meta_description: string;
+      hero_title: string;
+      hero_subtitle: string;
+    }>
+  ): Promise<AdminSeoArticle> {
+    return patchJson<AdminSeoArticle>(`/api/admin/seo-articles/${id}/`, data);
+  },
+
+  async generate(body: {
+    limit?: number;
+    locales?: string[];
+    as_published?: boolean;
+    property_ids?: number[];
+    city_ids?: number[];
+  }): Promise<AdminSeoGenerateResponse> {
+    return postJson<AdminSeoGenerateResponse>("/api/admin/seo-articles/generate/", body);
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────── //
 //  Reviews (admin moderation)
 // ─────────────────────────────────────────────────────────────────────────── //
 
@@ -2776,6 +2854,7 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
     case "analytics":
     case "reviews":
     case "coupons":
+    case "seo-content":
     case "users":
     case "corporate-credits":
     case "audit":

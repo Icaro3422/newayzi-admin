@@ -30,6 +30,7 @@ function pathnameToModule(pathname: string): string | null {
   if (pathname.startsWith("/admin/analytics")) return "analytics";
   if (pathname.startsWith("/admin/reviews")) return "reviews";
   if (pathname.startsWith("/admin/coupons")) return "coupons";
+  if (pathname.startsWith("/admin/seo-articles")) return "seo-content";
   return null;
 }
 
@@ -47,6 +48,7 @@ const NAV_ITEMS_BASE: { href: string; label: string; icon: string; module: strin
   { href: "/admin/analytics",    label: "Analytics",       icon: "solar:chart-2-bold-duotone",                module: "analytics"     },
   { href: "/admin/reviews",      label: "Reseñas",         icon: "solar:stars-bold-duotone",                  module: "reviews"       },
   { href: "/admin/coupons",      label: "Cupones",         icon: "solar:tag-price-bold-duotone",              module: "coupons"       },
+  { href: "/admin/seo-articles", label: "Guías SEO (IA)",  icon: "solar:document-text-bold-duotone",          module: "seo-content"   },
   { href: "/admin/users",          label: "Usuarios y roles",   icon: "solar:user-id-bold-duotone",          module: "users"          },
   { href: "/admin/agent-wallets",  label: "Billeteras Rewards", icon: "solar:wallet-bold-duotone",           module: "agent-wallets"  },
   { href: "/admin/corporate-credits", label: "Créditos corporativos", icon: "solar:buildings-2-bold-duotone", module: "corporate-credits" },
