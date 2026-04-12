@@ -39,7 +39,7 @@ export default function AdminSeoArticlesPage() {
 
   const [genOpen, setGenOpen] = useState(false);
   const [genLimit, setGenLimit] = useState("5");
-  const [genLocales, setGenLocales] = useState("es");
+  const [genLocales, setGenLocales] = useState("es, en");
   const [genPublished, setGenPublished] = useState(false);
   const [genPropertyIds, setGenPropertyIds] = useState("");
   const [genCityIds, setGenCityIds] = useState("");
@@ -176,8 +176,9 @@ export default function AdminSeoArticlesPage() {
           <div className="w-full max-w-lg rounded-2xl border border-white/[0.12] bg-[#0f1228] p-6 shadow-2xl">
             <h2 className="font-sora font-bold text-lg text-white mb-1">Generar guías</h2>
             <p className="text-white/50 text-sm font-sora mb-4">
-              Usa la clave <code className="text-white/70">OPENAI_API_KEY</code> en el servidor. Sin IDs: recorre
-              propiedades publicadas. Con IDs: solo esas propiedades o ciudades.
+              Usa <code className="text-white/70">OPENAI_API_KEY</code> en el servidor. El cron suele usar{" "}
+              <code className="text-white/70">SEO_GENERATE_DAILY_LIMIT</code> (p. ej. 66/día ≈ ~10 USD/mes si cada
+              artículo ≈ 0.005 USD). Sin IDs: recorre propiedades publicadas; con IDs: solo esas filas.
             </p>
             <form onSubmit={handleGenerate} className="space-y-4">
               <div>
