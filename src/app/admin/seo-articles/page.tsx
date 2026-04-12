@@ -18,9 +18,14 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const TYPE_LABEL: Record<string, string> = {
-  property_guide: "Propiedad",
-  city_guide: "Ciudad",
+  property_guide: "Guía propiedad",
+  city_guide: "Guía ciudad",
   editorial: "Editorial",
+  industry_news: "Noticia sector",
+  platform_event: "Evento / temporada",
+  platform_promo: "Promo plataforma",
+  operator_partner_spotlight: "Spotlight partner",
+  rewards_spotlight: "Oferta Rewards",
 };
 
 function parseIds(raw: string): number[] | undefined {
