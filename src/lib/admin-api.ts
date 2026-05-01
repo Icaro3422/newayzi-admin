@@ -3,7 +3,19 @@
  * Alineado con el plan: GET /api/admin/me/, properties, connections, operators, etc.
  */
 
+function isAlmaraTravelHost(hostname: string): boolean {
+  return hostname === "almara.travel" || hostname.endsWith(".almara.travel");
+}
+
 function getApiBase(): string {
+  if (typeof window !== "undefined") {
+    const h = window.location.hostname;
+    const isLocal = h === "localhost" || h === "127.0.0.1";
+    if (!isLocal && !isAlmaraTravelHost(h)) {
+      return "";
+    }
+  }
+
   const env = process.env.NEXT_PUBLIC_API_URL?.trim();
 
   if (env) {
@@ -26,15 +38,10 @@ function getApiBase(): string {
     // → ignorar env y usar detección por hostname
   }
 
-  // Detección automática por hostname del browser
   if (typeof window !== "undefined") {
     const h = window.location.hostname;
-    if (h === "portal.newayzi.com") return "https://api.newayzi.com";
-    if (h === "admin.production.newayzi.com") return "https://api.production.newayzi.com";
-    if (h === "portal.staging.newayzi.com")
-      return "https://api.staging.newayzi.com";
-    if (h === "admin.staging.newayzi.com") return "https://api.staging.newayzi.com";
     if (h === "localhost" || h === "127.0.0.1") return "http://localhost:8000";
+    if (isAlmaraTravelHost(h)) return "https://api.almara.travel";
   }
   return "";
 }
