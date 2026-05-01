@@ -3,11 +3,16 @@
  * Alineado con el plan: GET /api/admin/me/, properties, connections, operators, etc.
  */
 
+function normalizeApiUrl(url: string): string {
+  return url.trim().replace(/\/$/, "");
+}
+
 function isAlmaraTravelHost(hostname: string): boolean {
   return hostname === "almara.travel" || hostname.endsWith(".almara.travel");
 }
 
-function getApiBase(): string {
+/** URL del backend Django (sin proxy). Solo localhost, *.almara.travel y env. */
+function getDirectApiBase(): string {
   if (typeof window !== "undefined") {
     const h = window.location.hostname;
     const isLocal = h === "localhost" || h === "127.0.0.1";
@@ -36,62 +41,22 @@ function getApiBase(): string {
   }
 
   if (typeof window !== "undefined") {
-<<<<<<< HEAD
     const h = window.location.hostname;
     if (h === "localhost" || h === "127.0.0.1") return "http://localhost:8000";
     if (isAlmaraTravelHost(h)) return "https://api.almara.travel";
-=======
-    return inferApiBaseFromHostname(window.location.hostname);
->>>>>>> main
   }
   return "";
 }
 
-/**
- * Base URL para fetch en el navegador.
- *
- * Estrategia:
- * - Dominios *.newayzi.com y newayzi.com → llamada directa al API (CORS configurado en Django).
- * - Otros (preview .vercel.app, localhost etc.) → proxy same-origin /proxy-api si está disponible.
- * - Desactivar proxy forzado: NEXT_PUBLIC_USE_SAME_ORIGIN_API_PROXY=false
- */
 function getApiBase(): string {
   const direct = getDirectApiBase();
   if (typeof window === "undefined") {
-    return direct;
+    return normalizeApiUrl(direct);
   }
   if (!direct) {
     return "";
   }
-
-  // Para dominios propios (*.newayzi.com), CORS está configurado en Django → llamar directo.
-  // Esto evita dependencia del proxy rewrite de Next.js (frágil en Vercel para URLs externas).
-  const hostname = window.location.hostname;
-  if (
-    hostname === "newayzi.com" ||
-    hostname.endsWith(".newayzi.com") ||
-    hostname === "localhost" ||
-    hostname === "127.0.0.1"
-  ) {
-    return normalizeApiUrl(direct);
-  }
-
-  const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  const proxyDisabled = process.env.NEXT_PUBLIC_USE_SAME_ORIGIN_API_PROXY === "false";
-  // Sin URL en el bundle no hay rewrite fiable → llamar directo al API.
-  if (proxyDisabled || !envUrl) {
-    return normalizeApiUrl(direct);
-  }
-  try {
-    const apiOrigin = new URL(normalizeApiUrl(direct)).origin;
-    if (window.location.origin === apiOrigin) {
-      return normalizeApiUrl(direct);
-    }
-    // Para origins no-newayzi (ej. preview de Vercel), usar el proxy same-origin.
-    return `${window.location.origin}/proxy-api`;
-  } catch {
-    return normalizeApiUrl(direct);
-  }
+  return normalizeApiUrl(direct);
 }
 
 /**
