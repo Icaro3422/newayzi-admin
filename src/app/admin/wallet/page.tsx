@@ -75,7 +75,7 @@ function AgentWalletView() {
         <Icon icon="solar:wallet-bold-duotone" className="text-3xl text-yellow-400" />
       </div>
       <h2 className="text-lg font-bold text-white mb-2">Billetera no disponible</h2>
-      <p className="text-white/50 text-sm">{error ?? "Tu billetera de Newayzi Rewards aún no ha sido activada."}</p>
+      <p className="text-white/50 text-sm">{error ?? "Tu billetera de Almara Rewards aún no ha sido activada."}</p>
     </div>
   );
 
@@ -85,7 +85,7 @@ function AgentWalletView() {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold text-white">Mi Billetera Newayzi Rewards</h1>
+        <h1 className="text-2xl font-bold text-white">Mi Billetera Almara Rewards</h1>
         <p className="text-white/50 text-sm mt-1">
           Puntos acumulados · Se convierten en descuentos y cashback en futuras reservas.
         </p>
@@ -210,7 +210,7 @@ function OperatorRewardsView({ operatorId }: { operatorId: number }) {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold text-white">Mi Participación en Newayzi Rewards</h1>
+        <h1 className="text-2xl font-bold text-white">Mi Participación en Almara Rewards</h1>
         <p className="text-white/50 text-sm mt-1">
           Como operador, contribuyes al fondo de cashback para que tus huéspedes acumulen puntos.
           A cambio, ganas mayor visibilidad y mejores condiciones en la plataforma.
@@ -277,7 +277,7 @@ function OperatorRewardsView({ operatorId }: { operatorId: number }) {
           <Icon icon="solar:file-text-bold-duotone" className="text-3xl text-amber-400 mx-auto mb-2" />
           <p className="font-bold text-white mb-1">Sin acuerdo activo</p>
           <p className="text-white/55 text-sm">
-            Aún no tienes un acuerdo comercial con Newayzi. Contacta al equipo para configurar tu participación en el programa Rewards.
+            Aún no tienes un acuerdo comercial con Almara. Contacta al equipo para configurar tu participación en el programa Rewards.
           </p>
         </div>
       )}
@@ -299,7 +299,7 @@ function OperatorRewardsView({ operatorId }: { operatorId: number }) {
               <p className="font-sora font-black text-white text-2xl">
                 {fmtCOP(stats.poolContributions)}
               </p>
-              <p className="text-white/35 text-[0.65rem] mt-0.5">contribuido al fondo Newayzi</p>
+              <p className="text-white/35 text-[0.65rem] mt-0.5">contribuido al fondo Almara</p>
             </div>
 
             <div className="rounded-2xl bg-white/[0.045] border border-white/[0.09] p-5">

@@ -8,7 +8,7 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 const slides = [
   { id: "nombre",    tag: "El origen del nombre",      content: "nombre"    },
   { id: "mision",   tag: "Nuestra misión",             content: "mision"    },
-  { id: "rewards",  tag: "Newayzi Rewards",            content: "rewards"   },
+  { id: "rewards",  tag: "Almara Rewards",            content: "rewards"   },
   { id: "niveles",  tag: "Cómo subir de nivel",        content: "niveles"   },
   { id: "ecosistema", tag: "Un ecosistema completo",   content: "ecosistema"},
   { id: "tecnologia", tag: "Tecnología que impulsa",   content: "tecnologia"},
@@ -48,21 +48,18 @@ function Card({ children, className = "" }: { children: ReactNode; className?: s
 /* ─── Slide: origen del nombre ─── */
 function SlideNombre() {
   const parts = [
-    { word: "New",     meaning: "Nuevo\nen inglés"   },
-    { word: "+",       meaning: ""                    },
-    { word: "Way",     meaning: "Lugar\nen inglés"    },
-    { word: "+",       meaning: ""                    },
-    { word: "Spazi",   meaning: "Espacio\nen italiano"},
-    { word: "=",       meaning: ""                    },
-    { word: "Newayzi", meaning: "Resultado", highlight: true },
+    { word: "Alma", meaning: "Cuidado\ny esencia" },
+    { word: "+", meaning: "" },
+    { word: "Estancia", meaning: "Hogar\ntemporal" },
+    { word: "=", meaning: "" },
+    { word: "Almara", meaning: "Experiencias\npremium", highlight: true },
   ];
   return (
     <div className="flex flex-col gap-7">
       <p className="font-sora font-light text-white leading-tight" style={{ fontSize: "clamp(1.6rem, 2.8vw, 2.5rem)" }}>
-        Nuevas formas<br /><span className="font-black">de espacios.</span>
+        Tu hogar temporal<br /><span className="font-black">por semanas o meses.</span>
       </p>
 
-      {/* Fórmula del nombre */}
       <div className="rounded-2xl border border-white/20 bg-white/[0.12] px-5 py-4 flex items-start gap-3 flex-wrap">
         {parts.map((item, i) =>
           item.meaning ? (
@@ -72,7 +69,7 @@ function SlideNombre() {
                 style={{
                   fontSize: "clamp(0.95rem, 1.6vw, 1.25rem)",
                   textDecoration: item.highlight ? "underline" : "none",
-                  textDecorationColor: "rgba(255,255,255,0.4)",
+                  textDecorationColor: "rgba(212,185,122,0.55)",
                   textUnderlineOffset: "4px",
                 }}
               >
@@ -91,7 +88,7 @@ function SlideNombre() {
       </div>
 
       <p className="font-sora text-white/85 text-[0.85rem] leading-relaxed">
-        Una marca construida desde el lenguaje: nuevo + lugar + espacio.<br />Así nació Newayzi.
+        Hospitalidad pensada para estancias extendidas, con el estándar Almara en cada detalle.
       </p>
     </div>
   );
@@ -134,7 +131,7 @@ function SlideMision({ stats }: { stats: { total_cities: number; total_room_type
   );
 }
 
-/* ─── Slide: Newayzi Rewards overview ─── */
+/* ─── Slide: Almara Rewards overview ─── */
 function SlideRewards() {
   const levels = [
     {
@@ -175,7 +172,7 @@ function SlideRewards() {
           Cada reserva te{" "}<span className="font-bold">acerca a más beneficios.</span>
         </p>
         <p className="font-sora text-white/85 text-[0.82rem] leading-relaxed mt-1.5">
-          Newayzi Rewards premia tu actividad. Cuanto más reservas, más ganas.
+          Almara Rewards premia tu actividad. Cuanto más reservas, más ganas.
         </p>
       </div>
       <div className="flex flex-col gap-2.5">
@@ -247,7 +244,7 @@ function SlideNiveles() {
   return (
     <div className="flex flex-col gap-5">
       <p className="font-sora font-light text-white leading-snug" style={{ fontSize: "clamp(1.2rem, 2vw, 1.625rem)" }}>
-        Así funciona{" "}<span className="font-bold">Newayzi Rewards.</span>
+        Así funciona{" "}<span className="font-bold">Almara Rewards.</span>
       </p>
       <div className="flex flex-col gap-2.5">
         {steps.map((step, i) => (
@@ -349,7 +346,7 @@ function SlideTecnologia() {
       bg: "bg-pink-500/20",
       ic: "text-pink-200",
       label: "Clientes que vuelven",
-      desc: "Newayzi Rewards premia la recompra. Tus usuarios regresan y tú vendes más.",
+      desc: "Almara Rewards premia la recompra. Tus usuarios regresan y tú vendes más.",
     },
     {
       icon: "solar:chart-square-bold-duotone",
@@ -448,51 +445,50 @@ function BrandPanel({ platformStats }: { platformStats: { total_cities: number; 
 
   return (
     <div
-      className="hidden lg:flex lg:w-[52%] relative overflow-hidden bg-[#080c3a] select-none"
+      className="hidden lg:flex lg:w-[52%] relative overflow-hidden bg-[#0f0f18] select-none"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* Fondos — gradiente más luminoso para mejor contraste */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 80% 90% at 60% 55%, #5a3cf8 0%, #3d28d4 35%, #1e1a6e 70%, #0d0f2e 100%)",
+            "radial-gradient(ellipse 85% 90% at 55% 45%, #2a2618 0%, #16151c 40%, #0a0908 100%)",
         }}
       />
       <div
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 55% 45% at 80% 10%, rgba(139,92,246,0.5) 0%, transparent 65%)",
+            "radial-gradient(ellipse 50% 40% at 85% 8%, rgba(184,154,94,0.22) 0%, transparent 62%)",
         }}
       />
       <div
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 45% 35% at 20% 92%, rgba(99,102,241,0.25) 0%, transparent 70%)",
+            "radial-gradient(ellipse 40% 32% at 12% 88%, rgba(212,185,122,0.12) 0%, transparent 72%)",
         }}
       />
 
-      {/* Patrón N — más sutil para no restar legibilidad */}
+      {/* Marca de agua oficial (wordmark vector/raster de marca) */}
       <div
-        className="absolute bottom-[-5%] right-[-8%] w-[72%] h-[72%] pointer-events-none"
+        className="absolute inset-0 z-[1] pointer-events-none flex items-end justify-end p-6 xl:p-10"
         aria-hidden
       >
         <img
-          src="/brand/n-patron-black.svg"
+          src="/brand/almara-white.png"
           alt=""
-          className="w-full h-full object-contain object-right-bottom"
-          style={{ filter: "invert(1)", opacity: 0.04 }}
+          className="w-[85%] max-w-[420px] max-h-[42vh] h-auto object-contain object-right-bottom select-none"
+          style={{ opacity: 0.1 }}
+          draggable={false}
         />
       </div>
 
-      {/* Barra de progreso — más visible */}
-      <div className="absolute top-0 left-0 right-0 h-[3px] bg-white/15 z-20">
+      <div className="absolute top-0 left-0 right-0 h-[3px] bg-white/10 z-20">
         <div
-          className="h-full bg-white transition-none"
-          style={{ width: `${progress}%` }}
+          className="h-full transition-none"
+          style={{ width: `${progress}%`, background: "linear-gradient(90deg, #b89a5e, #d4b97a)" }}
         />
       </div>
 
@@ -571,7 +567,7 @@ function MobileBrandSummary() {
         className="w-full flex items-center justify-between gap-2 text-left"
       >
         <span className="font-sora font-semibold text-gray-700 text-sm">
-          ¿Por qué Newayzi?
+          ¿Por qué Almara?
         </span>
         <Icon
           icon={expanded ? "solar:alt-arrow-up-bold" : "solar:alt-arrow-down-bold"}
@@ -581,12 +577,12 @@ function MobileBrandSummary() {
       {expanded && (
         <div className="mt-3 space-y-2 animate-fade-in">
           <p className="font-sora text-gray-500 text-[0.8rem] leading-snug">
-            Nuevas formas de espacios. Tecnología para operadores y agentes.
+            Estancias premium y tecnología para operadores y agentes.
           </p>
           {highlights.map((h, i) => (
             <div key={i} className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-newayzi-majorelle/10 flex items-center justify-center shrink-0">
-                <Icon icon={h.icon} className="text-newayzi-majorelle text-sm" />
+              <div className="w-7 h-7 rounded-lg bg-almara-champagne-gold/15 flex items-center justify-center shrink-0">
+                <Icon icon={h.icon} className="text-almara-champagne-gold text-sm" />
               </div>
               <span className="font-sora text-gray-700 text-[0.8rem]">{h.text}</span>
             </div>
@@ -613,18 +609,14 @@ export function AuthLayout({ children }: { children: ReactNode }) {
       <div className="w-full lg:w-[48%] flex flex-col justify-center px-5 sm:px-8 lg:px-16 xl:px-20 py-8 sm:py-10 lg:py-0 bg-white min-h-[100dvh] lg:min-h-0 overflow-y-auto">
         <div className="w-full max-w-[420px] mx-auto">
           <div className="mb-6 sm:mb-8 lg:mb-10">
-            <div className="flex items-center gap-2.5">
-              <Image
-                src="/brand/n-patron-black.svg"
-                width={32}
-                height={32}
-                alt="Newayzi"
-                className="object-contain shrink-0 sm:w-9 sm:h-9"
-              />
-              <span className="font-black font-sora tracking-[-0.03em] text-newayzi-jet text-lg sm:text-xl">
-                Newayzi
-              </span>
-            </div>
+            <Image
+              src="/brand/almara.png"
+              width={160}
+              height={48}
+              alt="Almara"
+              className="object-contain object-left w-[min(200px,55vw)] h-8 sm:h-9"
+              priority
+            />
           </div>
           {children}
         </div>

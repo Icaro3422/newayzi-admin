@@ -13,7 +13,7 @@ const localization: LocalizationResource = {
     ...esES.signIn,
     start: {
       ...esES.signIn?.start,
-      title: "Iniciar sesión en Newayzi",
+      title: "Iniciar sesión en Almara",
       subtitle: "¡Bienvenido de nuevo! Continúa para iniciar sesión.",
       actionText: "¿No tienes cuenta?",
       actionLink: "Regístrate",
@@ -23,7 +23,7 @@ const localization: LocalizationResource = {
     ...esES.signUp,
     start: {
       ...esES.signUp?.start,
-      title: "Crear cuenta en Newayzi",
+      title: "Crear cuenta en Almara",
       subtitle: "Completa los datos para acceder al panel.",
       actionText: "¿Ya tienes cuenta?",
       actionLink: "Iniciar sesión",
@@ -42,17 +42,16 @@ const localization: LocalizationResource = {
 };
 
 /**
- * Appearance Clerk: card completamente flat para integrarse al
- * panel blanco del layout split-screen. Colores de marca Newayzi.
+ * Appearance Clerk: card flat; colores marca Almara (champagne gold).
  */
 const clerkAppearance = {
   variables: {
-    colorPrimary: "#5E2CEC",
-    colorText: "#111827",
-    colorTextSecondary: "#6B7280",
+    colorPrimary: "#B89A5E",
+    colorText: "#1A1A24",
+    colorTextSecondary: "#6B6B7A",
     colorBackground: "transparent",
     colorInputBackground: "#f9fafb",
-    colorInputText: "#111827",
+    colorInputText: "#1A1A24",
     fontFamily: "var(--font-sora), system-ui, sans-serif",
     borderRadius: "10px",
     fontSize: "15px",
@@ -65,16 +64,18 @@ const clerkAppearance = {
     headerSubtitle: "font-sora text-[0.9375rem] text-gray-500 font-normal",
     formFieldLabel: "font-sora font-medium text-sm text-gray-700",
     formFieldInput: "font-sora rounded-[10px] border-[1.5px] border-gray-200 bg-gray-50 text-[0.9375rem]",
-    formButtonPrimary: "font-sora font-bold rounded-[10px] bg-gradient-to-br from-[#3d21c4] to-newayzi-majorelle",
-    formButtonReset: "font-sora text-newayzi-majorelle text-sm font-medium",
-    footerActionLink: "font-sora text-newayzi-majorelle font-semibold",
+    formButtonPrimary:
+      "font-sora font-bold rounded-[10px] bg-gradient-to-br from-[#9a7d4a] to-[#b89a5e] text-[#0f0f18]",
+    formButtonReset: "font-sora text-[#8a7346] text-sm font-medium",
+    footerActionLink: "font-sora text-[#8a7346] font-semibold",
     footerActionText: "font-sora text-gray-500",
     footer: "bg-transparent border-0 mt-5 p-0",
-    socialButtonsBlockButton: "font-sora rounded-[10px] border-[1.5px] border-gray-200 bg-white text-gray-700 font-medium",
+    socialButtonsBlockButton:
+      "font-sora rounded-[10px] border-[1.5px] border-gray-200 bg-white text-gray-700 font-medium",
     dividerText: "font-sora text-gray-400 font-medium uppercase text-[0.8125rem] tracking-wider",
     dividerLine: "bg-gray-100",
-    identityPreviewEditButton: "text-newayzi-majorelle font-sora text-sm",
-    formFieldAction: "font-sora text-newayzi-majorelle text-[0.8125rem] font-medium",
+    identityPreviewEditButton: "text-[#8a7346] font-sora text-sm",
+    formFieldAction: "font-sora text-[#8a7346] text-[0.8125rem] font-medium",
   },
 };
 
@@ -85,16 +86,13 @@ export function Providers({ children }: { children: ReactNode }) {
         placement="bottom-right"
         toastProps={{
           classNames: {
-            base: "bg-[#0f1220]/95 backdrop-blur-xl border border-white/[0.12] shadow-xl",
+            base: "bg-[#0f0f18]/95 backdrop-blur-xl border border-[#b89a5e]/20 shadow-xl",
             title: "text-white font-sora font-semibold",
             description: "text-white/70 text-sm",
           },
         }}
       />
-      <ClerkProvider
-        localization={localization}
-        appearance={clerkAppearance}
-      >
+      <ClerkProvider localization={localization} appearance={clerkAppearance}>
         {children}
       </ClerkProvider>
     </HeroUIProvider>

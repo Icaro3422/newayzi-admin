@@ -8,9 +8,9 @@ import { SignaturePad } from "@/components/contratos/SignaturePad";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
 
 const BG_GRADIENT =
-  "radial-gradient(ellipse 110% 80% at 20% 15%, #1e1060 0%, #0c0720 45%, #050310 100%)";
-const GLOW_1 = "radial-gradient(circle, rgba(94,44,236,0.18) 0%, transparent 70%)";
-const GLOW_2 = "radial-gradient(circle, rgba(66,45,246,0.10) 0%, transparent 70%)";
+  "radial-gradient(ellipse 110% 80% at 18% 12%, #1a1814 0%, #0f0f18 42%, #08080c 100%)";
+const GLOW_1 = "radial-gradient(circle, rgba(184, 154, 94, 0.16) 0%, transparent 70%)";
+const GLOW_2 = "radial-gradient(circle, rgba(212, 185, 122, 0.09) 0%, transparent 72%)";
 
 interface ContractPublicData {
   contractNumber: string;
@@ -141,7 +141,7 @@ export default function ContratoSignPage() {
     return (
       <PageShell>
         <div className="flex flex-col items-center py-24 gap-4">
-          <Icon icon="solar:loading-line-duotone" className="text-[#9b74ff] text-4xl animate-spin" />
+          <Icon icon="solar:loading-line-duotone" className="text-[#d4b97a] text-4xl animate-spin" />
           <p className="text-white/50 text-sm font-medium">Cargando contrato…</p>
         </div>
       </PageShell>
@@ -156,7 +156,7 @@ export default function ContratoSignPage() {
           iconColor="text-amber-400"
           iconBg="bg-amber-500/15 border-amber-400/25"
           title="Enlace expirado"
-          message="Este enlace de firma ya no es válido. Contacta al equipo de Newayzi para recibir un nuevo enlace."
+          message="Este enlace de firma ya no es válido. Contacta al equipo de Almara para recibir un nuevo enlace."
         />
       </PageShell>
     );
@@ -196,7 +196,7 @@ export default function ContratoSignPage() {
               href={contract.signedDocumentPdfUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-[#5e2cec] to-[#422df6] text-white hover:opacity-95 transition"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-[#b89a5e] to-[#9a7d4a] text-white hover:opacity-95 transition"
             >
               <Icon icon="solar:document-download-bold-duotone" className="text-lg" />
               Descargar PDF firmado
@@ -225,7 +225,7 @@ export default function ContratoSignPage() {
               href={signedPdfUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-[#5e2cec] to-[#422df6] text-white shadow-lg shadow-[#5e2cec]/25 hover:opacity-95 transition"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-[#b89a5e] to-[#9a7d4a] text-white shadow-lg shadow-[#b89a5e]/25 hover:opacity-95 transition"
             >
               <Icon icon="solar:document-download-bold-duotone" className="text-xl" />
               Descargar PDF firmado
@@ -248,7 +248,7 @@ export default function ContratoSignPage() {
   return (
     <PageShell wide>
       <div className="mb-8">
-        <p className="text-[#9b74ff] text-[0.65rem] uppercase tracking-[0.14em] font-bold mb-2">Firma digital requerida</p>
+        <p className="text-[#d4b97a] text-[0.65rem] uppercase tracking-[0.14em] font-bold mb-2">Firma digital requerida</p>
         <h1 className="font-sora font-extrabold text-white text-2xl sm:text-[1.65rem] tracking-tight leading-tight mb-2">
           {contract.title}
         </h1>
@@ -259,7 +259,7 @@ export default function ContratoSignPage() {
         <div className="flex flex-wrap gap-x-4 gap-y-2 mt-4 text-xs text-white/50">
           {contract.validFrom && (
             <span className="inline-flex items-center gap-1.5">
-              <Icon icon="solar:calendar-bold-duotone" className="text-[#7c5cfc]/80 text-sm" />
+              <Icon icon="solar:calendar-bold-duotone" className="text-[#d4b97a]/80 text-sm" />
               Vigencia: {fmtDate(contract.validFrom)}
               {contract.validUntil ? ` → ${fmtDate(contract.validUntil)}` : " (indefinido)"}
             </span>
@@ -267,7 +267,7 @@ export default function ContratoSignPage() {
           {contract.signedByNewayziName && (
             <span className="inline-flex items-center gap-1.5">
               <Icon icon="solar:verified-check-bold-duotone" className="text-emerald-400/90 text-sm" />
-              Firmado por Newayzi: {contract.signedByNewayziName}
+              Firmado por Almara: {contract.signedByNewayziName}
             </span>
           )}
         </div>
@@ -299,7 +299,7 @@ export default function ContratoSignPage() {
       <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 sm:p-6 mb-6">
         <p className="text-white/50 text-sm font-medium mb-4">
           Completa tu firma electrónica. Se generará un PDF que incluye este documento y una página de anexo con tu firma,
-          nombre, fecha e IP, alineado con los registros de Newayzi.
+          nombre, fecha e IP, alineado con los registros de Almara.
         </p>
 
         <SignaturePad onDataUrlChange={setSignatureDataUrl} className="mb-5" />
@@ -311,7 +311,7 @@ export default function ContratoSignPage() {
             onClick={() => fileInputRef.current?.click()}
             className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold border border-white/[0.14] text-white/80 hover:bg-white/[0.06] transition flex items-center justify-center gap-2"
           >
-            <Icon icon="solar:gallery-add-bold-duotone" className="text-lg text-[#9b74ff]" />
+            <Icon icon="solar:gallery-add-bold-duotone" className="text-lg text-[#d4b97a]" />
             Subir imagen de firma (PNG o JPEG)
           </button>
           {signatureDataUrl && (
@@ -328,7 +328,7 @@ export default function ContratoSignPage() {
               Tu nombre completo *
             </label>
             <input
-              className="w-full bg-white/[0.06] border border-white/[0.12] rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#7c5cfc]/70 focus:ring-1 focus:ring-[#7c5cfc]/35 transition"
+              className="w-full bg-white/[0.06] border border-white/[0.12] rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#d4b97a]/70 focus:ring-1 focus:ring-[#d4b97a]/35 transition"
               value={operatorName}
               onChange={e => setOperatorName(e.target.value)}
               placeholder="Nombre completo del representante legal"
@@ -344,7 +344,7 @@ export default function ContratoSignPage() {
           >
             <span
               className={`mt-0.5 shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition pointer-events-none ${
-                accepted ? "bg-[#5e2cec] border-[#5e2cec]" : "bg-transparent border-white/35 group-hover:border-white/55"
+                accepted ? "bg-[#b89a5e] border-[#b89a5e]" : "bg-transparent border-white/35 group-hover:border-white/55"
               }`}
               aria-hidden
             >
@@ -363,7 +363,7 @@ export default function ContratoSignPage() {
             </div>
           )}
 
-          <div className="rounded-xl bg-[#5e2cec]/10 border border-[#5e2cec]/25 px-4 py-3 text-white/45 text-xs leading-relaxed">
+          <div className="rounded-xl bg-[#b89a5e]/10 border border-[#b89a5e]/25 px-4 py-3 text-white/45 text-xs leading-relaxed">
             Al confirmar, se adjuntará tu firma al expediente, se guardará el PDF firmado y se registrarán fecha/hora e IP
             como evidencia. Esta acción es irreversible.
           </div>
@@ -372,7 +372,7 @@ export default function ContratoSignPage() {
             type="button"
             onClick={handleSign}
             disabled={signing || !operatorName.trim() || !accepted || !signatureDataUrl}
-            className="w-full py-3.5 rounded-2xl font-sora font-bold text-white text-sm bg-gradient-to-r from-[#5e2cec] via-[#6b3df0] to-[#422df6] hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 shadow-lg shadow-[#5e2cec]/20"
+            className="w-full py-3.5 rounded-2xl font-sora font-bold text-white text-sm bg-gradient-to-r from-[#b89a5e] via-[#6b3df0] to-[#9a7d4a] hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2 shadow-lg shadow-[#b89a5e]/20"
           >
             {signing ? (
               <>
@@ -405,19 +405,15 @@ function PageShell({ children, wide = false }: { children: React.ReactNode; wide
       />
 
       <div className={`relative z-10 mx-auto px-4 py-10 sm:py-14 ${wide ? "max-w-3xl" : "max-w-lg"}`}>
-        <header className="flex items-center gap-3 mb-10">
+        <header className="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-4 mb-10">
           <img
-            src="/brand/n-patron-black.svg"
-            alt="Newayzi"
-            width={44}
+            src="/brand/almara-white.png"
+            alt="Almara"
+            width={140}
             height={44}
-            className="shrink-0"
-            style={{ filter: "invert(1) brightness(1.15)" }}
+            className="shrink-0 h-8 sm:h-9 w-auto object-contain object-left"
           />
-          <div>
-            <span className="font-sora font-extrabold text-white text-xl tracking-tight block leading-none">Newayzi</span>
-            <span className="text-white/40 text-xs font-medium mt-1 block">Portal de firma de contratos</span>
-          </div>
+          <span className="text-white/40 text-xs font-medium sm:pb-0.5">Portal de firma de contratos</span>
         </header>
 
         <div className="rounded-3xl border border-white/[0.09] bg-[#0f1220]/75 backdrop-blur-xl p-6 sm:p-9 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
@@ -425,9 +421,12 @@ function PageShell({ children, wide = false }: { children: React.ReactNode; wide
         </div>
 
         <p className="text-center text-white/25 text-xs mt-8 font-medium">
-          © {new Date().getFullYear()} Newayzi ·{" "}
-          <a href="https://newayzi.com" className="text-white/35 hover:text-white/50 underline-offset-2 hover:underline">
-            newayzi.com
+          © {new Date().getFullYear()} Almara ·{" "}
+          <a
+            href="https://almara.travel"
+            className="text-white/35 hover:text-white/50 underline-offset-2 hover:underline"
+          >
+            almara.travel
           </a>
         </p>
       </div>

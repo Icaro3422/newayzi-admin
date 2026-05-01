@@ -152,7 +152,7 @@ const MenuBar = ({ editor, dark }: { editor: ReturnType<typeof useEditor>; dark?
   if (!editor) return null;
 
   const btnBase = dark ? "text-white/70 hover:bg-white/10" : "text-gray-700";
-  const btnActive = dark ? "bg-[#5e2cec]/30 text-[#b89eff]" : "bg-newayzi-han-purple/20 text-newayzi-han-purple";
+  const btnActive = dark ? "bg-[#b89a5e]/30 text-[#f0e6d2]" : "bg-newayzi-han-purple/20 text-newayzi-han-purple";
 
   return (
     <div className={`flex flex-wrap gap-1 border-b p-2 rounded-t-lg ${
@@ -299,7 +299,7 @@ const MenuBar = ({ editor, dark }: { editor: ReturnType<typeof useEditor>; dark?
                   color="primary"
                   onPress={handleSetLink}
                   isLoading={linkLoading}
-                  className={dark ? "bg-[#5e2cec] hover:bg-[#6d3cf5] text-white" : ""}
+                  className={dark ? "bg-[#b89a5e] hover:bg-[#6d3cf5] text-white" : ""}
                 >
                   {linkLoading ? "Obteniendo vista previa…" : "Aplicar"}
                 </Button>
@@ -408,7 +408,7 @@ export function EmailRichEditor({
           margin: 0.5em 0;
         }
         .ProseMirror blockquote {
-          border-left: 4px solid #9b74ff;
+          border-left: 4px solid #d4b97a;
           padding-left: 1em;
           margin: 1em 0;
           color: inherit;
@@ -416,12 +416,12 @@ export function EmailRichEditor({
           opacity: 0.9;
         }
         .ProseMirror a {
-          color: #9b74ff;
+          color: #d4b97a;
           text-decoration: underline;
           cursor: pointer;
         }
         .ProseMirror a:hover {
-          color: #b89eff;
+          color: #f0e6d2;
         }
         .ProseMirror hr {
           border: none;

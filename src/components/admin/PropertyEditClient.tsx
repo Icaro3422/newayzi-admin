@@ -50,8 +50,8 @@ function SectionHeader({
   icon,
   title,
   subtitle,
-  iconBg = "from-[#5e2cec]/20 to-[#9b74ff]/20",
-  iconColor = "text-[#9b74ff]",
+  iconBg = "from-[#b89a5e]/20 to-[#d4b97a]/20",
+  iconColor = "text-[#d4b97a]",
   action,
 }: {
   icon: string;
@@ -568,7 +568,7 @@ export function PropertyEditClient() {
   if (loading) {
     return (
       <GlassCard className="flex justify-center items-center py-16">
-        <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+        <Spinner size="lg" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }} />
       </GlassCard>
     );
   }
@@ -700,7 +700,7 @@ export function PropertyEditClient() {
                 <Button
                   size="sm"
                   variant="flat"
-                  className="rounded-xl border border-[#5e2cec]/40 bg-[#5e2cec]/20 text-[#d4c4ff] font-medium"
+                  className="rounded-xl border border-[#b89a5e]/40 bg-[#b89a5e]/20 text-[#d4c4ff] font-medium"
                   isLoading={aiSuggesting}
                   startContent={!aiSuggesting ? <Icon icon="solar:magic-stick-3-bold-duotone" width={18} /> : undefined}
                   onPress={suggestDescriptionWithAi}
@@ -731,10 +731,10 @@ export function PropertyEditClient() {
             <div className="flex flex-wrap gap-2 mb-3">
               {amenities.length === 0 && <span className="text-sm text-white/30 italic">Sin amenidades registradas</span>}
               {amenities.map((a, idx) => (
-                <span key={`amenity-${idx}-${a}`} className="inline-flex items-center gap-1.5 rounded-full bg-[#5e2cec]/25 border border-[#5e2cec]/30 px-3 py-1.5 text-sm font-medium text-[#b89eff]">
+                <span key={`amenity-${idx}-${a}`} className="inline-flex items-center gap-1.5 rounded-full bg-[#b89a5e]/25 border border-[#b89a5e]/30 px-3 py-1.5 text-sm font-medium text-[#f0e6d2]">
                   {a}
                   {!readOnly && (
-                    <button type="button" onClick={() => setAmenities(amenities.filter((x) => x !== a))} className="hover:bg-[#5e2cec]/30 rounded-full p-0.5 transition-colors text-white/80">
+                    <button type="button" onClick={() => setAmenities(amenities.filter((x) => x !== a))} className="hover:bg-[#b89a5e]/30 rounded-full p-0.5 transition-colors text-white/80">
                       <Icon icon="solar:close-circle-outline" width={16} />
                     </button>
                   )}
@@ -952,13 +952,13 @@ export function PropertyEditClient() {
                         value={cityQuery}
                         onChange={(e) => setCityQuery(e.target.value)}
                         placeholder="Buscar ciudad…"
-                        className="w-full bg-white/[0.06] rounded-xl px-3 py-2 text-sm text-white/90 outline-none placeholder:text-white/35 border border-white/[0.1] focus:border-[#5e2cec]/60"
+                        className="w-full bg-white/[0.06] rounded-xl px-3 py-2 text-sm text-white/90 outline-none placeholder:text-white/35 border border-white/[0.1] focus:border-[#b89a5e]/60"
                       />
                     </div>
                     <div className="max-h-56 overflow-y-auto">
                       {citySearching && (
                         <div className="flex items-center justify-center py-4">
-                          <Spinner size="sm" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#9b74ff]" }} />
+                          <Spinner size="sm" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#d4b97a]" }} />
                         </div>
                       )}
                       {!citySearching && cityQuery.length < 2 && (
@@ -1013,7 +1013,7 @@ export function PropertyEditClient() {
               <span className="text-xs text-white/45 font-sora">Conexiones PMS</span>
               <div className="flex flex-wrap gap-2 mt-1">
                 {property.pms_connections.map((c) => (
-                  <span key={c.id} className="inline-flex items-center gap-1 rounded-full bg-[#5e2cec]/20 border border-[#5e2cec]/25 px-3 py-1 text-xs text-[#b89eff]">
+                  <span key={c.id} className="inline-flex items-center gap-1 rounded-full bg-[#b89a5e]/20 border border-[#b89a5e]/25 px-3 py-1 text-xs text-[#f0e6d2]">
                     <Icon icon="solar:plug-circle-bold" width={12} />
                     {c.name} <span className="text-white/40">({c.pms_type})</span>
                   </span>
@@ -1268,7 +1268,7 @@ export function PropertyEditClient() {
                     </div>
                   )}
                   {rt.pms && (
-                    <span className="absolute top-2 left-2 text-[0.65rem] font-semibold px-2 py-0.5 rounded-full bg-[#5e2cec]/85 text-white border border-white/20">
+                    <span className="absolute top-2 left-2 text-[0.65rem] font-semibold px-2 py-0.5 rounded-full bg-[#b89a5e]/85 text-white border border-white/20">
                       PMS
                     </span>
                   )}
@@ -1288,7 +1288,7 @@ export function PropertyEditClient() {
                     )}
                     {rt.area_sqm != null && <span>{rt.area_sqm} m²</span>}
                     {rt.base_rates?.[0] && (
-                      <span className="text-[#b89eff]">
+                      <span className="text-[#f0e6d2]">
                         {formatPmsMoney(rt.base_rates[0].price_per_night, rt.base_rates[0].currency)}/noche
                       </span>
                     )}
@@ -1297,7 +1297,7 @@ export function PropertyEditClient() {
                     <Button
                       as={Link}
                       href={`/admin/properties/${propertyId}/room-types/${rt.id}`}
-                      className="w-full font-semibold bg-[#5e2cec]/30 border border-[#5e2cec]/50 text-[#e8deff]"
+                      className="w-full font-semibold bg-[#b89a5e]/30 border border-[#b89a5e]/50 text-[#f5f0e8]"
                       size="sm"
                       startContent={<Icon icon="solar:pen-new-round-bold-duotone" width={18} />}
                     >

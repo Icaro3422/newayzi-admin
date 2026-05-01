@@ -62,7 +62,7 @@ function AccentCard({ children, className = "" }: { children: React.ReactNode; c
     <div
       className={`rounded-[28px] p-6 relative overflow-hidden ${className}`}
       style={{
-        background: "radial-gradient(ellipse 90% 80% at 60% 55%, #5e2cec 0%, #3d21c4 45%, #2a178a 100%)",
+        background: "radial-gradient(ellipse 90% 80% at 60% 55%, #b89a5e 0%, #8a7346 45%, #2a178a 100%)",
       }}
     >
       <div
@@ -80,7 +80,7 @@ function StatChip({ label, value, icon, loading }: { label: string; value?: numb
     <div className="flex flex-col gap-1 min-w-0">
       <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.12em] font-semibold whitespace-nowrap">{label}</p>
       <div className="flex items-center gap-1.5">
-        <Icon icon={icon} className="text-[#7c4cff] text-sm shrink-0" />
+        <Icon icon={icon} className="text-[#d4b97a] text-sm shrink-0" />
         <p className="font-sora font-black text-white text-2xl leading-none">
           {loading || value == null ? (
             <span className="inline-block w-10 h-6 rounded-md bg-white/10 animate-pulse" />
@@ -100,8 +100,8 @@ function QuickLink({ href, icon, label, count }: { href: string; icon: string; l
       className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3 bg-white/[0.05] hover:bg-white/[0.10] border border-white/[0.07] transition-all duration-200 group"
     >
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-xl bg-[#5e2cec]/20 flex items-center justify-center shrink-0">
-          <Icon icon={icon} className="text-[#9b74ff] text-base" />
+        <div className="w-8 h-8 rounded-xl bg-[#b89a5e]/20 flex items-center justify-center shrink-0">
+          <Icon icon={icon} className="text-[#d4b97a] text-base" />
         </div>
         <p className="text-white/80 text-[0.8125rem] font-medium group-hover:text-white transition-colors">{label}</p>
       </div>
@@ -204,10 +204,10 @@ export function AdminDashboardClient() {
               {roleMeta?.description} — Accedé a la disponibilidad desde el menú lateral.
             </p>
             {me?.agency?.inventory_hint && (
-              <div className="mt-3 flex items-start gap-2.5 rounded-2xl border border-[#5e2cec]/30 bg-[#5e2cec]/12 px-3.5 py-2.5">
+              <div className="mt-3 flex items-start gap-2.5 rounded-2xl border border-[#b89a5e]/30 bg-[#b89a5e]/12 px-3.5 py-2.5">
                 <Icon
                   icon="solar:buildings-2-bold-duotone"
-                  className="text-[#b89eff] shrink-0 mt-0.5"
+                  className="text-[#f0e6d2] shrink-0 mt-0.5"
                   width={18}
                 />
                 <p className="text-[0.8125rem] text-white/75 leading-relaxed">{me.agency.inventory_hint}</p>
@@ -226,7 +226,7 @@ export function AdminDashboardClient() {
           <AccentCard className="flex flex-col">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Newayzi Rewards</p>
+                <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Almara Rewards</p>
                 <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">Nivel {loyalty.level}</p>
               </div>
               <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
@@ -276,7 +276,7 @@ export function AdminDashboardClient() {
               <div key={s.label} className="rounded-2xl bg-white/[0.04] border border-white/[0.06] px-4 py-3">
                 <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.1em] font-semibold truncate">{s.label}</p>
                 <div className="flex items-center gap-2 mt-1.5">
-                  <Icon icon={s.icon} className="text-[#7c4cff] text-base shrink-0" />
+                  <Icon icon={s.icon} className="text-[#d4b97a] text-base shrink-0" />
                   <p className="font-sora font-black text-white text-2xl leading-none">
                     {loading ? <span className="inline-block w-8 h-5 rounded bg-white/10 animate-pulse" /> : (s.value ?? "—")}
                   </p>
@@ -299,17 +299,17 @@ export function AdminDashboardClient() {
       {/* ── Bienvenida (arriba del todo) ── */}
       <GlassCard
         className="flex flex-row items-center gap-4 py-4 px-5"
-        style={{ borderLeft: `4px solid ${roleMeta?.color ?? "#5e2cec"}50` }}
+        style={{ borderLeft: `4px solid ${roleMeta?.color ?? "#b89a5e"}50` }}
       >
         <div
           className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: `${roleMeta?.color ?? "#5e2cec"}20` }}
+          style={{ background: `${roleMeta?.color ?? "#b89a5e"}20` }}
         >
-          <Icon icon={roleMeta?.icon ?? "solar:home-2-bold-duotone"} className="text-xl" style={{ color: roleMeta?.color ?? "#9b74ff" }} />
+          <Icon icon={roleMeta?.icon ?? "solar:home-2-bold-duotone"} className="text-xl" style={{ color: roleMeta?.color ?? "#d4b97a" }} />
         </div>
         <div className="min-w-0">
           <p className="font-sora font-bold text-white text-[0.9375rem] leading-tight">
-            {role === "operador" ? `Hola, ${displayName} — tu panel de gestión` : `Bienvenido al panel de administración de Newayzi`}
+            {role === "operador" ? `Hola, ${displayName} — tu panel de gestión` : `Bienvenido al panel de administración de Almara`}
           </p>
           <p className="mt-1 text-[0.8125rem] text-white/60 leading-relaxed">
             {roleMeta?.description ?? "Usa el menú lateral para navegar. Los ítems visibles dependen de tu rol."}
@@ -356,8 +356,8 @@ export function AdminDashboardClient() {
                 Propiedades y conexiones
               </p>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
-              <Icon icon="solar:graph-up-bold-duotone" className="text-[#9b74ff] text-base" />
+            <div className="w-9 h-9 rounded-xl bg-[#b89a5e]/25 flex items-center justify-center shrink-0">
+              <Icon icon="solar:graph-up-bold-duotone" className="text-[#d4b97a] text-base" />
             </div>
           </div>
 
@@ -456,7 +456,7 @@ export function AdminDashboardClient() {
 
         {/* Fila 2: Programa de Socios / Rewards + Accesos rápidos */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-5">
-        {/* Card: Programa de Socios (operador), Newayzi Rewards (agente), o nada (comercial/super_admin) */}
+        {/* Card: Programa de Socios (operador), Almara Rewards (agente), o nada (comercial/super_admin) */}
         {role === "operador" ? (() => {
           const ag = operatorRewards?.activeAgreement ?? null;
           const stats = operatorRewards?.stats;
@@ -496,7 +496,7 @@ export function AdminDashboardClient() {
                     {ag
                       ? activeTier
                         ? activeTier.benefits[0]
-                        : "Tu propiedad participa en Newayzi Rewards con los beneficios del acuerdo firmado."
+                        : "Tu propiedad participa en Almara Rewards con los beneficios del acuerdo firmado."
                       : "Activa un nivel para que tus huéspedes reciban cashback en sus reservas y ganes visibilidad en el marketplace."}
                   </p>
                 </div>
@@ -595,7 +595,7 @@ export function AdminDashboardClient() {
                         <p className="text-white/75 text-[0.72rem] font-semibold">Próximo escalón</p>
                         <p className="text-white/50 text-[0.68rem] leading-snug mt-0.5">
                           <span className="text-white/80">{nextTier.name}</span> — {nextTier.benefits[0].toLowerCase()}{" "}
-                          Habla con Newayzi para evaluar un upgrade cuando tu operación lo permita.
+                          Habla con Almara para evaluar un upgrade cuando tu operación lo permita.
                         </p>
                       </div>
                     </div>
@@ -605,7 +605,7 @@ export function AdminDashboardClient() {
                     <div className="rounded-xl bg-amber-500/10 border border-amber-400/20 px-3.5 py-2.5 mb-3 flex items-center gap-2">
                       <Icon icon="mdi:star-four-points" className="text-amber-300 text-lg shrink-0" />
                       <p className="text-amber-100/90 text-[0.72rem] leading-snug">
-                        Estás en el nivel máximo del programa. Gracias por ser socio estratégico Newayzi.
+                        Estás en el nivel máximo del programa. Gracias por ser socio estratégico Almara.
                       </p>
                     </div>
                   )}
@@ -673,7 +673,7 @@ export function AdminDashboardClient() {
                       <div>
                         <p className="text-white/90 text-[0.78rem] font-semibold leading-tight">¿Cómo activarlo?</p>
                         <p className="text-white/60 text-[0.72rem] leading-relaxed mt-1">
-                          Escríbenos desde tu canal habitual con Newayzi. Firmarás un acuerdo de socio, configuramos tu
+                          Escríbenos desde tu canal habitual con Almara. Firmarás un acuerdo de socio, configuramos tu
                           porcentaje de cashback y tus huéspedes empezarán a ver recompensas en el checkout.
                         </p>
                       </div>
@@ -732,7 +732,7 @@ export function AdminDashboardClient() {
           <AccentCard className="flex flex-col">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Newayzi Rewards</p>
+                <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Almara Rewards</p>
                 <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
                   {loyalty ? `Nivel ${loyalty.level}` : "Programa de lealtad"}
                 </p>
@@ -770,7 +770,7 @@ export function AdminDashboardClient() {
                     </div>
                     <div className="w-full h-1.5 rounded-full overflow-hidden bg-white/10">
                       <div
-                        className="h-full rounded-full bg-[#9b74ff] transition-all duration-700"
+                        className="h-full rounded-full bg-[#d4b97a] transition-all duration-700"
                         style={{
                           width: `${Math.min(
                             (loyalty.progressToNextLevel.current / loyalty.progressToNextLevel.required) * 100,
@@ -804,7 +804,7 @@ export function AdminDashboardClient() {
                 </p>
                 {[
                   { name: "Member", badge: "Nivel base", color: "30%", accent: "rgba(160,160,180,0.9)" },
-                  { name: "Plus", badge: "Nivel medio", color: "60%", accent: "#9b74ff" },
+                  { name: "Plus", badge: "Nivel medio", color: "60%", accent: "#d4b97a" },
                   { name: "Premium", badge: "Nivel máximo", color: "95%", accent: "#fbbf24" },
                 ].map((lvl) => (
                   <div
@@ -847,8 +847,8 @@ export function AdminDashboardClient() {
                 {role === "operador" ? "Tu gestión" : "Módulos del panel"}
               </p>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
-              <Icon icon="solar:widget-5-bold-duotone" className="text-[#9b74ff] text-base" />
+            <div className="w-9 h-9 rounded-xl bg-[#b89a5e]/25 flex items-center justify-center shrink-0">
+              <Icon icon="solar:widget-5-bold-duotone" className="text-[#d4b97a] text-base" />
             </div>
           </div>
           <div className="flex flex-col gap-2">

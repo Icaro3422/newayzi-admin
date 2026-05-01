@@ -106,7 +106,7 @@ export function RewardPoolStatus() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">
-            Newayzi Rewards
+            Almara Rewards
           </p>
           <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
             Reward Pool — Fondo central

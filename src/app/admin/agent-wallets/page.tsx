@@ -102,9 +102,9 @@ export default function AgentWalletsPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Billeteras Newayzi Rewards</h1>
+          <h1 className="text-2xl font-bold text-white">Billeteras Almara Rewards</h1>
           <p className="text-white/50 text-sm mt-1">
-            Los puntos del equipo interno son los mismos puntos del programa Newayzi Rewards.
+            Los puntos del equipo interno son los mismos puntos del programa Almara Rewards.
           </p>
         </div>
         <div className="text-right">

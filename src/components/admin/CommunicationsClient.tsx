@@ -184,7 +184,7 @@ export function CommunicationsClient() {
   if (loading) {
     return (
       <GlassCard className="flex justify-center items-center py-16">
-        <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+        <Spinner size="lg" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }} />
       </GlassCard>
     );
   }
@@ -195,8 +195,8 @@ export function CommunicationsClient() {
       <GlassCard className="p-5">
         <div className="flex items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
-              <Icon icon="solar:document-text-bold-duotone" className="text-[#9b74ff] text-base" />
+            <div className="w-9 h-9 rounded-xl bg-[#b89a5e]/25 flex items-center justify-center shrink-0">
+              <Icon icon="solar:document-text-bold-duotone" className="text-[#d4b97a] text-base" />
             </div>
             <div>
               <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Plantillas</p>
@@ -206,7 +206,7 @@ export function CommunicationsClient() {
             </div>
           </div>
           {templateId && (
-            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-[#5e2cec]/25 border border-[#5e2cec]/30 text-[#b89eff]">
+            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-[#b89a5e]/25 border border-[#b89a5e]/30 text-[#f0e6d2]">
               <Icon icon="solar:document-text-bold" width={14} />
               {templates.find((t) => t.id === templateId)?.name ?? "Seleccionada"}
             </span>
@@ -226,7 +226,7 @@ export function CommunicationsClient() {
                   onClick={() => setTemplateId(t.id)}
                   className={`w-full max-w-md text-left rounded-2xl border p-4 transition-all ${
                     templateId === t.id
-                      ? "border-[#5e2cec]/50 bg-[#5e2cec]/15 ring-2 ring-[#5e2cec]/25"
+                      ? "border-[#b89a5e]/50 bg-[#b89a5e]/15 ring-2 ring-[#b89a5e]/25"
                       : "border-white/[0.1] bg-white/[0.03] hover:border-white/[0.14] hover:bg-white/[0.06]"
                   }`}
                 >
@@ -240,7 +240,7 @@ export function CommunicationsClient() {
                     {templateId === t.id && (
                       <Icon
                         icon="solar:check-circle-bold"
-                        className="text-[#9b74ff] flex-shrink-0"
+                        className="text-[#d4b97a] flex-shrink-0"
                         width={24}
                       />
                     )}
@@ -281,7 +281,7 @@ export function CommunicationsClient() {
           <ModalBody>
             {previewLoading ? (
               <div className="flex justify-center py-12">
-                <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+                <Spinner size="lg" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }} />
               </div>
             ) : previewHtml ? (
               <div
@@ -296,8 +296,8 @@ export function CommunicationsClient() {
       {/* Formulario de envío */}
       <GlassCard className="p-5">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
-            <Icon icon="solar:letter-bold-duotone" className="text-[#9b74ff] text-base" />
+          <div className="w-9 h-9 rounded-xl bg-[#b89a5e]/25 flex items-center justify-center shrink-0">
+            <Icon icon="solar:letter-bold-duotone" className="text-[#d4b97a] text-base" />
           </div>
           <div>
             <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Envío</p>
@@ -362,14 +362,14 @@ export function CommunicationsClient() {
                 className={`rounded-xl border p-4 ${
                   groupId === "custom"
                     ? "border-amber-400/30 bg-amber-500/15"
-                    : "border-[#5e2cec]/30 bg-[#5e2cec]/10"
+                    : "border-[#b89a5e]/30 bg-[#b89a5e]/10"
                 }`}
               >
                 <div className="flex items-center gap-2">
                   <Icon
                     icon="solar:users-group-rounded-outline"
                     width={20}
-                    className={groupId === "custom" ? "text-amber-400" : "text-[#9b74ff]"}
+                    className={groupId === "custom" ? "text-amber-400" : "text-[#d4b97a]"}
                   />
                   <div>
                     <p className="font-medium text-white">
@@ -447,13 +447,13 @@ export function CommunicationsClient() {
               theme="dark"
             />
             <p className="text-xs text-white/50">
-              El contenido se enviará con el formato de la plantilla Newayzi (logo, políticas, etc.)
+              El contenido se enviará con el formato de la plantilla Almara (logo, políticas, etc.)
             </p>
           </div>
 
           <div className="rounded-2xl border border-white/[0.1] bg-white/[0.03] p-5 space-y-3">
             <div className="flex items-center gap-2">
-              <Icon icon="solar:link-circle-bold" width={20} className="text-[#9b74ff]" />
+              <Icon icon="solar:link-circle-bold" width={20} className="text-[#d4b97a]" />
               <span className="text-sm font-medium text-white/80">
                 Botón CTA (opcional)
               </span>

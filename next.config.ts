@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 /** Solo si está definido en build; sin esto no registrar rewrite (evita 404 en /proxy-api).
  *  Normaliza la URL: si no lleva protocolo, añade https:// para que Next.js pueda hacer el rewrite.
- *  Funciona tanto con "api.production.newayzi.com" como con "https://api.production.newayzi.com".
+ *  Funciona con host con o sin protocolo (ej. api.almara.travel o https://api.almara.travel).
  */
 function normalizeUpstreamUrl(raw: string): string {
   const trimmed = raw.trim().replace(/\/$/, "");

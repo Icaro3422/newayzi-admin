@@ -176,12 +176,12 @@ export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
               }}
             />
 
-            {/* Newayzi Rewards: solo plataforma puede fijar nivel/puntos en el alta */}
+            {/* Almara Rewards: solo plataforma puede fijar nivel/puntos en el alta */}
             {isSuperAdmin ? (
               <div className="border-t border-white/[0.08] pt-4">
                 <p className="text-xs text-white/50 uppercase tracking-wider font-medium mb-3 flex items-center gap-1.5">
-                  <Icon icon="solar:star-bold" width={14} className="text-[#b89eff]" />
-                  Newayzi Rewards — configuración inicial
+                  <Icon icon="solar:star-bold" width={14} className="text-[#f0e6d2]" />
+                  Almara Rewards — configuración inicial
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <Select

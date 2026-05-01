@@ -52,7 +52,7 @@ const GLASS =
   "rounded-[24px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl";
 
 const INPUT_CLS =
-  "bg-white/[0.07] border border-white/[0.12] rounded-xl px-2 py-1.5 text-white text-sm text-right focus:outline-none focus:border-[#5e2cec]/60 focus:bg-white/[0.1] transition-colors";
+  "bg-white/[0.07] border border-white/[0.12] rounded-xl px-2 py-1.5 text-white text-sm text-right focus:outline-none focus:border-[#b89a5e]/60 focus:bg-white/[0.1] transition-colors";
 
 // ---------------------------------------------------------------------------
 // Pure helpers
@@ -112,7 +112,7 @@ function SummaryCard({
   return (
     <div
       className={`${GLASS} p-4 flex flex-col gap-2 ${
-        highlight ? "border-[#5e2cec]/35 bg-[#5e2cec]/[0.09]" : ""
+        highlight ? "border-[#b89a5e]/35 bg-[#b89a5e]/[0.09]" : ""
       }`}
     >
       <div className="flex items-center gap-2">
@@ -144,7 +144,7 @@ function PeriodToggle({
           onClick={() => onChange(p)}
           className={`flex-1 py-1.5 px-3 text-sm transition-all whitespace-nowrap ${
             value === p
-              ? "bg-[#5e2cec] text-white font-semibold"
+              ? "bg-[#b89a5e] text-white font-semibold"
               : "bg-white/[0.04] text-white/50 hover:text-white/80"
           }`}
         >
@@ -170,7 +170,7 @@ function CurrencyToggle({
           onClick={() => onChange(c)}
           className={`flex-1 py-1.5 px-3 text-sm transition-all ${
             value === c
-              ? "bg-[#5e2cec] text-white font-semibold"
+              ? "bg-[#b89a5e] text-white font-semibold"
               : "bg-white/[0.04] text-white/50 hover:text-white/80"
           }`}
         >
@@ -294,7 +294,7 @@ export function RevenueSimulatorClient() {
       backgroundColor: "transparent",
       tooltip: {
         backgroundColor: "rgba(10,10,20,0.95)",
-        borderColor: "rgba(94,44,236,0.45)",
+        borderColor: "rgba(184, 154, 94,0.45)",
         borderWidth: 1,
         textStyle: { color: "#e5e5e5", fontSize: 12 },
         trigger: "axis",
@@ -342,7 +342,7 @@ export function RevenueSimulatorClient() {
               x2: 1,
               y2: 0,
               colorStops: [
-                { offset: 0, color: "#422df6" },
+                { offset: 0, color: "#9a7d4a" },
                 { offset: 1, color: "#9430cf" },
               ],
             },
@@ -382,7 +382,7 @@ export function RevenueSimulatorClient() {
       {/* Header */}
       <AdminPageHeader
         title="Simulador de Ingresos"
-        subtitle={`Proyecta cuánto factura Newayzi con el ${params.commissionRate}% de comisión según el portafolio actual de operadores.`}
+        subtitle={`Proyecta cuánto factura Almara con el ${params.commissionRate}% de comisión según el portafolio actual de operadores.`}
       >
         <button
           onClick={resetAll}
@@ -396,7 +396,7 @@ export function RevenueSimulatorClient() {
       {/* Global Parameters Card */}
       <div className={`${GLASS} p-6`}>
         <div className="flex items-center gap-2 mb-5">
-          <div className="w-8 h-8 rounded-lg bg-[#5e2cec]/20 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-[#b89a5e]/20 flex items-center justify-center shrink-0">
             <Icon icon="solar:settings-bold-duotone" className="text-[#a78bfa] text-lg" />
           </div>
           <div>
@@ -413,7 +413,7 @@ export function RevenueSimulatorClient() {
           {/* Commission rate */}
           <div className="lg:col-span-2">
             <label className="text-xs text-white/50 mb-2 block font-sora font-medium">
-              Comisión Newayzi
+              Comisión Almara
             </label>
             <div className="flex items-center gap-3">
               <input
@@ -425,7 +425,7 @@ export function RevenueSimulatorClient() {
                 onChange={(e) =>
                   setParams((p) => ({ ...p, commissionRate: Number(e.target.value) }))
                 }
-                className="flex-1 accent-[#5e2cec] cursor-pointer"
+                className="flex-1 accent-[#b89a5e] cursor-pointer"
               />
               <div className="flex items-center bg-white/[0.07] border border-white/[0.12] rounded-xl px-3 py-1.5 gap-1 shrink-0">
                 <input
@@ -516,7 +516,7 @@ export function RevenueSimulatorClient() {
             className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm transition-all ${
               appliedGlobal
                 ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400"
-                : "bg-[#5e2cec]/15 border-[#5e2cec]/30 text-[#a78bfa] hover:bg-[#5e2cec]/25"
+                : "bg-[#b89a5e]/15 border-[#b89a5e]/30 text-[#a78bfa] hover:bg-[#b89a5e]/25"
             }`}
           >
             <Icon
@@ -550,7 +550,7 @@ export function RevenueSimulatorClient() {
         />
         <SummaryCard
           icon="solar:chart-bold-duotone"
-          label={`Comisión Newayzi (${params.commissionRate}%)`}
+          label={`Comisión Almara (${params.commissionRate}%)`}
           value={fmtCur(totals.commission, params.currency)}
           valueClass="text-[#a78bfa]"
           highlight
@@ -566,7 +566,7 @@ export function RevenueSimulatorClient() {
       {/* Operators Table */}
       <div className={`${GLASS} p-6`}>
         <div className="flex items-center gap-2 mb-5">
-          <div className="w-8 h-8 rounded-lg bg-[#5e2cec]/20 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-[#b89a5e]/20 flex items-center justify-center shrink-0">
             <Icon icon="solar:users-group-rounded-bold-duotone" className="text-[#a78bfa] text-lg" />
           </div>
           <div>
@@ -581,7 +581,7 @@ export function RevenueSimulatorClient() {
 
         {loading ? (
           <div className="flex items-center justify-center h-36 text-white/40 text-sm gap-3">
-            <Icon icon="svg-spinners:ring-resize" className="text-[#5e2cec] text-xl" />
+            <Icon icon="svg-spinners:ring-resize" className="text-[#b89a5e] text-xl" />
             Cargando operadores y propiedades…
           </div>
         ) : error ? (
@@ -638,7 +638,7 @@ export function RevenueSimulatorClient() {
                           onClick={() => updateRow(row.id, "enabled", !row.enabled)}
                           className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
                             row.enabled
-                              ? "bg-[#5e2cec] border-[#5e2cec]"
+                              ? "bg-[#b89a5e] border-[#b89a5e]"
                               : "bg-transparent border-white/20 hover:border-white/40"
                           }`}
                         >
@@ -774,7 +774,7 @@ export function RevenueSimulatorClient() {
       {!loading && enabledChartRows.length > 0 && (
         <div className={`${GLASS} p-6`}>
           <div className="flex items-center gap-2 mb-5">
-            <div className="w-8 h-8 rounded-lg bg-[#5e2cec]/20 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-[#b89a5e]/20 flex items-center justify-center shrink-0">
               <Icon icon="solar:chart-2-bold-duotone" className="text-[#a78bfa] text-lg" />
             </div>
             <div>
@@ -823,11 +823,11 @@ export function RevenueSimulatorClient() {
               label: "Tasa de retención",
               value: `${params.commissionRate}%`,
               icon: "solar:pie-chart-bold-duotone",
-              sub: `Newayzi retiene ${params.commissionRate}% del GMV`,
+              sub: `Almara retiene ${params.commissionRate}% del GMV`,
             },
           ].map((card) => (
             <div key={card.label} className={`${GLASS} p-5 flex gap-4 items-start`}>
-              <div className="w-10 h-10 rounded-xl bg-[#5e2cec]/15 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-[#b89a5e]/15 flex items-center justify-center shrink-0">
                 <Icon icon={card.icon} className="text-[#a78bfa] text-xl" />
               </div>
               <div>

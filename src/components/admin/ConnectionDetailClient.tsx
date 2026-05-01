@@ -1055,8 +1055,8 @@ export function ConnectionDetailClient() {
       <GlassCard className="p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 p-3 shrink-0">
-              <Icon icon="solar:server-bold-duotone" width={28} className="text-[#b89eff]" />
+            <div className="rounded-2xl bg-[#b89a5e]/20 border border-[#b89a5e]/30 p-3 shrink-0">
+              <Icon icon="solar:server-bold-duotone" width={28} className="text-[#f0e6d2]" />
             </div>
             <div>
               <h2 className="font-sora font-bold text-white text-lg leading-tight">
@@ -1090,7 +1090,7 @@ export function ConnectionDetailClient() {
                 isDisabled={patching}
                 color="secondary"
                 classNames={{
-                  wrapper: "group-data-[selected=true]:bg-[#5e2cec]",
+                  wrapper: "group-data-[selected=true]:bg-[#b89a5e]",
                   label: "text-white/70 text-sm",
                 }}
               >
@@ -1129,7 +1129,7 @@ export function ConnectionDetailClient() {
                             type="checkbox"
                             checked={syncOnlyImages}
                             onChange={(e) => setSyncOnlyImages(e.target.checked)}
-                            className="rounded border-white/30 bg-white/10 text-[#5e2cec] focus:ring-[#5e2cec]"
+                            className="rounded border-white/30 bg-white/10 text-[#b89a5e] focus:ring-[#b89a5e]"
                           />
                           <span className="text-sm text-white/70">Solo imágenes</span>
                         </label>
@@ -1146,7 +1146,7 @@ export function ConnectionDetailClient() {
                               setSyncPricingOnly(v);
                               if (v) setSyncForceFullSync(false);
                             }}
-                            className="rounded border-white/30 bg-white/10 text-[#5e2cec] focus:ring-[#5e2cec] disabled:opacity-40"
+                            className="rounded border-white/30 bg-white/10 text-[#b89a5e] focus:ring-[#b89a5e] disabled:opacity-40"
                           />
                           <span className="text-sm text-white/70">Solo precios y disponibilidad</span>
                         </label>
@@ -1156,7 +1156,7 @@ export function ConnectionDetailClient() {
                             checked={syncForceFullSync}
                             disabled={syncPricingOnly || syncOnlyImages}
                             onChange={(e) => setSyncForceFullSync(e.target.checked)}
-                            className="rounded border-white/30 bg-white/10 text-[#5e2cec] focus:ring-[#5e2cec] disabled:opacity-40"
+                            className="rounded border-white/30 bg-white/10 text-[#b89a5e] focus:ring-[#b89a5e] disabled:opacity-40"
                           />
                           <span className="text-sm text-white/70">Redescubrir propiedades y alojamientos</span>
                         </label>
@@ -1341,7 +1341,7 @@ export function ConnectionDetailClient() {
         <Modal isOpen={syncProgressModalOpen} onOpenChange={setSyncProgressModalOpen} size="lg" backdrop="blur">
           <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
             <ModalHeader className="text-white font-sora flex items-center gap-2">
-              <Icon icon="solar:refresh-bold-duotone" className="text-[#9b74ff]" width={18} />
+              <Icon icon="solar:refresh-bold-duotone" className="text-[#d4b97a]" width={18} />
               Sincronización en vivo
             </ModalHeader>
             <ModalBody>
@@ -1406,7 +1406,7 @@ export function ConnectionDetailClient() {
         <Modal isOpen={syncResultModalOpen} onOpenChange={setSyncResultModalOpen} size="lg" backdrop="blur">
           <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
             <ModalHeader className="text-white font-sora flex items-center gap-2">
-              <Icon icon="solar:check-circle-bold" className="text-[#9b74ff]" width={18} />
+              <Icon icon="solar:check-circle-bold" className="text-[#d4b97a]" width={18} />
               Resumen de sincronización
             </ModalHeader>
             <ModalBody>
@@ -1541,7 +1541,7 @@ export function ConnectionDetailClient() {
         >
           <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
             <ModalHeader className="text-white font-sora flex items-center gap-2">
-              <Icon icon="solar:layers-minimalistic-bold-duotone" className="text-[#9b74ff]" width={18} />
+              <Icon icon="solar:layers-minimalistic-bold-duotone" className="text-[#d4b97a]" width={18} />
               Detalle de sincronización
               {selectedRun && (
                 <span className="text-[0.65rem] font-mono text-white/50 ml-1">
@@ -1656,7 +1656,7 @@ export function ConnectionDetailClient() {
                           </div>
                         </div>
                         {Boolean(selectedRun.params?.pricing_only) && (
-                          <div className="rounded-xl border border-[#5e2cec]/30 bg-[#5e2cec]/10 p-3 text-white/80 text-sm">
+                          <div className="rounded-xl border border-[#b89a5e]/30 bg-[#b89a5e]/10 p-3 text-white/80 text-sm">
                             <p className="font-medium text-white/95">Modo solo precios y disponibilidad</p>
                             <p className="mt-1 text-[0.8rem] text-white/65">
                               No se volvieron a sincronizar propiedades ni tipos de habitación; solo tarifas (p. ej. Stays:
@@ -1757,7 +1757,7 @@ export function ConnectionDetailClient() {
         >
           <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
             <ModalHeader className="text-white font-sora flex items-center gap-2">
-              <Icon icon="solar:layers-minimalistic-bold-duotone" className="text-[#9b74ff]" width={18} />
+              <Icon icon="solar:layers-minimalistic-bold-duotone" className="text-[#d4b97a]" width={18} />
               Todas las corridas de sincronización
             </ModalHeader>
             <ModalBody>
@@ -1883,7 +1883,7 @@ export function ConnectionDetailClient() {
         {lastSyncSummary?.run_id && (
           <div className="mt-4 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4">
             <div className="flex items-center gap-2 mb-3">
-              <Icon icon="solar:chart-2-bold-duotone" width={17} className="text-[#b89eff]" />
+              <Icon icon="solar:chart-2-bold-duotone" width={17} className="text-[#f0e6d2]" />
               <p className="text-sm font-semibold text-white/80">Resumen del último sync</p>
               <span className="text-[0.7rem] text-white/40">
                 {lastSyncSummary.completed_at
@@ -1929,7 +1929,7 @@ export function ConnectionDetailClient() {
         <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Icon icon="solar:layers-minimalistic-bold-duotone" width={17} className="text-[#b89eff]" />
+              <Icon icon="solar:layers-minimalistic-bold-duotone" width={17} className="text-[#f0e6d2]" />
               <p className="text-sm font-semibold text-white/80">Bloques de tareas (últimas 5)</p>
             </div>
             <Button
@@ -1939,7 +1939,7 @@ export function ConnectionDetailClient() {
                 setAllSyncRunsModalOpen(true);
                 setAllSyncRunsPage(0);
               }}
-              className="!text-[#b89eff] bg-[#5e2cec]/15 border border-[#5e2cec]/25 hover:bg-[#5e2cec]/25"
+              className="!text-[#f0e6d2] bg-[#b89a5e]/15 border border-[#b89a5e]/25 hover:bg-[#b89a5e]/25"
             >
               Ver todas
             </Button>
@@ -2018,7 +2018,7 @@ export function ConnectionDetailClient() {
           <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Icon icon="solar:key-bold-duotone" width={17} className="text-[#b89eff]" />
+                <Icon icon="solar:key-bold-duotone" width={17} className="text-[#f0e6d2]" />
                 <p className="text-sm font-semibold text-white/80">Credenciales de la API</p>
               </div>
               {!editingConfig ? (
@@ -2102,7 +2102,7 @@ export function ConnectionDetailClient() {
           <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Icon icon="solar:key-bold-duotone" width={17} className="text-[#b89eff]" />
+                <Icon icon="solar:key-bold-duotone" width={17} className="text-[#f0e6d2]" />
                 <p className="text-sm font-semibold text-white/80">Credenciales Kunas</p>
               </div>
               {!editingConfig ? (
@@ -2184,7 +2184,7 @@ export function ConnectionDetailClient() {
           <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Icon icon="solar:key-bold-duotone" width={17} className="text-[#b89eff]" />
+                <Icon icon="solar:key-bold-duotone" width={17} className="text-[#f0e6d2]" />
                 <p className="text-sm font-semibold text-white/80">SiteMinder (dashboard)</p>
               </div>
               {!editingConfig ? (
@@ -2331,7 +2331,7 @@ export function ConnectionDetailClient() {
           <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <Icon icon="solar:graph-up-bold-duotone" width={17} className="text-[#b89eff]" />
+                <Icon icon="solar:graph-up-bold-duotone" width={17} className="text-[#f0e6d2]" />
                 <p className="text-sm font-semibold text-white/80">RateGain Smart Distribution</p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -2501,7 +2501,7 @@ export function ConnectionDetailClient() {
                   <span
                     className={`ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                       isActive
-                        ? "bg-[#5e2cec]/30 text-[#b89eff]"
+                        ? "bg-[#b89a5e]/30 text-[#f0e6d2]"
                         : "bg-white/[0.07] text-white/40"
                     }`}
                   >
@@ -2528,7 +2528,7 @@ export function ConnectionDetailClient() {
               }}
               className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-all ${
                 viewType === v
-                  ? "bg-[#5e2cec]/25 text-[#b89eff] border border-[#5e2cec]/30"
+                  ? "bg-[#b89a5e]/25 text-[#f0e6d2] border border-[#b89a5e]/30"
                   : "text-white/40 hover:text-white/70 border border-transparent"
               }`}
             >

@@ -368,7 +368,7 @@ function RoomTypeDetailPanel({
   if (loading) {
     return (
       <div className="flex justify-center py-6">
-        <Spinner size="sm" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+        <Spinner size="sm" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }} />
       </div>
     );
   }
@@ -383,7 +383,7 @@ function RoomTypeDetailPanel({
               {fallbackSummary.available} disponibles
               {fallbackSummary.totalRooms > 0 && ` de ${fallbackSummary.totalRooms} aloj.`}
               {fallbackSummary.pricePerNight && (
-                <span className="ml-2 text-[#b89eff] font-medium">
+                <span className="ml-2 text-[#f0e6d2] font-medium">
                   {formatPrice(fallbackSummary.pricePerNight, fallbackSummary.currency)}
                 </span>
               )}
@@ -640,9 +640,9 @@ function SlotDetailModal({
 
               {/* Price range */}
               {slotDetail.priceRange && (
-                <div className="flex items-center gap-2 rounded-xl border border-[#5e2cec]/30 bg-[#5e2cec]/10 px-4 py-2.5">
-                  <Icon icon="solar:tag-price-bold-duotone" className="text-[#b89eff] shrink-0" width={18} />
-                  <span className="text-sm font-semibold text-[#b89eff]">
+                <div className="flex items-center gap-2 rounded-xl border border-[#b89a5e]/30 bg-[#b89a5e]/10 px-4 py-2.5">
+                  <Icon icon="solar:tag-price-bold-duotone" className="text-[#f0e6d2] shrink-0" width={18} />
+                  <span className="text-sm font-semibold text-[#f0e6d2]">
                     {slotDetail.currency
                       ? `${formatPrice(slotDetail.priceRange.min, slotDetail.currency)}${slotDetail.priceRange.min !== slotDetail.priceRange.max ? ` – ${formatPrice(slotDetail.priceRange.max, slotDetail.currency)}` : ""} / noche`
                       : formatPriceRangeCompact(slotDetail.priceRange.min, slotDetail.priceRange.max)}
@@ -674,7 +674,7 @@ function SlotDetailModal({
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
                             {rt.pricePerNight && (
-                              <span className="text-sm font-semibold text-[#b89eff]">
+                              <span className="text-sm font-semibold text-[#f0e6d2]">
                                 {formatPrice(rt.pricePerNight, rt.currency)}
                               </span>
                             )}
@@ -939,7 +939,7 @@ function CityBreakdownPanel({
               onClick={() => setSortKey(o.key)}
               className={`text-[0.65rem] font-semibold uppercase tracking-[0.09em] rounded-full px-3 py-1.5 border transition-colors ${
                 sortKey === o.key
-                  ? "bg-[#5e2cec]/30 border-[#5e2cec]/50 text-violet-200"
+                  ? "bg-[#b89a5e]/30 border-[#b89a5e]/50 text-violet-200"
                   : "bg-white/[0.06] border-white/[0.1] text-white/50 hover:text-white/70"
               }`}
             >
@@ -968,13 +968,13 @@ function CityBreakdownPanel({
           return (
             <div
               key={c.city}
-              className="rounded-2xl border border-white/[0.1] bg-white/[0.035] hover:border-[#5e2cec]/35 hover:bg-white/[0.06] transition-all overflow-hidden"
+              className="rounded-2xl border border-white/[0.1] bg-white/[0.035] hover:border-[#b89a5e]/35 hover:bg-white/[0.06] transition-all overflow-hidden"
             >
               {/* Card header */}
               <div className="px-4 pt-4 pb-3">
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-[#5e2cec]/20 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-[#b89a5e]/20 flex items-center justify-center shrink-0">
                       <Icon icon="solar:city-bold-duotone" className="text-violet-300 text-base" />
                     </div>
                     <div className="min-w-0">
@@ -1164,7 +1164,7 @@ function BlocksPanel({
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+          <Spinner size="lg" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }} />
         </div>
       ) : blocks.length === 0 ? (
         <div className="py-16 text-center text-white/50">
@@ -1618,8 +1618,8 @@ export function AvailabilityList() {
       {/* Filtros */}
       <GlassCard className="p-5">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
-            <Icon icon="solar:filter-bold-duotone" className="text-[#9b74ff] text-base" />
+          <div className="w-9 h-9 rounded-xl bg-[#b89a5e]/25 flex items-center justify-center shrink-0">
+            <Icon icon="solar:filter-bold-duotone" className="text-[#d4b97a] text-base" />
           </div>
           <div>
             <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Filtros</p>
@@ -1698,8 +1698,8 @@ export function AvailabilityList() {
           </Button>
         </div>
         {isAgente && agency?.inventory_hint && (
-          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-[#5e2cec]/25 bg-[#5e2cec]/10 px-4 py-3">
-            <Icon icon="solar:info-circle-bold-duotone" className="text-[#b89eff] shrink-0 text-lg" />
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-[#b89a5e]/25 bg-[#b89a5e]/10 px-4 py-3">
+            <Icon icon="solar:info-circle-bold-duotone" className="text-[#f0e6d2] shrink-0 text-lg" />
             <p className="text-sm text-white/80 leading-snug">{agency.inventory_hint}</p>
           </div>
         )}
@@ -1707,11 +1707,11 @@ export function AvailabilityList() {
 
       {/* Barra de progreso de carga granular (visible cuando ya hay datos parciales) */}
       {loading && list.length > 0 && loadProgress && (
-        <div className="rounded-2xl border border-[#5e2cec]/25 bg-[#5e2cec]/10 px-5 py-3 flex items-center gap-4">
-          <Spinner size="sm" classNames={{ circle1: "border-b-[#9b74ff]", circle2: "border-b-[#9b74ff]" }} />
+        <div className="rounded-2xl border border-[#b89a5e]/25 bg-[#b89a5e]/10 px-5 py-3 flex items-center gap-4">
+          <Spinner size="sm" classNames={{ circle1: "border-b-[#d4b97a]", circle2: "border-b-[#d4b97a]" }} />
           <div className="flex-1 space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[0.75rem] text-[#b89eff] font-medium">
+              <span className="text-[0.75rem] text-[#f0e6d2] font-medium">
                 Cargando disponibilidad…
               </span>
               <span className="text-[0.7rem] text-white/45 tabular-nums">
@@ -1720,7 +1720,7 @@ export function AvailabilityList() {
             </div>
             <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-[#5e2cec] to-[#9b74ff] transition-all duration-300"
+                className="h-full rounded-full bg-gradient-to-r from-[#b89a5e] to-[#d4b97a] transition-all duration-300"
                 style={{ width: `${loadProgress.total > 0 ? Math.round((loadProgress.loaded / loadProgress.total) * 100) : 0}%` }}
               />
             </div>
@@ -1759,7 +1759,7 @@ export function AvailabilityList() {
         size="sm"
         classNames={{
           tabList: "bg-white/[0.06] border border-white/[0.1] rounded-xl p-1",
-          cursor: "bg-[#5e2cec]/40 rounded-lg",
+          cursor: "bg-[#b89a5e]/40 rounded-lg",
           tab: "text-white/70 data-[selected=true]:text-white",
           tabContent: "group-data-[selected=true]:text-white",
         }}
@@ -1785,7 +1785,7 @@ export function AvailabilityList() {
       ) : loading && list.length === 0 ? (
         /* Spinner solo cuando no hay ningún dato aún */
         <GlassCard className="flex flex-col items-center justify-center py-16 gap-5">
-          <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+          <Spinner size="lg" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }} />
           {loadProgress && (
             <div className="w-full max-w-xs space-y-2 px-2">
               <div className="flex items-center justify-between text-xs text-white/50">
@@ -1794,7 +1794,7 @@ export function AvailabilityList() {
               </div>
               <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-[#5e2cec] to-[#9b74ff] transition-all duration-300"
+                  className="h-full rounded-full bg-gradient-to-r from-[#b89a5e] to-[#d4b97a] transition-all duration-300"
                   style={{ width: `${loadProgress.total > 0 ? Math.round((loadProgress.loaded / loadProgress.total) * 100) : 0}%` }}
                 />
               </div>
@@ -1842,7 +1842,7 @@ export function AvailabilityList() {
                           return (
                             <td
                               key={d}
-                              className={`border border-white/[0.06] px-2 py-2 text-center text-sm font-semibold align-top ${getAvailabilityColor(avail, total)} ${hasDetail ? "cursor-pointer hover:ring-2 hover:ring-[#5e2cec]/50 hover:ring-inset transition-all" : ""}`}
+                              className={`border border-white/[0.06] px-2 py-2 text-center text-sm font-semibold align-top ${getAvailabilityColor(avail, total)} ${hasDetail ? "cursor-pointer hover:ring-2 hover:ring-[#b89a5e]/50 hover:ring-inset transition-all" : ""}`}
                               role={hasDetail ? "button" : undefined}
                               tabIndex={hasDetail ? 0 : undefined}
                               onClick={hasDetail ? () => setSlotDetail(detail) : undefined}
@@ -1882,7 +1882,7 @@ export function AvailabilityList() {
                 <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-amber-500/40" /> Media (25-49%)</span>
                 <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-orange-500/40" /> Baja (&lt;25%)</span>
                 <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-red-500/40" /> Sin disponibilidad</span>
-                <span className="flex items-center gap-1.5 text-[#9b74ff]"><Icon icon="solar:mouse-minimalistic-outline" width={14} /> Clic en slot para ver detalle</span>
+                <span className="flex items-center gap-1.5 text-[#d4b97a]"><Icon icon="solar:mouse-minimalistic-outline" width={14} /> Clic en slot para ver detalle</span>
               </div>
             </>
           )}

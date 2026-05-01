@@ -128,7 +128,7 @@ export function RoomTypeEditClient() {
   if (loading) {
     return (
       <div className="flex justify-center py-24">
-        <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+        <Spinner size="lg" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }} />
       </div>
     );
   }
@@ -147,11 +147,11 @@ export function RoomTypeEditClient() {
   return (
     <div className="space-y-6">
       <nav className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-white/45">
-        <Link href="/admin/properties" className="hover:text-[#b89eff] transition-colors">
+        <Link href="/admin/properties" className="hover:text-[#f0e6d2] transition-colors">
           Propiedades
         </Link>
         <Icon icon="solar:alt-arrow-right-linear" className="text-white/25" width={14} />
-        <Link href={`/admin/properties/${propertyId}`} className="hover:text-[#b89eff] transition-colors truncate max-w-[10rem] sm:max-w-xs">
+        <Link href={`/admin/properties/${propertyId}`} className="hover:text-[#f0e6d2] transition-colors truncate max-w-[10rem] sm:max-w-xs">
           {detail.property_name}
         </Link>
         <Icon icon="solar:alt-arrow-right-linear" className="text-white/25" width={14} />
@@ -174,7 +174,7 @@ export function RoomTypeEditClient() {
           </Button>
           {!readOnly && (
             <Button
-              className="bg-[#5e2cec] text-white font-semibold"
+              className="bg-[#b89a5e] text-white font-semibold"
               onPress={handleSave}
               isLoading={saving}
               startContent={!saving ? <Icon icon="solar:diskette-bold-duotone" width={18} /> : undefined}
@@ -267,7 +267,7 @@ export function RoomTypeEditClient() {
                 key={`${m.connection_id}-${m.pms_room_type_id}`}
                 className="rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-2 text-sm text-white/75"
               >
-                <span className="text-[#b89eff] font-medium">{m.connection_name}</span>
+                <span className="text-[#f0e6d2] font-medium">{m.connection_name}</span>
                 <span className="text-white/40 mx-2">·</span>
                 <span className="font-mono text-xs text-white/50">ID PMS: {m.pms_room_type_id}</span>
               </li>
@@ -282,7 +282,7 @@ export function RoomTypeEditClient() {
           Moneda e importe según sincronización PMS (sin conversión en el panel). La fila de referencia usa el precio de
           la <span className="text-white/55">última noche del rango que sincronizó el PMS</span> (no se promedian días).
           En la web pública el cobro se calcula con el desglose por fechas del catálogo (tiers / mínimo de noches) más la
-          comisión Newayzi en el motor de precios; puede diferir de esta referencia si las fechas del huésped no son esa
+          comisión Almara en el motor de precios; puede diferir de esta referencia si las fechas del huésped no son esa
           última noche.
         </p>
         {detail.base_rates?.length ? (
@@ -332,8 +332,8 @@ export function RoomTypeEditClient() {
 
       <div className="rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-5 sm:p-6">
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/20 border border-white/10 flex items-center justify-center">
-            <Icon icon="solar:gallery-bold-duotone" className="text-[#9b74ff] text-lg" />
+          <div className="w-9 h-9 rounded-xl bg-[#b89a5e]/20 border border-white/10 flex items-center justify-center">
+            <Icon icon="solar:gallery-bold-duotone" className="text-[#d4b97a] text-lg" />
           </div>
           <div>
             <h2 className="text-base font-bold text-white/90">Galería del tipo de habitación</h2>

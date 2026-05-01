@@ -30,7 +30,7 @@ const VISIBILITY_LABELS: Record<number, string> = {
 const LABEL_META: Record<string, { label: string; color: string }> = {
   none:      { label: "Sin etiqueta",      color: "text-white/40" },
   partner:   { label: "Rewards Partner",   color: "text-blue-300" },
-  preferred: { label: "Preferred Rewards", color: "text-[#9b74ff]" },
+  preferred: { label: "Preferred Rewards", color: "text-[#d4b97a]" },
   elite:     { label: "Elite Rewards",     color: "text-amber-300" },
 };
 
@@ -95,7 +95,7 @@ function AgreementForm({ operatorId: _operatorId, initial, onSave, onCancel, sav
 
   const inputCls =
     "w-full border border-white/[0.12] bg-white/[0.06] rounded-lg px-3 py-2 text-[0.8375rem] text-white placeholder:text-white/25 " +
-    "focus:outline-none focus:border-[#5e2cec] focus:ring-2 focus:ring-[#5e2cec]/20 transition-all font-sora " +
+    "focus:outline-none focus:border-[#b89a5e] focus:ring-2 focus:ring-[#b89a5e]/20 transition-all font-sora " +
     "[color-scheme:dark]"; // for date inputs
   const labelCls =
     "block text-[0.62rem] font-semibold text-white/40 mb-1.5 uppercase tracking-[0.12em]";
@@ -133,7 +133,7 @@ function AgreementForm({ operatorId: _operatorId, initial, onSave, onCancel, sav
               onChange={(e) => handle("commissionOffsetPct", e.target.value)}
               placeholder="ej. 1.5"
             />
-            <p className={hintCls}>Reducción de comisión Newayzi como compensación</p>
+            <p className={hintCls}>Reducción de comisión Almara como compensación</p>
           </div>
           <div>
             <label className={labelCls}>Boost de visibilidad</label>
@@ -210,7 +210,7 @@ function AgreementForm({ operatorId: _operatorId, initial, onSave, onCancel, sav
               id="autoRenew"
               checked={form.autoRenew}
               onChange={(e) => handle("autoRenew", e.target.checked)}
-              className="w-4 h-4 accent-[#5e2cec] rounded"
+              className="w-4 h-4 accent-[#b89a5e] rounded"
             />
             <label htmlFor="autoRenew" className="text-[0.8125rem] text-white/80 font-medium cursor-pointer">
               Renovación automática
@@ -224,7 +224,7 @@ function AgreementForm({ operatorId: _operatorId, initial, onSave, onCancel, sav
         <p className={sectionTitleCls}>Firma y condiciones pactadas</p>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={labelCls}>Firmado por (Newayzi)</label>
+            <label className={labelCls}>Firmado por (Almara)</label>
             <input
               type="text"
               className={inputCls}
@@ -282,9 +282,9 @@ function AgreementForm({ operatorId: _operatorId, initial, onSave, onCancel, sav
           type="submit"
           disabled={saving}
           className="px-5 py-2 text-[0.8125rem] font-bold text-white rounded-xl
-            bg-gradient-to-br from-[#3d21c4] to-[#5e2cec]
-            shadow-[0_4px_14px_rgba(94,44,236,0.35)]
-            hover:from-[#5e2cec] hover:to-[#422df6]
+            bg-gradient-to-br from-[#8a7346] to-[#b89a5e]
+            shadow-[0_4px_14px_rgba(184, 154, 94,0.35)]
+            hover:from-[#b89a5e] hover:to-[#9a7d4a]
             hover:-translate-y-px active:translate-y-0
             transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed
             flex items-center gap-2"
@@ -363,7 +363,7 @@ function AgreementCard({
           {onEdit && !["expired", "cancelled"].includes(agreement.status) && (
             <button
               onClick={() => onEdit(agreement)}
-              className="text-[0.75rem] font-semibold text-white/35 hover:text-[#9b74ff] transition-colors flex items-center gap-1"
+              className="text-[0.75rem] font-semibold text-white/35 hover:text-[#d4b97a] transition-colors flex items-center gap-1"
             >
               <Icon icon="solar:pen-bold-duotone" width={12} />
               Editar
@@ -384,7 +384,7 @@ function AgreementCard({
       {/* Condiciones — 4 stat chips */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
         <div className="rounded-xl bg-white/[0.05] border border-white/[0.08] p-3 text-center">
-          <p className="text-xl font-black text-[#9b74ff]">{agreement.cashbackContributionPct}</p>
+          <p className="text-xl font-black text-[#d4b97a]">{agreement.cashbackContributionPct}</p>
           <p className="text-[0.6rem] text-white/35 font-medium mt-0.5 uppercase tracking-wide">Aporte cashback</p>
         </div>
         <div className="rounded-xl bg-white/[0.05] border border-white/[0.08] p-3 text-center">
@@ -428,7 +428,7 @@ function AgreementCard({
         )}
         {agreement.signedByNewayzi && (
           <span>
-            <span className="text-white/55 font-semibold">Firmado Newayzi:</span> {agreement.signedByNewayzi}
+            <span className="text-white/55 font-semibold">Firmado Almara:</span> {agreement.signedByNewayzi}
           </span>
         )}
         {agreement.signedByOperator && (
@@ -528,7 +528,7 @@ export function OperatorRewardsPanel({ operatorId, readOnly = false }: OperatorR
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
-        <Icon icon="svg-spinners:ring-resize" className="text-[#7c4cff] text-2xl" />
+        <Icon icon="svg-spinners:ring-resize" className="text-[#d4b97a] text-2xl" />
       </div>
     );
   }
@@ -581,7 +581,7 @@ export function OperatorRewardsPanel({ operatorId, readOnly = false }: OperatorR
       {stats && (
         <div className="grid grid-cols-3 gap-3">
           {[
-            { icon: "solar:money-bag-bold-duotone",   label: "Aportado al pool",      value: fmt(stats.poolContributions),    color: "text-[#9b74ff]" },
+            { icon: "solar:money-bag-bold-duotone",   label: "Aportado al pool",      value: fmt(stats.poolContributions),    color: "text-[#d4b97a]" },
             { icon: "solar:gift-bold-duotone",         label: "Cashback emitido",       value: fmt(stats.cashbackEmitted),      color: "text-emerald-400" },
             { icon: "solar:bookmark-bold-duotone",     label: "Reservas con Rewards",   value: String(stats.bookingsRewarded),  color: "text-amber-400" },
           ].map((s) => (
@@ -610,11 +610,11 @@ export function OperatorRewardsPanel({ operatorId, readOnly = false }: OperatorR
 
       {/* ── Formulario nuevo / edición ── */}
       {!readOnly && (showForm || editingAgreement) && (
-        <div className="rounded-2xl border border-[#5e2cec]/30 bg-[#5e2cec]/[0.07] p-5">
+        <div className="rounded-2xl border border-[#b89a5e]/30 bg-[#b89a5e]/[0.07] p-5">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[#5e2cec]/25 border border-[#5e2cec]/30 flex items-center justify-center">
-                <Icon icon={editingAgreement ? "solar:pen-bold-duotone" : "solar:add-circle-bold-duotone"} className="text-[#9b74ff] text-sm" />
+              <div className="w-7 h-7 rounded-lg bg-[#b89a5e]/25 border border-[#b89a5e]/30 flex items-center justify-center">
+                <Icon icon={editingAgreement ? "solar:pen-bold-duotone" : "solar:add-circle-bold-duotone"} className="text-[#d4b97a] text-sm" />
               </div>
               <h3 className="font-bold text-[0.875rem] text-white">
                 {editingAgreement ? "Editar acuerdo" : "Nuevo acuerdo de participación"}
@@ -641,8 +641,8 @@ export function OperatorRewardsPanel({ operatorId, readOnly = false }: OperatorR
       {!readOnly && !showForm && !editingAgreement && (
         <button
           onClick={() => setShowForm(true)}
-          className="w-full py-3 rounded-2xl border-2 border-dashed border-[#5e2cec]/35 text-[0.8125rem] font-bold text-[#9b74ff]
-            hover:bg-[#5e2cec]/10 hover:border-[#5e2cec]/55
+          className="w-full py-3 rounded-2xl border-2 border-dashed border-[#b89a5e]/35 text-[0.8125rem] font-bold text-[#d4b97a]
+            hover:bg-[#b89a5e]/10 hover:border-[#b89a5e]/55
             transition-all duration-200 flex items-center justify-center gap-2"
         >
           <Icon icon="solar:add-circle-bold-duotone" width={18} />
@@ -672,7 +672,7 @@ export function OperatorRewardsPanel({ operatorId, readOnly = false }: OperatorR
       {/* ── Estado vacío ── */}
       {agreements.length === 0 && !showForm && (
         <div className="text-center py-12 text-white/30">
-          <Icon icon="solar:handshake-bold-duotone" className="text-5xl mb-3 mx-auto text-[#5e2cec]/40" />
+          <Icon icon="solar:handshake-bold-duotone" className="text-5xl mb-3 mx-auto text-[#b89a5e]/40" />
           <p className="text-[0.875rem] font-semibold text-white/45">Este operador aún no tiene acuerdos Rewards.</p>
           {!readOnly && (
             <p className="text-[0.78rem] mt-1 text-white/25">Crea el primer acuerdo para integrarlo al programa de cashback.</p>

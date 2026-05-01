@@ -263,8 +263,8 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
       <ModalContent>
         <ModalHeader>
           <div className="flex items-start gap-3 w-full pr-8">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5e2cec]/35 to-[#9430cf]/25 border border-white/[0.12] flex items-center justify-center shrink-0">
-              <Icon icon="solar:buildings-2-bold-duotone" className="text-[#b89eff] text-xl" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#b89a5e]/35 to-[#9430cf]/25 border border-white/[0.12] flex items-center justify-center shrink-0">
+              <Icon icon="solar:buildings-2-bold-duotone" className="text-[#f0e6d2] text-xl" />
             </div>
             <div className="min-w-0 flex-1">
               <h2 className="font-sora font-bold text-lg text-white tracking-tight">Nueva propiedad (manual)</h2>
@@ -280,7 +280,7 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
             <div>
               {loadingOps ? (
                 <div className="flex items-center gap-2 text-white/50 text-sm py-2">
-                  <Spinner size="sm" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#9b74ff]" }} />
+                  <Spinner size="sm" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#d4b97a]" }} />
                   Cargando operadores…
                 </div>
               ) : (
@@ -314,7 +314,7 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
 
           <div className="rounded-2xl border border-white/[0.09] bg-white/[0.04] p-4 space-y-3">
             <div className="flex items-center gap-2">
-              <Icon icon="solar:map-point-bold-duotone" className="text-[#9b74ff] shrink-0" width={18} />
+              <Icon icon="solar:map-point-bold-duotone" className="text-[#d4b97a] shrink-0" width={18} />
               <span className="text-xs font-semibold uppercase tracking-wider text-white/45">Ubicación</span>
             </div>
             {pickedCity ? (
@@ -353,7 +353,7 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
                   <div className="flex justify-center py-2">
                     <Spinner
                       size="sm"
-                      classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#9b74ff]" }}
+                      classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#d4b97a]" }}
                     />
                   </div>
                 )}
@@ -363,7 +363,7 @@ export function CreatePropertyModal({ isOpen, onOpenChange, role }: Props) {
                       <li key={c.id}>
                         <button
                           type="button"
-                          className="w-full text-left px-3 py-2.5 text-sm text-white/88 hover:bg-[#5e2cec]/15 transition-colors"
+                          className="w-full text-left px-3 py-2.5 text-sm text-white/88 hover:bg-[#b89a5e]/15 transition-colors"
                           onClick={() => {
                             setPickedCity(c);
                             setCityQuery("");

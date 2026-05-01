@@ -258,7 +258,7 @@ function CorporateCreditsInner() {
                       {new Date(r.created_at).toLocaleString("es-CO")}
                     </td>
                     <td className="py-2.5 pr-3">
-                      <Link href={`/admin/users`} className="text-[#b89eff] hover:underline">
+                      <Link href={`/admin/users`} className="text-[#f0e6d2] hover:underline">
                         {r.profile_email}
                       </Link>
                       <span className="text-white/35 text-xs ml-1">#{r.profile_id}</span>

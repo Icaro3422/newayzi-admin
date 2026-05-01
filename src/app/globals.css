@@ -4,40 +4,45 @@
 
 @layer base {
   :root {
-    /* Newayzi brand - alineado con frontend */
-    --newayzi-jet: #2d2d2d;
-    --newayzi-majorelle: #5e2cec;
-    --newayzi-han-purple: #422df6;
-    --newayzi-dark-orchid: #9430cf;
+    /* Almara — alineado con newayzi-frontend-v2 */
+    --almara-midnight: #0f0f18;
+    --almara-champagne-gold: #b89a5e;
+    --almara-gold-light: #d4b97a;
+    --almara-ivory: #f5f0e8;
+    --almara-jet: #1a1a24;
+    --newayzi-jet: #1a1a24;
+    --newayzi-majorelle: #b89a5e;
+    --newayzi-han-purple: #b89a5e;
+    --newayzi-dark-orchid: #b89a5e;
 
-    --background: 0 0% 100%;
-    --foreground: 0 0% 17.6%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 17.6%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 17.6%;
-    --primary: 262 83% 58%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 262 83% 58%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 262 83% 58%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 262 83% 58%;
+    --background: 40 33% 96%;
+    --foreground: 240 15% 12%;
+    --card: 40 33% 98%;
+    --card-foreground: 240 15% 12%;
+    --popover: 40 33% 98%;
+    --popover-foreground: 240 15% 12%;
+    --primary: 43 39% 55%;
+    --primary-foreground: 40 33% 96%;
+    --secondary: 43 45% 65%;
+    --secondary-foreground: 240 15% 12%;
+    --muted: 40 20% 92%;
+    --muted-foreground: 240 8% 45%;
+    --accent: 43 39% 55%;
+    --accent-foreground: 40 33% 96%;
+    --destructive: 240 8% 45%;
+    --destructive-foreground: 40 33% 96%;
+    --border: 40 20% 88%;
+    --input: 40 20% 88%;
+    --ring: 43 39% 55%;
     --radius: 0.75rem;
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 0 0% 17.6%;
-    --sidebar-primary: 262 83% 58%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 262 83% 96%;
-    --sidebar-accent-foreground: 262 83% 58%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 262 83% 58%;
+    --sidebar-background: 240 20% 8%;
+    --sidebar-foreground: 40 33% 96%;
+    --sidebar-primary: 43 39% 55%;
+    --sidebar-primary-foreground: 240 20% 8%;
+    --sidebar-accent: 240 15% 14%;
+    --sidebar-accent-foreground: 40 33% 96%;
+    --sidebar-border: 240 12% 18%;
+    --sidebar-ring: 43 39% 55%;
   }
 
   .dark {
@@ -109,8 +114,8 @@
 }
 .admin-panel [data-slot="input-wrapper"][data-focus="true"] {
   background: rgba(15, 12, 32, 0.72) !important;
-  border-color: rgba(94, 44, 236, 0.65) !important;
-  box-shadow: 0 0 0 3px rgba(94, 44, 236, 0.14) !important;
+  border-color: rgba(184, 154, 94, 0.65) !important;
+  box-shadow: 0 0 0 3px rgba(184, 154, 94, 0.18) !important;
 }
 
 /* Texto del input y placeholder */
@@ -142,8 +147,8 @@
 .admin-panel [data-slot="trigger"][data-open="true"],
 .admin-panel [data-slot="trigger"][data-focus="true"] {
   background: rgba(15, 12, 32, 0.72) !important;
-  border-color: rgba(94, 44, 236, 0.65) !important;
-  box-shadow: 0 0 0 3px rgba(94, 44, 236, 0.14) !important;
+  border-color: rgba(184, 154, 94, 0.65) !important;
+  box-shadow: 0 0 0 3px rgba(184, 154, 94, 0.18) !important;
 }
 .admin-panel [data-slot="trigger"] *,
 .admin-panel [data-slot="trigger"] span,
@@ -189,8 +194,8 @@
 }
 .admin-modal-dark [data-slot="input-wrapper"][data-focus="true"] {
   background: rgba(255, 255, 255, 0.11) !important;
-  border-color: rgba(94, 44, 236, 0.7) !important;
-  box-shadow: 0 0 0 3px rgba(94, 44, 236, 0.16) !important;
+  border-color: rgba(184, 154, 94, 0.7) !important;
+  box-shadow: 0 0 0 3px rgba(184, 154, 94, 0.2) !important;
 }
 .admin-modal-dark [data-slot="input-wrapper"] input {
   color: rgba(255, 255, 255, 0.95) !important;
@@ -222,8 +227,8 @@
 }
 .admin-modal-dark [data-slot="trigger"][data-open="true"],
 .admin-modal-dark [data-slot="trigger"][data-focus="true"] {
-  border-color: rgba(94, 44, 236, 0.7) !important;
-  box-shadow: 0 0 0 3px rgba(94, 44, 236, 0.16) !important;
+  border-color: rgba(184, 154, 94, 0.7) !important;
+  box-shadow: 0 0 0 3px rgba(184, 154, 94, 0.2) !important;
 }
 .admin-modal-dark [data-slot="trigger"] *,
 .admin-modal-dark [data-slot="trigger"] span,
@@ -243,26 +248,40 @@
   color: rgba(255, 255, 255, 0.85) !important;
 }
 
-/* Botón primario Newayzi - alineado con frontend, alto contraste */
+/* Botón primario Almara — champagne / gold light */
 @layer components {
+  .btn-almara-primary {
+    @apply bg-gradient-to-r from-almara-champagne-gold to-almara-gold-light hover:from-almara-gold-light hover:to-almara-champagne-gold font-bold rounded-xl shadow-[0_2px_14px_rgba(184,154,94,0.45)] transition-all disabled:opacity-50 disabled:cursor-not-allowed;
+    color: #0f0f18 !important;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+  }
+  .btn-almara-primary * {
+    color: inherit !important;
+  }
   .btn-newayzi-primary {
-    @apply bg-gradient-to-r from-[#3d21c4] to-newayzi-majorelle hover:from-newayzi-majorelle hover:to-[#3d21c4] font-bold rounded-xl shadow-[0_2px_12px_rgba(94,44,236,0.35)] transition-all disabled:opacity-50 disabled:cursor-not-allowed;
-    color: white !important;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    @apply bg-gradient-to-r from-almara-champagne-gold to-almara-gold-light hover:from-almara-gold-light hover:to-almara-champagne-gold font-bold rounded-xl shadow-[0_2px_14px_rgba(184,154,94,0.45)] transition-all disabled:opacity-50 disabled:cursor-not-allowed;
+    color: #0f0f18 !important;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
   }
   .btn-newayzi-primary * {
     color: inherit !important;
   }
 }
 
-/* HeroUI Button: forzar texto blanco en botones con fondos oscuros */
-button.btn-newayzi-primary,
+/* HeroUI Button */
+button.btn-almara-primary,
+button.btn-newayzi-primary {
+  color: #0f0f18 !important;
+}
+button.btn-almara-primary *,
+button.btn-newayzi-primary * {
+  color: inherit !important;
+}
 button.btn-action-amber,
 button.btn-action-red,
 button.btn-action-green {
   color: white !important;
 }
-button.btn-newayzi-primary *,
 button.btn-action-amber *,
 button.btn-action-red *,
 button.btn-action-green * {
@@ -274,8 +293,8 @@ button.btn-action-green * {
   min-height: 200px;
   padding: 1rem 1.25rem;
   outline: none;
-  font-family: var(--font-heebo), system-ui, sans-serif;
-  color: #2d2d2d;
+  font-family: var(--font-sora), system-ui, sans-serif;
+  color: #1a1a24;
 }
 .rich-text-content .ProseMirror p.is-editor-empty:first-child::before {
   color: #9ca3af;
@@ -303,11 +322,11 @@ button.btn-action-green * {
 }
 .rich-text-dark .ProseMirror blockquote {
   color: rgba(255, 255, 255, 0.7);
-  border-left-color: rgba(94, 44, 236, 0.6);
+  border-left-color: rgba(184, 154, 94, 0.65);
 }
 .rich-text-dark .ProseMirror code {
   background: rgba(255, 255, 255, 0.1);
-  color: #b89eff;
+  color: #d4b97a;
 }
 .rich-text-content .ProseMirror ul {
   list-style-type: disc;
@@ -325,7 +344,7 @@ button.btn-action-green * {
   font-family: var(--font-sora), system-ui, sans-serif;
 }
 .rich-text-content .ProseMirror blockquote {
-  border-left: 4px solid hsl(262 83% 58%);
+  border-left: 4px solid #b89a5e;
   padding-left: 1rem;
   margin: 1rem 0;
   color: #4b5563;
@@ -421,12 +440,12 @@ button.btn-action-green * {
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease !important;
 }
 .cl-formFieldInput:hover {
-  border-color: #c4b5fd !important;
+  border-color: #d4b97a !important;
   background: #ffffff !important;
 }
 .cl-formFieldInput:focus {
-  border-color: #5e2cec !important;
-  box-shadow: 0 0 0 3px rgba(94, 44, 236, 0.12) !important;
+  border-color: #b89a5e !important;
+  box-shadow: 0 0 0 3px rgba(184, 154, 94, 0.22) !important;
   background: #ffffff !important;
   outline: none !important;
 }
@@ -435,10 +454,10 @@ button.btn-action-green * {
   font-weight: 400 !important;
 }
 
-/* Botón primario Newayzi */
+/* Botón primario Almara */
 .cl-formButtonPrimary {
-  background: linear-gradient(135deg, #3d21c4 0%, #5e2cec 100%) !important;
-  box-shadow: 0 4px 16px rgba(94, 44, 236, 0.38) !important;
+  background: linear-gradient(135deg, #9a7d4a 0%, #b89a5e 45%, #d4b97a 100%) !important;
+  box-shadow: 0 4px 18px rgba(184, 154, 94, 0.42) !important;
   border-radius: 10px !important;
   font-family: var(--font-sora), system-ui, sans-serif !important;
   font-weight: 700 !important;
@@ -446,43 +465,43 @@ button.btn-action-green * {
   padding: 0.8rem 1.25rem !important;
   min-height: 48px !important;
   width: 100% !important;
-  color: #ffffff !important;
+  color: #0f0f18 !important;
   letter-spacing: -0.01em !important;
   transition: transform 0.15s ease, box-shadow 0.15s ease !important;
 }
 .cl-formButtonPrimary:hover {
-  background: linear-gradient(135deg, #5e2cec 0%, #422df6 100%) !important;
-  box-shadow: 0 6px 22px rgba(94, 44, 236, 0.46) !important;
+  background: linear-gradient(135deg, #b89a5e 0%, #d4b97a 100%) !important;
+  box-shadow: 0 6px 22px rgba(184, 154, 94, 0.5) !important;
   transform: translateY(-1px) !important;
 }
 .cl-formButtonPrimary:active {
   transform: translateY(0) !important;
-  box-shadow: 0 2px 8px rgba(94, 44, 236, 0.35) !important;
+  box-shadow: 0 2px 10px rgba(184, 154, 94, 0.35) !important;
 }
 
 /* Botón secundario / resetear */
 .cl-formButtonReset {
   font-family: var(--font-sora), system-ui, sans-serif !important;
-  color: #5e2cec !important;
+  color: #8a7346 !important;
   font-size: 0.875rem !important;
   font-weight: 500 !important;
   text-decoration: none !important;
   transition: color 0.15s !important;
 }
 .cl-formButtonReset:hover {
-  color: #422df6 !important;
+  color: #b89a5e !important;
 }
 
 /* Link "¿Olvidaste tu contraseña?" */
 .cl-formFieldAction {
   font-family: var(--font-sora), system-ui, sans-serif !important;
-  color: #5e2cec !important;
+  color: #8a7346 !important;
   font-size: 0.8125rem !important;
   font-weight: 500 !important;
   transition: color 0.15s !important;
 }
 .cl-formFieldAction:hover {
-  color: #422df6 !important;
+  color: #b89a5e !important;
 }
 
 /* Botones de redes sociales */
@@ -534,19 +553,19 @@ button.btn-action-green * {
   font-size: 0.9375rem !important;
 }
 .cl-footerActionLink {
-  color: #5e2cec !important;
+  color: #8a7346 !important;
   font-weight: 600 !important;
   font-size: 0.9375rem !important;
   transition: color 0.15s !important;
   text-decoration: none !important;
 }
 .cl-footerActionLink:hover {
-  color: #422df6 !important;
+  color: #b89a5e !important;
 }
 
 /* Identidad de verificación / chips */
 .cl-identityPreviewEditButton {
-  color: #5e2cec !important;
+  color: #8a7346 !important;
   font-family: var(--font-sora), system-ui, sans-serif !important;
   font-size: 0.875rem !important;
 }
@@ -568,6 +587,6 @@ button.btn-action-green * {
   font-weight: 600 !important;
 }
 .cl-otpCodeFieldInput:focus {
-  border-color: #5e2cec !important;
-  box-shadow: 0 0 0 3px rgba(94, 44, 236, 0.12) !important;
+  border-color: #b89a5e !important;
+  box-shadow: 0 0 0 3px rgba(184, 154, 94, 0.22) !important;
 }

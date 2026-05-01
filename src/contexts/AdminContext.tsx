@@ -79,8 +79,8 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         const fallback =
           "No se pudo cargar la sesión (GET /api/admin/me/ devolvió vacío o 404). Verifica NEXT_PUBLIC_API_URL, el backend y que tengas perfil admin.";
         if (typeof window !== "undefined") {
-          console.error("[newayzi-admin] getMe sin datos", {
-            hint: "Revisa consola por entradas [newayzi-admin] de authFetch y la pestaña Red.",
+          console.error("[almara-admin] getMe sin datos", {
+            hint: "Revisa consola por entradas [almara-admin] de authFetch y la pestaña Red.",
           });
         }
         setError(fallback);
@@ -88,7 +88,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al cargar sesión";
       if (typeof window !== "undefined") {
-        console.error("[newayzi-admin] getMe error", { message: msg, cause: e });
+        console.error("[almara-admin] getMe error", { message: msg, cause: e });
       }
       // 401 tras login puede ser race condition de Clerk: reintentar una vez
       if (retryOn401 === true && msg.includes("401")) {
@@ -118,12 +118,12 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         if (!token && isSignedIn) {
           if (typeof window !== "undefined") {
             console.error(
-              "[newayzi-admin] Clerk isSignedIn pero getToken sigue null tras esperar",
+              "[almara-admin] Clerk isSignedIn pero getToken sigue null tras esperar",
               { hint: "Revisa dominios autorizados en Clerk y cookies del navegador." }
             );
           }
           setError(
-            "No se pudo obtener el token de sesión de Clerk. Abre la consola (filtra newayzi-admin) o recarga la página."
+            "No se pudo obtener el token de sesión de Clerk. Abre la consola (filtra almara-admin) o recarga la página."
           );
         }
         setLoading(false);

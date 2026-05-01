@@ -44,7 +44,7 @@ function AccentCard({ children, className = "" }: { children: React.ReactNode; c
     <div
       className={`rounded-[28px] p-6 relative overflow-hidden ${className}`}
       style={{
-        background: "radial-gradient(ellipse 90% 80% at 60% 55%, #5e2cec 0%, #3d21c4 45%, #2a178a 100%)",
+        background: "radial-gradient(ellipse 90% 80% at 60% 55%, #b89a5e 0%, #8a7346 45%, #2a178a 100%)",
       }}
     >
       <div
@@ -62,7 +62,7 @@ function LoyaltyBadge({ level }: { level: string }) {
     level === "premium"
       ? { bg: "bg-amber-500/25", border: "border-amber-400/40", icon: "solar:crown-bold-duotone", text: "text-amber-200" }
       : level === "plus"
-        ? { bg: "bg-[#5e2cec]/25", border: "border-[#5e2cec]/40", icon: "solar:star-bold-duotone", text: "text-[#b89eff]" }
+        ? { bg: "bg-[#b89a5e]/25", border: "border-[#b89a5e]/40", icon: "solar:star-bold-duotone", text: "text-[#f0e6d2]" }
         : { bg: "bg-white/15", border: "border-white/25", icon: "solar:user-id-bold-duotone", text: "text-white/90" };
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full ${config.bg} border ${config.border} px-3 py-1.5`}>
@@ -129,7 +129,7 @@ export function AdminProfileClient() {
   const { profile, operator_name, loyalty, operator_id } = me;
   const isOperator = (role?.toLowerCase?.() ?? "") === "operador";
   const operatorRewards = useOperatorRewards(isOperator ? (operator_id ?? null) : null);
-  // Roles staff que no deben ver badges ni sección Newayzi Rewards (programa de huéspedes)
+  // Roles staff que no deben ver badges ni sección Almara Rewards (programa de huéspedes)
   const isStaffNoGuestRewards = ["super_admin", "comercial", "visualizador"].includes(role ?? "");
 
   // Sincronizar nombre desde Clerk o me
@@ -390,15 +390,15 @@ export function AdminProfileClient() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading || !user}
-                className="relative group rounded-2xl overflow-hidden border border-white/[0.12] focus:outline-none focus:ring-2 focus:ring-[#9b74ff]/50 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="relative group rounded-2xl overflow-hidden border border-white/[0.12] focus:outline-none focus:ring-2 focus:ring-[#d4b97a]/50 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {imageUrl ? (
                   <div className="h-20 w-20 sm:h-24 sm:w-24 shrink-0">
                     <img src={imageUrl} alt="" className="h-full w-full object-cover" />
                   </div>
                 ) : (
-                  <div className="flex h-20 w-20 sm:h-24 sm:w-24 shrink-0 items-center justify-center rounded-2xl bg-[#5e2cec]/25 border border-[#5e2cec]/30">
-                    <Icon icon="solar:user-id-bold-duotone" className="text-[#9b74ff]" width={36} />
+                  <div className="flex h-20 w-20 sm:h-24 sm:w-24 shrink-0 items-center justify-center rounded-2xl bg-[#b89a5e]/25 border border-[#b89a5e]/30">
+                    <Icon icon="solar:user-id-bold-duotone" className="text-[#d4b97a]" width={36} />
                   </div>
                 )}
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -480,9 +480,9 @@ export function AdminProfileClient() {
               <div>
                 <dt className="text-white/45 text-[0.7rem] uppercase tracking-wide">Rol</dt>
                 <dd className="flex items-center gap-2 mt-0.5">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#5e2cec]/20 border border-[#5e2cec]/30">
-                    <span className="w-1 h-1 rounded-full bg-[#9b74ff]" />
-                    <span className="text-[#b89eff] text-[0.7rem] font-semibold uppercase">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#b89a5e]/20 border border-[#b89a5e]/30">
+                    <span className="w-1 h-1 rounded-full bg-[#d4b97a]" />
+                    <span className="text-[#f0e6d2] text-[0.7rem] font-semibold uppercase">
                       {ROLE_LABELS[role ?? "super_admin"]}
                     </span>
                   </span>
@@ -524,8 +524,8 @@ export function AdminProfileClient() {
       {/* ── Seguridad: correo + contraseña ── */}
       <GlassCard>
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
-            <Icon icon="solar:shield-keyhole-bold-duotone" className="text-[#9b74ff] text-base" />
+          <div className="w-9 h-9 rounded-xl bg-[#b89a5e]/25 flex items-center justify-center shrink-0">
+            <Icon icon="solar:shield-keyhole-bold-duotone" className="text-[#d4b97a] text-base" />
           </div>
           <div>
             <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Seguridad</p>
@@ -544,7 +544,7 @@ export function AdminProfileClient() {
               className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.04] transition-colors"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <Icon icon="solar:letter-bold-duotone" className="text-[#9b74ff] text-base shrink-0" />
+                <Icon icon="solar:letter-bold-duotone" className="text-[#d4b97a] text-base shrink-0" />
                 <div className="text-left min-w-0">
                   <p className="text-white/90 text-sm font-medium">Correo electrónico</p>
                   <p className="text-white/45 text-[0.75rem] truncate">
@@ -553,7 +553,7 @@ export function AdminProfileClient() {
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className="text-[0.75rem] text-[#9b74ff] font-semibold">
+                <span className="text-[0.75rem] text-[#d4b97a] font-semibold">
                   {emailOpen ? "Cancelar" : "Cambiar"}
                 </span>
                 <Icon
@@ -604,7 +604,7 @@ export function AdminProfileClient() {
                 {emailStep === "pending_code" && (
                   <>
                     <div className="flex items-center gap-2 text-sm text-white/70">
-                      <Icon icon="solar:letter-opened-bold-duotone" className="text-[#9b74ff] text-base" />
+                      <Icon icon="solar:letter-opened-bold-duotone" className="text-[#d4b97a] text-base" />
                       <span>Código enviado a <span className="text-white font-semibold">{newEmail}</span></span>
                     </div>
                     <p className="text-white/50 text-[0.78rem]">
@@ -678,7 +678,7 @@ export function AdminProfileClient() {
               className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.04] transition-colors"
             >
               <div className="flex items-center gap-3">
-                <Icon icon="solar:lock-password-bold-duotone" className="text-[#9b74ff] text-base shrink-0" />
+                <Icon icon="solar:lock-password-bold-duotone" className="text-[#d4b97a] text-base shrink-0" />
                 <div className="text-left">
                   <p className="text-white/90 text-sm font-medium">Contraseña</p>
                   <p className="text-white/45 text-[0.75rem]">
@@ -687,7 +687,7 @@ export function AdminProfileClient() {
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className="text-[0.75rem] text-[#9b74ff] font-semibold">
+                <span className="text-[0.75rem] text-[#d4b97a] font-semibold">
                   {passwordOpen ? "Cancelar" : user?.passwordEnabled ? "Cambiar" : "Crear"}
                 </span>
                 <Icon
@@ -859,7 +859,7 @@ export function AdminProfileClient() {
               <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
                 {operatorRewards?.activeAgreement
                   ? operatorRewards.activeAgreement.rewardsLabelDisplay
-                  : "Tu participación en Newayzi"}
+                  : "Tu participación en Almara"}
               </p>
               {operatorRewards?.activeAgreement && (
                 <p className="text-white/45 text-[0.72rem] mt-1 leading-snug">
@@ -910,7 +910,7 @@ export function AdminProfileClient() {
                 <div>
                   <p className="text-white/80 text-sm font-semibold">Sin acuerdo de socio activo</p>
                   <p className="text-white/50 text-xs mt-1.5 leading-relaxed">
-                    Cuando Newayzi active tu nivel, aquí verás cashback, visibilidad y vigencia del acuerdo. Mientras
+                    Cuando Almara active tu nivel, aquí verás cashback, visibilidad y vigencia del acuerdo. Mientras
                     tanto, puedes revisar el resumen del programa en tu <span className="text-white/70">Dashboard</span>.
                   </p>
                 </div>
@@ -984,12 +984,12 @@ export function AdminProfileClient() {
         </AccentCard>
       )}
 
-      {/* ── Newayzi Rewards (programa de huéspedes) — oculto para operador y staff (super_admin, comercial, visualizador) ── */}
+      {/* ── Almara Rewards (programa de huéspedes) — oculto para operador y staff (super_admin, comercial, visualizador) ── */}
       {!isOperator && !isStaffNoGuestRewards && (loyalty ? (
         <AccentCard>
           <div className="flex items-start justify-between gap-4 mb-5 min-w-0">
             <div>
-              <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Newayzi Rewards</p>
+              <p className="text-white/50 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Almara Rewards</p>
               <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
                 Nivel {loyalty.level}
               </p>
@@ -1028,7 +1028,7 @@ export function AdminProfileClient() {
               </div>
               <div className="w-full h-2 rounded-full overflow-hidden bg-white/10">
                 <div
-                  className="h-full rounded-full bg-[#9b74ff] transition-all duration-700"
+                  className="h-full rounded-full bg-[#d4b97a] transition-all duration-700"
                   style={{
                     width: `${Math.min(
                       100,
@@ -1042,12 +1042,12 @@ export function AdminProfileClient() {
         </AccentCard>
       ) : (
           <GlassCard className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 flex items-center justify-center mb-4">
-              <Icon icon="solar:gift-bold-duotone" className="text-[#9b74ff] text-2xl" />
+            <div className="w-14 h-14 rounded-2xl bg-[#b89a5e]/20 border border-[#b89a5e]/30 flex items-center justify-center mb-4">
+              <Icon icon="solar:gift-bold-duotone" className="text-[#d4b97a] text-2xl" />
             </div>
             <p className="font-sora font-bold text-white text-base">Sin programa de loyalty</p>
             <p className="mt-2 text-sm text-white/50 max-w-md leading-relaxed">
-              Este perfil no tiene datos de Newayzi Rewards. Los perfiles de staff pueden no tener loyalty si no han realizado reservas como huéspedes.
+              Este perfil no tiene datos de Almara Rewards. Los perfiles de staff pueden no tener loyalty si no han realizado reservas como huéspedes.
             </p>
           </GlassCard>
         )

@@ -73,7 +73,7 @@ const PMS_CONFIG_FIELDS: Record<
       label: "Refrescar reserva tras crear",
       required: false,
       placeholder: "true",
-      description: "Si es true, tras POST de reserva en Stays se hace GET para guardar el snapshot completo en Newayzi (una llamada API extra por reserva).",
+      description: "Si es true, tras POST de reserva en Stays se hace GET para guardar el snapshot completo en Almara (una llamada API extra por reserva).",
     },
   ],
   generic: [
@@ -309,12 +309,12 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
                       key={t.code}
                       type="button"
                       onClick={() => { setPmsType(t.code); setStep(2); }}
-                      className="flex items-center gap-4 rounded-2xl border border-white/[0.1] bg-white/[0.05] hover:bg-white/[0.10] hover:border-[#9b74ff]/50 transition-all px-4 py-3.5 text-left group"
+                      className="flex items-center gap-4 rounded-2xl border border-white/[0.1] bg-white/[0.05] hover:bg-white/[0.10] hover:border-[#d4b97a]/50 transition-all px-4 py-3.5 text-left group"
                     >
-                      <div className="w-10 h-10 rounded-xl bg-[#5e2cec]/20 flex items-center justify-center shrink-0 group-hover:bg-[#5e2cec]/35 transition-colors">
+                      <div className="w-10 h-10 rounded-xl bg-[#b89a5e]/20 flex items-center justify-center shrink-0 group-hover:bg-[#b89a5e]/35 transition-colors">
                         <Icon
                           icon={PMS_ICONS[t.code] ?? "solar:link-circle-bold-duotone"}
-                          className="text-[#9b74ff] text-xl"
+                          className="text-[#d4b97a] text-xl"
                         />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -325,10 +325,10 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
                       </div>
                       {(t.operator_count ?? 0) > 0 && (
                         <span className="shrink-0 text-[0.65rem] text-emerald-400 bg-emerald-500/15 border border-emerald-500/25 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap">
-                          {t.operator_count} {t.operator_count === 1 ? "operador" : "operadores"} en Newayzi
+                          {t.operator_count} {t.operator_count === 1 ? "operador" : "operadores"} en Almara
                         </span>
                       )}
-                      <Icon icon="solar:arrow-right-bold" className="text-white/25 text-sm group-hover:text-[#9b74ff] transition-colors shrink-0" />
+                      <Icon icon="solar:arrow-right-bold" className="text-white/25 text-sm group-hover:text-[#d4b97a] transition-colors shrink-0" />
                     </button>
                   ))}
                 </div>
