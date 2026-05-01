@@ -52,7 +52,7 @@ function RewardsCell({ ri }: { ri: PropertyRewardsInfo }) {
     ? "bg-amber-500/20 border-amber-400/30 text-amber-300"
     : isPreferred
       ? "bg-violet-500/20 border-violet-400/30 text-[#c4a8ff]"
-      : "bg-[#5e2cec]/20 border-[#5e2cec]/35 text-[#b89eff]";
+      : "bg-[#b89a5e]/20 border-[#b89a5e]/35 text-[#f0e6d2]";
 
   const extraLines: string[] = [];
   if (ri.cashback_pct !== undefined && ri.cashback_pct > 0) {
@@ -113,7 +113,7 @@ function StatusColumn({ p }: { p: PropertyListItem }) {
         <span
           className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[0.65rem] font-semibold border cursor-default shrink-0 ${
             p.is_published
-              ? "bg-[#5e2cec]/25 border-[#5e2cec]/35 text-[#b89eff]"
+              ? "bg-[#b89a5e]/25 border-[#b89a5e]/35 text-[#f0e6d2]"
               : "bg-white/10 border-white/10 text-white/45"
           }`}
         >
@@ -142,7 +142,7 @@ function PmsChips({ p }: { p: PropertyListItem }) {
       {p.pms_connections.map((c) => (
         <span
           key={c.id}
-          className="inline-flex items-center rounded-full bg-[#5e2cec]/25 border border-[#5e2cec]/30 px-2.5 py-0.5 text-[0.7rem] font-semibold text-[#b89eff] break-all"
+          className="inline-flex items-center rounded-full bg-[#b89a5e]/25 border border-[#b89a5e]/30 px-2.5 py-0.5 text-[0.7rem] font-semibold text-[#f0e6d2] break-all"
         >
           {c.name}
         </span>
@@ -175,7 +175,7 @@ function PropertyActions({
       as={Link}
       href={`/admin/properties/${p.id}`}
       size="sm"
-      className={`font-semibold bg-[#5e2cec]/30 border border-[#5e2cec]/50 text-[#e8deff] hover:bg-[#5e2cec]/45 ${layout === "card" ? "w-full" : "w-full"}`}
+      className={`font-semibold bg-[#b89a5e]/30 border border-[#b89a5e]/50 text-[#f5f0e8] hover:bg-[#b89a5e]/45 ${layout === "card" ? "w-full" : "w-full"}`}
       startContent={<Icon icon="solar:eye-bold-duotone" className="text-lg shrink-0" />}
     >
       Ver detalle
@@ -198,7 +198,7 @@ function PropertyActions({
           px-2.5 py-1.5 rounded-xl text-[0.7rem] font-semibold transition-all flex-1 min-h-[2.25rem]
           ${p.is_published
             ? "bg-amber-500/25 border border-amber-400/40 text-amber-200 hover:bg-amber-500/35"
-            : "bg-[#5e2cec]/25 border border-[#5e2cec]/40 text-[#b89eff] hover:bg-[#5e2cec]/35"
+            : "bg-[#b89a5e]/25 border border-[#b89a5e]/40 text-[#f0e6d2] hover:bg-[#b89a5e]/35"
           }
           disabled:opacity-50 disabled:cursor-not-allowed
         `}
@@ -274,13 +274,13 @@ function PropertyCard({
           <div className="flex items-start gap-2 flex-wrap">
             <Link
               href={`/admin/properties/${p.id}`}
-              className="font-sora font-semibold text-[#9b74ff] hover:text-[#b89eff] transition-colors text-base break-words"
+              className="font-sora font-semibold text-[#d4b97a] hover:text-[#f0e6d2] transition-colors text-base break-words"
             >
               {p.name}
             </Link>
             {p.from_pms && (
               <span
-                className="inline-flex items-center rounded-full bg-[#5e2cec]/20 border border-[#5e2cec]/40 px-2 py-0.5 text-[0.65rem] font-semibold text-[#b89eff] shrink-0"
+                className="inline-flex items-center rounded-full bg-[#b89a5e]/20 border border-[#b89a5e]/40 px-2 py-0.5 text-[0.65rem] font-semibold text-[#f0e6d2] shrink-0"
                 title="Sincronizada desde PMS"
               >
                 PMS
@@ -480,8 +480,8 @@ export function PropertiesList() {
 
       <GlassCard className="p-4 sm:p-5">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
-            <Icon icon="solar:filter-bold-duotone" className="text-[#9b74ff] text-base" />
+          <div className="w-9 h-9 rounded-xl bg-[#b89a5e]/25 flex items-center justify-center shrink-0">
+            <Icon icon="solar:filter-bold-duotone" className="text-[#d4b97a] text-base" />
           </div>
           <div className="min-w-0">
             <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Filtros</p>
@@ -571,12 +571,12 @@ export function PropertiesList() {
 
       {loading ? (
         <GlassCard className="flex justify-center items-center py-16">
-          <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+          <Spinner size="lg" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }} />
         </GlassCard>
       ) : list.length === 0 ? (
         <GlassCard className="flex flex-col items-center justify-center py-16 text-center px-4">
-          <div className="w-14 h-14 rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 flex items-center justify-center mb-4">
-            <Icon icon="solar:buildings-2-bold-duotone" className="text-[#9b74ff] text-2xl" />
+          <div className="w-14 h-14 rounded-2xl bg-[#b89a5e]/20 border border-[#b89a5e]/30 flex items-center justify-center mb-4">
+            <Icon icon="solar:buildings-2-bold-duotone" className="text-[#d4b97a] text-2xl" />
           </div>
           <p className="font-sora font-bold text-white text-base">Sin resultados</p>
           <p className="mt-2 text-sm text-white/50 max-w-md">
@@ -665,13 +665,13 @@ export function PropertiesList() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <Link
                                 href={`/admin/properties/${p.id}`}
-                                className="font-sora font-semibold text-[#9b74ff] hover:text-[#b89eff] transition-colors break-words"
+                                className="font-sora font-semibold text-[#d4b97a] hover:text-[#f0e6d2] transition-colors break-words"
                               >
                                 {p.name}
                               </Link>
                               {p.from_pms && (
                                 <span
-                                  className="inline-flex items-center rounded-full bg-[#5e2cec]/20 border border-[#5e2cec]/40 px-2 py-0.5 text-[0.65rem] font-semibold text-[#b89eff] shrink-0"
+                                  className="inline-flex items-center rounded-full bg-[#b89a5e]/20 border border-[#b89a5e]/40 px-2 py-0.5 text-[0.65rem] font-semibold text-[#f0e6d2] shrink-0"
                                   title="Sincronizada desde PMS"
                                 >
                                   PMS

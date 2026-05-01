@@ -111,7 +111,7 @@ function Input({
           placeholder:text-gray-400 placeholder:font-normal
           outline-none transition-all duration-150
           hover:border-gray-300 hover:bg-white
-          focus:border-[#5e2cec] focus:bg-white focus:ring-3 focus:ring-[#5e2cec]/10
+          focus:border-[#b89a5e] focus:bg-white focus:ring-3 focus:ring-[#b89a5e]/10
         "
         style={{ minHeight: "46px" }}
       />
@@ -142,12 +142,12 @@ function PrimaryButton({
       disabled={loading || disabled}
       className="
         w-full min-h-[48px] rounded-[10px] font-sora font-bold text-[0.9375rem] text-white
-        bg-gradient-to-br from-[#3d21c4] to-[#5e2cec]
-        shadow-[0_4px_16px_rgba(94,44,236,0.38)]
-        hover:from-[#5e2cec] hover:to-[#422df6]
-        hover:shadow-[0_6px_22px_rgba(94,44,236,0.46)]
+        bg-gradient-to-br from-[#8a7346] to-[#b89a5e]
+        shadow-[0_4px_16px_rgba(184, 154, 94,0.38)]
+        hover:from-[#b89a5e] hover:to-[#9a7d4a]
+        hover:shadow-[0_6px_22px_rgba(184, 154, 94,0.46)]
         hover:-translate-y-px
-        active:translate-y-0 active:shadow-[0_2px_8px_rgba(94,44,236,0.35)]
+        active:translate-y-0 active:shadow-[0_2px_8px_rgba(184, 154, 94,0.35)]
         transition-all duration-150
         disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0
         flex items-center justify-center gap-2
@@ -341,7 +341,7 @@ export function CustomSignIn() {
         const sel = resolveSecondFactorSelection(supported);
         if (!sel) {
           setError(
-            "No hay un método de verificación compatible. Contacta al equipo de Newayzi."
+            "No hay un método de verificación compatible. Contacta al equipo de Almara."
           );
           return;
         }
@@ -588,7 +588,7 @@ export function CustomSignIn() {
               <button
                 type="button"
                 onClick={() => goTo("forgot")}
-                className="font-sora text-[0.78rem] text-[#5e2cec] hover:text-[#422df6] font-medium transition-colors"
+                className="font-sora text-[0.78rem] text-[#b89a5e] hover:text-[#9a7d4a] font-medium transition-colors"
               >
                 ¿Olvidaste tu contraseña?
               </button>
@@ -645,7 +645,7 @@ export function CustomSignIn() {
           ¿No tienes cuenta?{" "}
           <Link
             href="/sign-up"
-            className="text-[#5e2cec] font-semibold hover:text-[#422df6] transition-colors"
+            className="text-[#b89a5e] font-semibold hover:text-[#9a7d4a] transition-colors"
           >
             Regístrate
           </Link>
@@ -692,7 +692,7 @@ export function CustomSignIn() {
             }}
           />
           <div className="w-12 h-12 rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center mb-4">
-            <Icon icon="solar:shield-keyhole-bold-duotone" className="text-[#5e2cec] text-2xl" />
+            <Icon icon="solar:shield-keyhole-bold-duotone" className="text-[#b89a5e] text-2xl" />
           </div>
           <h1 className="font-sora font-extrabold text-[1.75rem] tracking-tight text-gray-900 leading-tight">
             Verificación en dos pasos
@@ -729,7 +729,7 @@ export function CustomSignIn() {
               type="button"
               disabled={loading || resendCooldown > 0}
               onClick={() => void handleResendSecondFactor()}
-              className="font-sora text-[0.8125rem] font-medium text-[#5e2cec] hover:text-[#422df6] disabled:opacity-50 disabled:cursor-not-allowed underline underline-offset-2"
+              className="font-sora text-[0.8125rem] font-medium text-[#b89a5e] hover:text-[#9a7d4a] disabled:opacity-50 disabled:cursor-not-allowed underline underline-offset-2"
             >
               {resendCooldown > 0 ? `Reenviar código (${resendCooldown}s)` : "Reenviar código"}
             </button>
@@ -742,18 +742,18 @@ export function CustomSignIn() {
               <>
                 <span className="font-semibold">¿No llega el correo?</span>{" "}
                 Espera un minuto, revisa spam y usa &quot;Reenviar código&quot;. Si sigue fallando, pide a un
-                administrador que revise el envío de emails en Clerk o contacte al equipo de Newayzi.
+                administrador que revise el envío de emails en Clerk o contacte al equipo de Almara.
               </>
             ) : isPhone ? (
               <>
                 <span className="font-semibold">¿No recibiste el SMS?</span>{" "}
                 Comprueba la señal y usa &quot;Reenviar código&quot;. Si persiste el problema, contacta al equipo de
-                Newayzi.
+                Almara.
               </>
             ) : (
               <>
                 <span className="font-semibold">¿Problemas con la verificación?</span>{" "}
-                Pide a un administrador que revise tu cuenta en Clerk o contacte al equipo de Newayzi.
+                Pide a un administrador que revise tu cuenta en Clerk o contacte al equipo de Almara.
               </>
             )}
           </p>

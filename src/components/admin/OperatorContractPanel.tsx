@@ -85,7 +85,7 @@ function ContractForm({ operatorId, operatorName = "", initial, onSave, onCancel
     setCounterpartyDisplayName((prev) => (prev.trim() === "" ? operatorName.trim() : prev));
   }, [operatorName, initial]);
 
-  const inputCls = "w-full bg-white/[0.06] border border-white/[0.12] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#7c5cfc]/60 focus:ring-1 focus:ring-[#7c5cfc]/30 transition";
+  const inputCls = "w-full bg-white/[0.06] border border-white/[0.12] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#d4b97a]/60 focus:ring-1 focus:ring-[#d4b97a]/30 transition";
 
   const isTemplateContract = initial?.documentSource === "platform_template";
   const showCounterpartyField = !initial || isTemplateContract;
@@ -138,7 +138,7 @@ function ContractForm({ operatorId, operatorName = "", initial, onSave, onCancel
     <div className="space-y-4">
       <div>
         <FieldLabel>Título del contrato *</FieldLabel>
-        <input className={inputCls} value={title} onChange={e => setTitle(e.target.value)} placeholder="Ej. Contrato de Servicio Newayzi 2026" />
+        <input className={inputCls} value={title} onChange={e => setTitle(e.target.value)} placeholder="Ej. Contrato de Servicio Almara 2026" />
       </div>
 
       {!initial && (
@@ -150,18 +150,18 @@ function ContractForm({ operatorId, operatorName = "", initial, onSave, onCancel
               onClick={() => setCreationMode("platform_template")}
               className={`px-4 py-2 rounded-xl text-sm font-semibold border transition ${
                 creationMode === "platform_template"
-                  ? "bg-[#5e2cec] border-[#7c5cfc] text-white"
+                  ? "bg-[#b89a5e] border-[#d4b97a] text-white"
                   : "border-white/[0.12] text-white/60 hover:text-white hover:bg-white/[0.06]"
               }`}
             >
-              Plantilla estándar Newayzi
+              Plantilla estándar Almara
             </button>
             <button
               type="button"
               onClick={() => setCreationMode("upload")}
               className={`px-4 py-2 rounded-xl text-sm font-semibold border transition ${
                 creationMode === "upload"
-                  ? "bg-[#5e2cec] border-[#7c5cfc] text-white"
+                  ? "bg-[#b89a5e] border-[#d4b97a] text-white"
                   : "border-white/[0.12] text-white/60 hover:text-white hover:bg-white/[0.06]"
               }`}
             >
@@ -176,9 +176,9 @@ function ContractForm({ operatorId, operatorName = "", initial, onSave, onCancel
 
       {initial && (
         <div className="rounded-xl border border-white/[0.1] bg-white/[0.03] px-3 py-2 flex items-center gap-2">
-          <Icon icon="solar:document-text-bold-duotone" className="text-[#9b74ff] text-lg shrink-0" />
+          <Icon icon="solar:document-text-bold-duotone" className="text-[#d4b97a] text-lg shrink-0" />
           <span className="text-white/80 text-sm">
-            {isTemplateContract ? "Contrato generado desde plantilla estándar Newayzi (firma del operador incrustada al firmar)." : "Documento PDF subido manualmente (firma como anexo si no es plantilla v1)."}
+            {isTemplateContract ? "Contrato generado desde plantilla estándar Almara (firma del operador incrustada al firmar)." : "Documento PDF subido manualmente (firma como anexo si no es plantilla v1)."}
           </span>
         </div>
       )}
@@ -217,9 +217,9 @@ function ContractForm({ operatorId, operatorName = "", initial, onSave, onCancel
           <FieldLabel>{initial ? "Reemplazar PDF (opcional)" : "Documento PDF *"}</FieldLabel>
           <div
             onClick={() => fileRef.current?.click()}
-            className="w-full border-2 border-dashed border-white/[0.15] rounded-xl px-4 py-5 flex flex-col items-center gap-2 cursor-pointer hover:border-[#7c5cfc]/40 hover:bg-white/[0.03] transition"
+            className="w-full border-2 border-dashed border-white/[0.15] rounded-xl px-4 py-5 flex flex-col items-center gap-2 cursor-pointer hover:border-[#d4b97a]/40 hover:bg-white/[0.03] transition"
           >
-            <Icon icon="solar:document-add-bold-duotone" className="text-[#9b74ff] text-3xl" />
+            <Icon icon="solar:document-add-bold-duotone" className="text-[#d4b97a] text-3xl" />
             {pdfFile ? (
               <p className="text-sm text-emerald-300 font-medium">{pdfFile.name}</p>
             ) : initial?.documentPdfUrl ? (
@@ -240,7 +240,7 @@ function ContractForm({ operatorId, operatorName = "", initial, onSave, onCancel
           className={`${inputCls} resize-none h-20`}
           value={notes}
           onChange={e => setNotes(e.target.value)}
-          placeholder="Notas para el equipo Newayzi (no visibles para el operador)"
+          placeholder="Notas para el equipo Almara (no visibles para el operador)"
         />
       </div>
 
@@ -258,7 +258,7 @@ function ContractForm({ operatorId, operatorName = "", initial, onSave, onCancel
         <button
           onClick={handleSave}
           disabled={saving}
-          className="px-5 py-2 rounded-xl text-sm font-semibold bg-[#5e2cec] text-white hover:bg-[#7c5cfc] disabled:opacity-50 transition flex items-center gap-2"
+          className="px-5 py-2 rounded-xl text-sm font-semibold bg-[#b89a5e] text-white hover:bg-[#d4b97a] disabled:opacity-50 transition flex items-center gap-2"
         >
           {saving && <Icon icon="solar:loading-line-duotone" className="animate-spin" />}
           {saving ? "Guardando…" : "Guardar contrato"}
@@ -268,7 +268,7 @@ function ContractForm({ operatorId, operatorName = "", initial, onSave, onCancel
   );
 }
 
-// ── Modal de firma Newayzi ─────────────────────────────────────────────────
+// ── Modal de firma plataforma (Almara) ─────────────────────────────────────
 
 function SignNewayziModal({
   operatorId,
@@ -311,21 +311,21 @@ function SignNewayziModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="w-full max-w-md bg-[#13111e] border border-white/[0.12] rounded-2xl p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-sora font-bold text-white text-base">Firma de Newayzi</h3>
+          <h3 className="font-sora font-bold text-white text-base">Firma de Almara</h3>
           <button onClick={onClose} className="text-white/40 hover:text-white transition">
             <Icon icon="solar:close-circle-bold-duotone" className="text-xl" />
           </button>
         </div>
         <p className="text-white/55 text-sm">
-          Al continuar, se registrará tu firma como representante de Newayzi y se enviará un link de firma al operador por email.
+          Al continuar, se registrará tu firma como representante de Almara y se enviará un link de firma al operador por email.
         </p>
         <div>
           <FieldLabel>Tu nombre completo *</FieldLabel>
           <input
-            className="w-full bg-white/[0.06] border border-white/[0.12] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#7c5cfc]/60 focus:ring-1 focus:ring-[#7c5cfc]/30 transition"
+            className="w-full bg-white/[0.06] border border-white/[0.12] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#d4b97a]/60 focus:ring-1 focus:ring-[#d4b97a]/30 transition"
             value={signerName}
             onChange={e => setSignerName(e.target.value)}
-            placeholder="Nombre del firmante de Newayzi"
+            placeholder="Nombre del firmante de Almara"
           />
         </div>
         <div className="rounded-xl bg-amber-500/10 border border-amber-400/20 px-4 py-3 text-amber-200/80 text-xs">
@@ -351,7 +351,7 @@ function SignNewayziModal({
             <button
               onClick={handleSign}
               disabled={saving || !signerName.trim()}
-              className="px-5 py-2 rounded-xl text-sm font-semibold bg-[#5e2cec] text-white hover:bg-[#7c5cfc] disabled:opacity-50 transition flex items-center gap-2"
+              className="px-5 py-2 rounded-xl text-sm font-semibold bg-[#b89a5e] text-white hover:bg-[#d4b97a] disabled:opacity-50 transition flex items-center gap-2"
             >
               {saving && <Icon icon="solar:loading-line-duotone" className="animate-spin" />}
               {saving ? "Firmando…" : "Firmar y enviar al operador"}
@@ -457,8 +457,8 @@ function ContractCard({
             <p className="font-sora font-bold text-white text-sm truncate">{contract.title}</p>
             <p className="text-white/35 text-xs mt-0.5">{contract.contractNumber}</p>
             {contract.documentSource === "platform_template" && (
-              <span className="inline-flex mt-1.5 px-2 py-0.5 rounded-md text-[0.65rem] font-semibold uppercase tracking-wide bg-[#5e2cec]/25 text-[#c4b5fd] border border-[#7c5cfc]/30">
-                Plantilla Newayzi
+              <span className="inline-flex mt-1.5 px-2 py-0.5 rounded-md text-[0.65rem] font-semibold uppercase tracking-wide bg-[#b89a5e]/25 text-[#c4b5fd] border border-[#d4b97a]/30">
+                Plantilla Almara
               </span>
             )}
           </div>
@@ -474,7 +474,7 @@ function ContractCard({
             </FieldValue>
           </div>
           <div>
-            <FieldLabel>Firma Newayzi</FieldLabel>
+            <FieldLabel>Firma Almara</FieldLabel>
             <FieldValue>{contract.signedByNewayziName || "—"}</FieldValue>
           </div>
           {contract.documentSource === "platform_template" && (
@@ -512,7 +512,7 @@ function ContractCard({
               href={contract.documentPdfUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 text-[#9b74ff] text-sm hover:text-white transition w-fit"
+              className="inline-flex items-center gap-2 text-[#d4b97a] text-sm hover:text-white transition w-fit"
             >
               <Icon icon="solar:document-bold-duotone" className="text-base" />
               Ver documento PDF (original)
@@ -554,7 +554,7 @@ function ContractCard({
               </button>
               <button
                 onClick={() => setShowSignModal(true)}
-                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#5e2cec] text-white hover:bg-[#7c5cfc] transition flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#b89a5e] text-white hover:bg-[#d4b97a] transition flex items-center gap-1.5"
               >
                 <Icon icon="solar:pen-new-square-bold-duotone" className="text-sm" />
                 Firmar y enviar al operador
@@ -655,7 +655,7 @@ export function OperatorContractPanel({ operatorId, operatorName = "", readOnly 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Icon icon="solar:loading-line-duotone" className="text-[#9b74ff] text-2xl animate-spin" />
+        <Icon icon="solar:loading-line-duotone" className="text-[#d4b97a] text-2xl animate-spin" />
       </div>
     );
   }
@@ -671,7 +671,7 @@ export function OperatorContractPanel({ operatorId, operatorName = "", readOnly 
         {!readOnly && !showForm && (
           <button
             onClick={() => { setEditingContract(null); setShowForm(true); }}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#5e2cec] text-white text-sm font-semibold hover:bg-[#7c5cfc] transition"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#b89a5e] text-white text-sm font-semibold hover:bg-[#d4b97a] transition"
           >
             <Icon icon="solar:add-circle-bold-duotone" className="text-base" />
             Nuevo contrato
@@ -681,7 +681,7 @@ export function OperatorContractPanel({ operatorId, operatorName = "", readOnly 
 
       {/* Formulario (create / edit draft) */}
       {showForm && !readOnly && (
-        <GlassCard className="border-[#7c5cfc]/30">
+        <GlassCard className="border-[#d4b97a]/30">
           <p className="font-sora font-semibold text-white text-sm mb-4">
             {editingContract ? "Editar contrato" : "Nuevo contrato"}
           </p>
@@ -727,8 +727,8 @@ export function OperatorContractPanel({ operatorId, operatorName = "", readOnly 
       {/* Sin contratos */}
       {contracts.length === 0 && !showForm && (
         <div className="flex flex-col items-center justify-center py-10 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-[#5e2cec]/15 border border-[#5e2cec]/25 flex items-center justify-center mb-3">
-            <Icon icon="solar:document-add-bold-duotone" className="text-[#9b74ff] text-xl" />
+          <div className="w-12 h-12 rounded-2xl bg-[#b89a5e]/15 border border-[#b89a5e]/25 flex items-center justify-center mb-3">
+            <Icon icon="solar:document-add-bold-duotone" className="text-[#d4b97a] text-xl" />
           </div>
           <p className="text-white/60 text-sm font-medium">Sin contratos</p>
           <p className="text-white/30 text-xs mt-1 max-w-xs">

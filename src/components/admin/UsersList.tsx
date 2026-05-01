@@ -194,7 +194,7 @@ export function UsersList() {
   if (loading) {
     return (
       <GlassCard className="flex justify-center items-center py-16">
-        <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+        <Spinner size="lg" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }} />
       </GlassCard>
     );
   }
@@ -202,8 +202,8 @@ export function UsersList() {
   if (list.length === 0) {
     return (
       <GlassCard className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 flex items-center justify-center mb-4">
-          <Icon icon="solar:users-group-rounded-bold-duotone" className="text-[#9b74ff] text-2xl" />
+        <div className="w-14 h-14 rounded-2xl bg-[#b89a5e]/20 border border-[#b89a5e]/30 flex items-center justify-center mb-4">
+          <Icon icon="solar:users-group-rounded-bold-duotone" className="text-[#d4b97a] text-2xl" />
         </div>
         <p className="font-sora font-bold text-white text-base">No hay usuarios con perfil</p>
         <p className="mt-2 text-sm text-white/50 max-w-md">
@@ -252,7 +252,7 @@ export function UsersList() {
                 </td>
                 <td className="py-4 px-5 text-white/70 text-sm">{u.email}</td>
                 <td className="py-4 px-5">
-                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.7rem] font-medium bg-[#5e2cec]/25 border border-[#5e2cec]/30 text-[#b89eff]">
+                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.7rem] font-medium bg-[#b89a5e]/25 border border-[#b89a5e]/30 text-[#f0e6d2]">
                     {u.loyalty_level ?? "member"} · {u.loyalty_points ?? 0} pts
                   </span>
                 </td>
@@ -427,7 +427,7 @@ export function UsersList() {
       >
         <ModalContent>
           <ModalHeader className="flex items-center gap-3">
-            <Icon icon="solar:pen-bold-duotone" className="text-[#9b74ff] text-2xl" />
+            <Icon icon="solar:pen-bold-duotone" className="text-[#d4b97a] text-2xl" />
             Editar usuario
           </ModalHeader>
           <ModalBody className="space-y-4">

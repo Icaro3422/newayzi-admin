@@ -134,7 +134,7 @@ export default function AdminSeoArticlesPage() {
             setGenError(null);
             setGenMessage(null);
           }}
-          className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl font-sora font-semibold text-sm text-white bg-gradient-to-br from-[#3d21c4] to-[#5e2cec] hover:from-[#5e2cec] hover:to-[#422df6] transition-all"
+          className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-xl font-sora font-semibold text-sm text-white bg-gradient-to-br from-[#8a7346] to-[#b89a5e] hover:from-[#b89a5e] hover:to-[#9a7d4a] transition-all"
         >
           <Icon icon="solar:magic-stick-3-bold-duotone" className="text-lg" />
           Generar
@@ -159,7 +159,7 @@ export default function AdminSeoArticlesPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-white/[0.08] border border-white/[0.15] rounded-xl px-3 py-2 text-sm text-white font-sora outline-none focus:border-[#5e2cec]"
+          className="bg-white/[0.08] border border-white/[0.15] rounded-xl px-3 py-2 text-sm text-white font-sora outline-none focus:border-[#b89a5e]"
         >
           <option value="">Todos</option>
           <option value="published">Publicadas</option>
@@ -250,7 +250,7 @@ export default function AdminSeoArticlesPage() {
                 <button
                   type="submit"
                   disabled={genLoading}
-                  className="px-5 py-2.5 rounded-xl text-sm font-sora font-semibold text-white bg-gradient-to-br from-[#3d21c4] to-[#5e2cec] disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl text-sm font-sora font-semibold text-white bg-gradient-to-br from-[#8a7346] to-[#b89a5e] disabled:opacity-50"
                 >
                   {genLoading ? "Generando…" : "Ejecutar"}
                 </button>

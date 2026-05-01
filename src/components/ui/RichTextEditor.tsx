@@ -137,7 +137,7 @@ function ToolbarButton({
       className={`flex flex-col items-center justify-center gap-0.5 rounded-lg px-2 py-1.5 min-w-[44px] transition-all duration-200 [&_svg]:shrink-0 ${
         dark
           ? active
-            ? "bg-[#5e2cec] text-white shadow-sm"
+            ? "bg-[#b89a5e] text-white shadow-sm"
             : "text-white/70 hover:bg-white/[0.12] hover:text-white"
           : active
             ? "bg-newayzi-majorelle text-white shadow-sm"
@@ -363,7 +363,7 @@ export function RichTextEditor({
     <div
       className={`overflow-hidden rounded-xl transition-shadow ${
         dark
-          ? `border border-white/[0.12] bg-white/[0.06] focus-within:ring-2 focus-within:ring-[#5e2cec]/30 focus-within:border-[#5e2cec]/50 ${
+          ? `border border-white/[0.12] bg-white/[0.06] focus-within:ring-2 focus-within:ring-[#b89a5e]/30 focus-within:border-[#b89a5e]/50 ${
               disabled ? "opacity-60" : ""
             }`
           : `border border-gray-200/60 bg-white shadow-sm focus-within:ring-2 focus-within:ring-newayzi-majorelle/30 focus-within:border-newayzi-majorelle/50 ${

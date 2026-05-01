@@ -222,7 +222,7 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
             <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <Icon icon="solar:wallet-bold-duotone" className="text-violet-300 text-lg" />
-                <span className="text-white/80 text-sm font-semibold">Billetera Newayzi Rewards inicial</span>
+                <span className="text-white/80 text-sm font-semibold">Billetera Almara Rewards inicial</span>
               </div>
               <Select
                 label="Nivel Rewards de inicio"
@@ -273,7 +273,7 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
               Cancelar
             </Button>
             <Button
-              className="bg-[#5e2cec] hover:bg-[#6d3cf5] text-white"
+              className="bg-[#b89a5e] hover:bg-[#6d3cf5] text-white"
               onPress={handleCreate}
               isLoading={saving}
               isDisabled={!canSubmit}

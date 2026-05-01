@@ -159,7 +159,7 @@ function buildBarOption(categories: string[], data: BarSeriesPoint[]) {
         emphasis: {
           itemStyle: {
             shadowBlur: 12,
-            shadowColor: "rgba(94, 44, 236, 0.45)",
+            shadowColor: "rgba(184, 154, 94, 0.45)",
           },
         },
       },
@@ -335,8 +335,8 @@ export function OperatorInfrastructureCharts({
   const portfolioBarCategoriesAndData = useMemo(() => {
     const categories: string[] = ["Propiedades", "Activas", "Publicadas", "Conexiones"];
     const data: BarSeriesPoint[] = [
-      { value: properties.length, itemStyle: { color: barGradient("#9b74ff", "#5e2cec") } },
-      { value: activeProps, itemStyle: { color: barGradient("#7c6bff", "#422df6") } },
+      { value: properties.length, itemStyle: { color: barGradient("#d4b97a", "#b89a5e") } },
+      { value: activeProps, itemStyle: { color: barGradient("#7c6bff", "#9a7d4a") } },
       { value: publishedProps, itemStyle: { color: barGradient("#6ee7b7", "#10b981") } },
       { value: connections.length, itemStyle: { color: barGradient("#c4b5fd", "#8b5cf6") } },
     ];
@@ -388,10 +388,10 @@ export function OperatorInfrastructureCharts({
         portfolioBarCategoriesAndData.categories,
         portfolioBarCategoriesAndData.data,
         "#a78bfa",
-        "#5e2cec",
+        "#b89a5e",
         "rgba(167, 139, 250, 0.42)",
-        "rgba(94, 44, 236, 0.12)",
-        "rgba(94, 44, 236, 0.02)"
+        "rgba(184, 154, 94, 0.12)",
+        "rgba(184, 154, 94, 0.02)"
       ),
     [portfolioBarCategoriesAndData]
   );
@@ -480,7 +480,7 @@ export function OperatorInfrastructureCharts({
       "Propiedades y cartera",
       "#c4b5fd",
       "rgba(139, 92, 246, 0.22)",
-      "#5e2cec"
+      "#b89a5e"
     );
   }, [portfolioBarCategoriesAndData]);
 
@@ -508,7 +508,7 @@ export function OperatorInfrastructureCharts({
         averagePriceSynced,
         currency,
         [
-          [0.35, "rgba(94, 44, 236, 0.35)"],
+          [0.35, "rgba(184, 154, 94, 0.35)"],
           [0.65, "rgba(155, 116, 255, 0.55)"],
           [1, "rgba(139, 92, 246, 0.6)"],
         ],
@@ -543,7 +543,7 @@ export function OperatorInfrastructureCharts({
   const donutOption = useMemo(() => {
     const data = [
       { value: publishedProps, name: "Publicadas", itemStyle: { color: "#10b981" } },
-      { value: activeNotPublished, name: "Activas sin publicar", itemStyle: { color: "#9b74ff" } },
+      { value: activeNotPublished, name: "Activas sin publicar", itemStyle: { color: "#d4b97a" } },
       { value: inactive, name: "Inactivas", itemStyle: { color: "rgba(148, 163, 184, 0.85)" } },
     ];
     const hasVolume = data.some((d) => d.value > 0);

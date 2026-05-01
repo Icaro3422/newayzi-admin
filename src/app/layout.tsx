@@ -19,8 +19,13 @@ const heebo = Heebo({
 });
 
 export const metadata: Metadata = {
-  title: "Newayzi Admin | Panel de administración",
-  description: "Panel de administración de Newayzi",
+  title: "Almara Admin | Panel de administración",
+  description: "Panel de administración Almara",
+  icons: {
+    icon: [{ url: "/brand/almara-a-white.png", type: "image/png" }],
+    shortcut: "/brand/almara-a-white.png",
+    apple: "/brand/almara-a-white.png",
+  },
 };
 
 export default function RootLayout({
@@ -31,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="es" className="overflow-x-hidden max-w-full">
       <body
-        className={`${sora.variable} ${heebo.variable} antialiased font-sans overflow-x-hidden max-w-full`}
+        className={`${sora.variable} ${heebo.variable} antialiased font-sora overflow-x-hidden max-w-full`}
         suppressHydrationWarning
       >
         <Providers>

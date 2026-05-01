@@ -47,7 +47,7 @@ const POLICY_META: Record<CancellationPolicyType, { label: string; description: 
     label: "Personalizada",
     description: "Define tus propias reglas de reembolso por días antes del check-in.",
     icon: "solar:settings-bold-duotone",
-    color: "text-[#9b74ff]",
+    color: "text-[#d4b97a]",
   },
 };
 
@@ -68,7 +68,7 @@ function TiersEditor({
   onChange: (t: CancellationTier[]) => void;
   disabled?: boolean;
 }) {
-  const inputCls = `bg-white/[0.06] border border-white/[0.12] rounded-lg px-2.5 py-1.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#7c5cfc]/60 transition ${disabled ? "opacity-50 cursor-not-allowed" : ""}`;
+  const inputCls = `bg-white/[0.06] border border-white/[0.12] rounded-lg px-2.5 py-1.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#d4b97a]/60 transition ${disabled ? "opacity-50 cursor-not-allowed" : ""}`;
 
   function updateTier(idx: number, key: keyof CancellationTier, value: string | number) {
     const next = tiers.map((t, i) =>
@@ -152,7 +152,7 @@ function TiersEditor({
       {!disabled && (
         <button
           onClick={addTier}
-          className="text-[#9b74ff] text-xs hover:text-white transition flex items-center gap-1.5 mt-2"
+          className="text-[#d4b97a] text-xs hover:text-white transition flex items-center gap-1.5 mt-2"
         >
           <Icon icon="solar:add-circle-bold-duotone" />
           Agregar regla
@@ -188,7 +188,7 @@ function PolicyReadOnly({ policy }: { policy: PropertyCancellationPolicy }) {
 
       {policy.contractNumber && (
         <p className="text-white/40 text-xs mb-3">
-          Vinculada al contrato: <span className="text-[#9b74ff]">{policy.contractNumber}</span>
+          Vinculada al contrato: <span className="text-[#d4b97a]">{policy.contractNumber}</span>
         </p>
       )}
 
@@ -293,7 +293,7 @@ export function PropertyCancellationPolicyPanel({ propertyId, readOnly = false }
   async function handleClearPolicy() {
     const msg =
       "¿Quitar la política de cancelación de esta propiedad?\n\n" +
-      "Las cancelaciones volverán a regirse por los términos estándar de Newayzi (T&C §19). " +
+      "Las cancelaciones volverán a regirse por los términos estándar de Almara (T&C §19). " +
       "El historial de políticas anteriores se conserva.";
     if (!window.confirm(msg)) return;
     setClearing(true);
@@ -309,12 +309,12 @@ export function PropertyCancellationPolicyPanel({ propertyId, readOnly = false }
     }
   }
 
-  const inputCls = "w-full bg-white/[0.06] border border-white/[0.12] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#7c5cfc]/60 focus:ring-1 focus:ring-[#7c5cfc]/30 transition";
+  const inputCls = "w-full bg-white/[0.06] border border-white/[0.12] rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#d4b97a]/60 focus:ring-1 focus:ring-[#d4b97a]/30 transition";
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-10">
-        <Icon icon="solar:loading-line-duotone" className="text-[#9b74ff] text-2xl animate-spin" />
+        <Icon icon="solar:loading-line-duotone" className="text-[#d4b97a] text-2xl animate-spin" />
       </div>
     );
   }
@@ -333,7 +333,7 @@ export function PropertyCancellationPolicyPanel({ propertyId, readOnly = false }
           <p className="text-white/40 text-xs mt-1">
             {active
               ? "Esta política reemplaza la lógica estándar de T&C §19 para las cancelaciones de esta propiedad."
-              : "Sin política activa. Se usará la lógica estándar de T&C §19 de Newayzi."}
+              : "Sin política activa. Se usará la lógica estándar de T&C §19 de Almara."}
           </p>
         </div>
         {canEdit && !showEditor && (
@@ -363,7 +363,7 @@ export function PropertyCancellationPolicyPanel({ propertyId, readOnly = false }
                 setEffectiveUntil(active?.effectiveUntil ?? "");
                 setShowEditor(true);
               }}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#5e2cec] text-white text-sm font-semibold hover:bg-[#7c5cfc] transition"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#b89a5e] text-white text-sm font-semibold hover:bg-[#d4b97a] transition"
             >
               <Icon icon={active ? "solar:pen-bold-duotone" : "solar:add-circle-bold-duotone"} className="text-base" />
               {active ? "Cambiar política" : "Crear política"}
@@ -395,13 +395,13 @@ export function PropertyCancellationPolicyPanel({ propertyId, readOnly = false }
             <Icon icon="solar:documents-bold-duotone" className="text-white/30 text-xl" />
           </div>
           <p className="text-white/40 text-sm">Sin política de cancelación configurada</p>
-          <p className="text-white/25 text-xs mt-1">Se aplicará T&C §19 de Newayzi en las cancelaciones</p>
+          <p className="text-white/25 text-xs mt-1">Se aplicará T&C §19 de Almara en las cancelaciones</p>
         </div>
       )}
 
       {/* Editor */}
       {showEditor && !isLocked && (
-        <GlassCard className="border-[#7c5cfc]/25">
+        <GlassCard className="border-[#d4b97a]/25">
           <p className="font-sora font-semibold text-white text-sm mb-4">
             {active ? "Cambiar política de cancelación" : "Nueva política de cancelación"}
           </p>
@@ -419,7 +419,7 @@ export function PropertyCancellationPolicyPanel({ propertyId, readOnly = false }
                     onClick={() => handleTypeChange(type)}
                     className={`flex flex-col items-center gap-1 px-3 py-3 rounded-xl border text-center transition ${
                       sel
-                        ? "border-[#7c5cfc]/50 bg-[#5e2cec]/15"
+                        ? "border-[#d4b97a]/50 bg-[#b89a5e]/15"
                         : "border-white/[0.10] bg-white/[0.04] hover:bg-white/[0.07]"
                     }`}
                   >
@@ -477,7 +477,7 @@ export function PropertyCancellationPolicyPanel({ propertyId, readOnly = false }
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-5 py-2 rounded-xl text-sm font-semibold bg-[#5e2cec] text-white hover:bg-[#7c5cfc] disabled:opacity-50 transition flex items-center gap-2"
+              className="px-5 py-2 rounded-xl text-sm font-semibold bg-[#b89a5e] text-white hover:bg-[#d4b97a] disabled:opacity-50 transition flex items-center gap-2"
             >
               {saving && <Icon icon="solar:loading-line-duotone" className="animate-spin" />}
               {saving ? "Guardando…" : "Guardar política"}

@@ -102,7 +102,7 @@ export function OperatorDetailClient() {
       <GlassCard className="flex justify-center items-center py-16">
         <Spinner
           size="lg"
-          classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }}
+          classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }}
         />
       </GlassCard>
     );
@@ -202,7 +202,7 @@ export function OperatorDetailClient() {
         </p>
       </GlassCard>
 
-      {/* ── Acuerdos Newayzi Rewards — visible para super_admin y comercial ── */}
+      {/* ── Acuerdos Almara Rewards — visible para super_admin y comercial ── */}
       {canViewRewards && (
         <div className="rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6">
           <div className="flex items-center justify-between gap-3 mb-5">
@@ -211,7 +211,7 @@ export function OperatorDetailClient() {
                 <Icon icon="solar:gift-bold-duotone" className="text-purple-400 text-lg" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-white/90">Newayzi Rewards — Acuerdo comercial</h2>
+                <h2 className="text-base font-bold text-white/90">Almara Rewards — Acuerdo comercial</h2>
                 <p className="text-xs text-white/50">
                   {canEdit
                     ? "Gestiona los términos negociados con este operador para su participación en el programa de cashback."

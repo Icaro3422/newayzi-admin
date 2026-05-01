@@ -868,7 +868,7 @@ function logAdminSessionIssue(
   detail: Record<string, unknown>
 ): void {
   if (typeof window === "undefined") return;
-  console.error(`[newayzi-admin] ${phase}`, detail);
+  console.error(`[almara-admin] ${phase}`, detail);
 }
 
 /**
@@ -935,7 +935,7 @@ async function authFetch(path: string, options: RequestInit = {}) {
     });
     if (msg === "Failed to fetch" || msg.includes("NetworkError")) {
       throw new Error(
-        "No se pudo contactar la API (red, CORS o bloqueo del navegador). Revisa la consola [newayzi-admin] y la pestaña Red."
+        "No se pudo contactar la API (red, CORS o bloqueo del navegador). Revisa la consola [almara-admin] y la pestaña Red."
       );
     }
     throw e instanceof Error ? e : new Error(msg);
@@ -1098,7 +1098,7 @@ async function uploadToS3PresignedPost(uploadUrl: string, formData: FormData): P
     if (looksLikeCorsOrOpaqueNetwork) {
       if (typeof console !== "undefined" && typeof console.warn === "function") {
         console.warn(
-          "[newayzi-admin] POST a S3: respuesta no legible por CORS; si en Red ves 204, se asume éxito y se llama a confirm."
+          "[almara-admin] POST a S3: respuesta no legible por CORS; si en Red ves 204, se asume éxito y se llama a confirm."
         );
       }
       return;
@@ -2770,7 +2770,7 @@ export const ROLE_META: Record<AdminRole, { label: string; icon: string; color: 
 /** Permisos de acceso a módulos */
 export function canAccessModule(role: AdminRole | null, module: string): boolean {
   if (!role) return false;
-  // Super admin no ve "Mi Billetera" — es parte del equipo Newayzi, no usa rewards personales
+  // Super admin no ve "Mi Billetera" — es parte del equipo Almara, no usa rewards personales
   if (role === "super_admin" && module === "wallet") return false;
   if (role === "super_admin") return true;
   switch (module) {
@@ -2871,7 +2871,7 @@ export async function fetchPlatformStats(): Promise<PlatformStats | null> {
   }
 }
 
-// ─── Agent Wallets (unificado con Newayzi Rewards / LoyaltyUserSummary) ────────
+// ─── Agent Wallets (unificado con Almara Rewards / LoyaltyUserSummary) ────────
 
 export type WalletMovementReason =
   | "cashback"
@@ -2962,7 +2962,7 @@ export const agentWallets = {
     return res.json();
   },
 
-  /** El propio agente ve su billetera Newayzi Rewards */
+  /** El propio agente ve su billetera Almara Rewards */
   async getOwn(token: string): Promise<AgentWallet | null> {
     const res = await fetch(`${resolvedApiBase()}/api/agent/wallet/`, {
       headers: clerkAuthHeaders(token),
@@ -3086,7 +3086,7 @@ export interface OperatorContract {
 
 export interface CreateContractPayload {
   title: string;
-  /** upload = PDF manual; platform_template = genera contrato estándar Newayzi */
+  /** upload = PDF manual; platform_template = genera contrato estándar Almara */
   creation_mode?: "upload" | "platform_template";
   document_pdf?: File;
   /** Parte operadora en el PDF (plantilla); vacío = nombre del operador en sistema */

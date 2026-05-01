@@ -76,9 +76,10 @@ const ROLE_NAV_OVERRIDES: Partial<Record<AdminRole, Partial<Record<string, strin
   },
 };
 
-const BG_GRADIENT = "radial-gradient(ellipse 110% 80% at 20% 15%, #1e1060 0%, #0c0720 45%, #050310 100%)";
-const GLOW_1     = "radial-gradient(circle, rgba(94,44,236,0.18) 0%, transparent 70%)";
-const GLOW_2     = "radial-gradient(circle, rgba(66,45,246,0.10) 0%, transparent 70%)";
+const BG_GRADIENT =
+  "radial-gradient(ellipse 110% 80% at 18% 12%, #1a1814 0%, #0f0f18 42%, #08080c 100%)";
+const GLOW_1 = "radial-gradient(circle, rgba(184,154,94,0.14) 0%, transparent 68%)";
+const GLOW_2 = "radial-gradient(circle, rgba(212,185,122,0.08) 0%, transparent 72%)";
 
 /* ── Vista de acceso denegado ── */
 function AccessDeniedView({
@@ -125,13 +126,13 @@ function AccessDeniedView({
           </h1>
           <p className="text-white/70 text-[0.9375rem] leading-relaxed mb-3">
             {isPermissionDenied
-              ? "No tienes permisos para acceder al administrador. Si crees que deberías tener acceso, comunícate con el equipo de Newayzi."
-              : "Hubo un problema al cargar tu sesión. Si el problema persiste, contacta al equipo de Newayzi."}
+              ? "No tienes permisos para acceder al administrador. Si crees que deberías tener acceso, comunícate con el equipo de Almara."
+              : "Hubo un problema al cargar tu sesión. Si el problema persiste, contacta al equipo de Almara."}
           </p>
           {error.trim() ? (
             <div className="mb-6 rounded-xl border border-white/[0.12] bg-black/25 px-3 py-2.5 text-left">
               <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-white/40 mb-1">
-                Detalle (consola del navegador: filtra <span className="text-white/60">newayzi-admin</span>)
+                Detalle (consola del navegador: filtra <span className="text-white/60">almara-admin</span>)
               </p>
               <p className="text-white/85 text-[0.8125rem] font-mono leading-snug break-words whitespace-pre-wrap">
                 {error}
@@ -155,7 +156,7 @@ function AccessDeniedView({
             <button
               type="button"
               onClick={onSignOut}
-              className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-xl font-sora font-semibold text-sm text-white bg-gradient-to-br from-[#3d21c4] to-[#5e2cec] hover:from-[#5e2cec] hover:to-[#422df6] transition-all"
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-xl font-sora font-semibold text-sm text-[#0f0f18] bg-gradient-to-br from-[#b89a5e] to-[#d4b97a] hover:from-[#d4b97a] hover:to-[#b89a5e] transition-all shadow-[0_4px_16px_rgba(184,154,94,0.35)]"
             >
               <Icon icon="solar:logout-2-bold-duotone" className="text-lg" />
               Cerrar sesión
@@ -209,8 +210,8 @@ function ForcePasswordChange({ onDone }: { onDone: () => void }) {
     }}>
       <div className="w-full max-w-md bg-white/[0.06] border border-white/[0.1] rounded-2xl p-8 backdrop-blur-sm">
         {/* Ícono */}
-        <div className="w-14 h-14 rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 flex items-center justify-center mb-6 mx-auto">
-          <Icon icon="solar:lock-password-bold-duotone" className="text-[#a78bfa] text-3xl" />
+        <div className="w-14 h-14 rounded-2xl bg-[#b89a5e]/20 border border-[#b89a5e]/35 flex items-center justify-center mb-6 mx-auto">
+          <Icon icon="solar:lock-password-bold-duotone" className="text-[#d4b97a] text-3xl" />
         </div>
 
         <h1 className="font-sora font-extrabold text-2xl text-white text-center leading-tight mb-2">
@@ -234,7 +235,7 @@ function ForcePasswordChange({ onDone }: { onDone: () => void }) {
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Mínimo 8 caracteres"
                 autoFocus
-                className="w-full bg-white/[0.08] border border-white/[0.15] rounded-[10px] px-3.5 py-3 pr-10 text-white placeholder:text-white/30 font-sora text-[0.9375rem] outline-none focus:border-[#5e2cec] focus:ring-3 focus:ring-[#5e2cec]/20 transition-all"
+                className="w-full bg-white/[0.08] border border-white/[0.15] rounded-[10px] px-3.5 py-3 pr-10 text-white placeholder:text-white/30 font-sora text-[0.9375rem] outline-none focus:border-[#b89a5e] focus:ring-3 focus:ring-[#b89a5e]/25 transition-all"
                 style={{ minHeight: "46px" }}
               />
               <button type="button" onClick={() => setShowNew(v => !v)} tabIndex={-1}
@@ -255,7 +256,7 @@ function ForcePasswordChange({ onDone }: { onDone: () => void }) {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repite tu contraseña"
-                className="w-full bg-white/[0.08] border border-white/[0.15] rounded-[10px] px-3.5 py-3 pr-10 text-white placeholder:text-white/30 font-sora text-[0.9375rem] outline-none focus:border-[#5e2cec] focus:ring-3 focus:ring-[#5e2cec]/20 transition-all"
+                className="w-full bg-white/[0.08] border border-white/[0.15] rounded-[10px] px-3.5 py-3 pr-10 text-white placeholder:text-white/30 font-sora text-[0.9375rem] outline-none focus:border-[#b89a5e] focus:ring-3 focus:ring-[#b89a5e]/25 transition-all"
                 style={{ minHeight: "46px" }}
               />
               <button type="button" onClick={() => setShowConfirm(v => !v)} tabIndex={-1}
@@ -275,7 +276,7 @@ function ForcePasswordChange({ onDone }: { onDone: () => void }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full min-h-[48px] rounded-[10px] font-sora font-bold text-[0.9375rem] text-white bg-gradient-to-br from-[#3d21c4] to-[#5e2cec] shadow-[0_4px_16px_rgba(94,44,236,0.38)] hover:from-[#5e2cec] hover:to-[#422df6] hover:-translate-y-px active:translate-y-0 transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full min-h-[48px] rounded-[10px] font-sora font-bold text-[0.9375rem] text-[#0f0f18] bg-gradient-to-br from-[#b89a5e] to-[#d4b97a] shadow-[0_4px_16px_rgba(184,154,94,0.4)] hover:from-[#d4b97a] hover:to-[#b89a5e] hover:-translate-y-px active:translate-y-0 transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (
               <><Icon icon="svg-spinners:ring-resize" className="text-lg" /><span>Guardando…</span></>
@@ -334,8 +335,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <div className="flex h-screen items-center justify-center font-sora" style={{ background: BG_GRADIENT }}>
         {shellBg}
         <div className="relative z-10 flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center">
-            <img src="/brand/n-patron-black.svg" style={{ filter: "invert(1)" }} width={24} height={24} alt="" />
+          <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center overflow-hidden p-1.5">
+            <img src="/brand/almara-a-white.png" width={28} height={28} alt="" className="object-contain" />
           </div>
           <p className="text-white/50 text-sm">Cargando sesión…</p>
         </div>
@@ -376,16 +377,18 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       {shellBg}
 
       {/* ── Sidebar ── */}
-      <aside className="relative z-10 flex w-[220px] shrink-0 flex-col border-r border-white/[0.07] bg-[#0a0c24]/70 backdrop-blur-2xl">
+      <aside className="relative z-10 flex w-[220px] shrink-0 flex-col border-r border-white/[0.08] bg-[#0f0f18]/85 backdrop-blur-2xl">
         {/* Logo + Role badge */}
-        <div className="flex flex-col border-b border-white/[0.07]">
-          <div className="flex h-14 items-center gap-3 px-5">
-            <div className="w-8 h-8 rounded-xl bg-[#5e2cec]/25 border border-[#5e2cec]/30 flex items-center justify-center shrink-0">
-              <img src="/brand/n-patron-black.svg" style={{ filter: "invert(1)" }} width={18} height={18} alt="Newayzi" />
+        <div className="flex flex-col border-b border-white/[0.08]">
+          <div className="flex h-14 items-center gap-3 px-4">
+            <div className="w-9 h-9 rounded-xl bg-white/[0.06] border border-[#b89a5e]/25 flex items-center justify-center shrink-0 overflow-hidden p-1">
+              <img src="/brand/almara-a-white.png" width={26} height={26} alt="" className="object-contain" />
             </div>
             <div className="min-w-0">
-              <p className="font-sora font-bold text-white text-[0.9rem] leading-none tracking-[-0.02em]">Newayzi</p>
-              <p className="font-sora text-white/40 text-[0.6rem] mt-0.5 uppercase tracking-widest">Admin</p>
+              <p className="font-sora font-bold text-white text-[0.72rem] leading-none tracking-[0.28em] uppercase">
+                Almara
+              </p>
+              <p className="font-sora text-[#b89a5e]/90 text-[0.6rem] mt-1 uppercase tracking-[0.2em]">Admin</p>
             </div>
           </div>
           {roleMeta && (
@@ -416,17 +419,17 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 className={`relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[0.8125rem] font-medium transition-all duration-200 group ${
                   isActive
-                    ? "bg-[#5e2cec]/20 text-white shadow-[inset_0_0_0_1px_rgba(94,44,236,0.28)]"
+                    ? "bg-[#b89a5e]/18 text-white shadow-[inset_0_0_0_1px_rgba(184,154,94,0.35)]"
                     : "text-white/45 hover:text-white/85 hover:bg-white/[0.05]"
                 }`}
               >
                 {isActive && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[55%] bg-[#5e2cec] rounded-r-full" />
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[55%] bg-[#d4b97a] rounded-r-full" />
                 )}
                 <Icon
                   icon={item.icon}
                   width={17}
-                  className={`shrink-0 transition-colors ${isActive ? "text-[#7c4cff]" : "text-white/35 group-hover:text-white/60"}`}
+                  className={`shrink-0 transition-colors ${isActive ? "text-[#d4b97a]" : "text-[#b89a5e]/55 group-hover:text-[#d4b97a]/85"}`}
                 />
                 <span className="truncate">{item.label}</span>
               </Link>

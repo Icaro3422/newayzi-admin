@@ -65,7 +65,7 @@ function formatPoints(pts: number) {
 const LEVEL_COLORS: Record<string, string> = {
   member: "bg-white/10 text-white/70 border-white/20",
   plus: "bg-blue-500/20 text-blue-300 border-blue-400/30",
-  premium: "bg-[#b89eff]/20 text-[#b89eff] border-[#b89eff]/30",
+  premium: "bg-[#f0e6d2]/20 text-[#f0e6d2] border-[#f0e6d2]/30",
 };
 
 const REASON_ICON: Record<string, string> = {
@@ -154,7 +154,7 @@ function AgencyWalletSection({ agencyId, isSuperAdmin }: { agencyId: number; isS
   if (loading) {
     return (
       <GlassCard className="flex justify-center items-center py-10">
-        <Spinner size="md" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+        <Spinner size="md" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }} />
       </GlassCard>
     );
   }
@@ -189,8 +189,8 @@ function AgencyWalletSection({ agencyId, isSuperAdmin }: { agencyId: number; isS
     <GlassCard>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <h3 className="font-sora font-bold text-white text-base flex items-center gap-2">
-          <Icon icon="solar:star-bold" width={18} className="text-[#b89eff]" />
-          Newayzi Rewards
+          <Icon icon="solar:star-bold" width={18} className="text-[#f0e6d2]" />
+          Almara Rewards
         </h3>
         {isSuperAdmin && (
           <div className="flex gap-2">
@@ -216,7 +216,7 @@ function AgencyWalletSection({ agencyId, isSuperAdmin }: { agencyId: number; isS
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-5">
-        <div className="rounded-2xl bg-[#5e2cec]/15 border border-[#5e2cec]/30 p-4 text-center">
+        <div className="rounded-2xl bg-[#b89a5e]/15 border border-[#b89a5e]/30 p-4 text-center">
           <p className="text-2xl font-bold text-white font-sora">{formatPoints(wallet.points)}</p>
           <p className="text-xs text-white/50 mt-0.5">Puntos</p>
         </div>
@@ -250,7 +250,7 @@ function AgencyWalletSection({ agencyId, isSuperAdmin }: { agencyId: number; isS
                   <Icon
                     icon={REASON_ICON[m.reason] ?? "solar:wallet-outline"}
                     width={14}
-                    className="text-[#b89eff]"
+                    className="text-[#f0e6d2]"
                   />
                 </div>
                 <div className="min-w-0">
@@ -292,7 +292,7 @@ function AgencyWalletSection({ agencyId, isSuperAdmin }: { agencyId: number; isS
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                <Icon icon="solar:pen-bold" width={20} className="text-[#b89eff]" />
+                <Icon icon="solar:pen-bold" width={20} className="text-[#f0e6d2]" />
                 Ajustar billetera
               </span>
             )}
@@ -463,7 +463,7 @@ function AgencyManageSection({
     <>
       <GlassCard>
         <h3 className="font-sora font-bold text-white text-base mb-1 flex items-center gap-2">
-          <Icon icon="solar:pen-new-square-bold-duotone" width={20} className="text-[#b89eff]" />
+          <Icon icon="solar:pen-new-square-bold-duotone" width={20} className="text-[#f0e6d2]" />
           Gestionar agente
         </h3>
         <p className="text-xs text-white/45 mb-4">
@@ -514,7 +514,7 @@ function AgencyManageSection({
                 isSelected={active}
                 onValueChange={setActive}
                 color="primary"
-                classNames={{ wrapper: "group-data-[selected=true]:bg-[#5e2cec]" }}
+                classNames={{ wrapper: "group-data-[selected=true]:bg-[#b89a5e]" }}
               />
               <span className="text-sm text-white/80">Agencia activa</span>
             </div>
@@ -683,11 +683,11 @@ function AgencyInventoryScopeSection({
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
           <h3 className="font-sora font-bold text-white text-base flex items-center gap-2">
-            <Icon icon="solar:map-point-wave-bold-duotone" width={20} className="text-[#b89eff]" />
+            <Icon icon="solar:map-point-wave-bold-duotone" width={20} className="text-[#f0e6d2]" />
             Alcance de inventario
           </h3>
           <p className="mt-1 text-xs text-white/50 max-w-xl">
-            Agencia creada por Newayzi: podés limitar qué operadores y propiedades ven los agentes. Si dejás ambas listas
+            Agencia creada por Almara: podés limitar qué operadores y propiedades ven los agentes. Si dejás ambas listas
             vacías, el inventario es el catálogo completo (comportamiento por defecto). La unión de operadores y propiedades
             define el alcance.
           </p>
@@ -700,7 +700,7 @@ function AgencyInventoryScopeSection({
       )}
       {listsLoading ? (
         <div className="flex justify-center py-8">
-          <Spinner size="md" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+          <Spinner size="md" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }} />
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2">
@@ -717,7 +717,7 @@ function AgencyInventoryScopeSection({
                   >
                     <input
                       type="checkbox"
-                      className="rounded border-white/20 bg-white/5 text-[#5e2cec] focus:ring-[#5e2cec]/40"
+                      className="rounded border-white/20 bg-white/5 text-[#b89a5e] focus:ring-[#b89a5e]/40"
                       checked={opSelected.has(o.id)}
                       onChange={() => toggleOp(o.id)}
                     />
@@ -740,7 +740,7 @@ function AgencyInventoryScopeSection({
                   >
                     <input
                       type="checkbox"
-                      className="rounded border-white/20 bg-white/5 text-[#5e2cec] focus:ring-[#5e2cec]/40"
+                      className="rounded border-white/20 bg-white/5 text-[#b89a5e] focus:ring-[#b89a5e]/40"
                       checked={propSelected.has(p.id)}
                       onChange={() => toggleProp(p.id)}
                     />
@@ -804,7 +804,7 @@ export function AgencyDetailClient() {
       <GlassCard className="flex justify-center items-center py-16">
         <Spinner
           size="lg"
-          classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }}
+          classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }}
         />
       </GlassCard>
     );
@@ -816,7 +816,7 @@ export function AgencyDetailClient() {
         <p className="text-white/70 font-sora">Agencia no encontrada.</p>
         <Link
           href="/admin/agents"
-          className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-[#9b74ff] hover:text-[#b89eff] transition-colors"
+          className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-[#d4b97a] hover:text-[#f0e6d2] transition-colors"
         >
           <Icon icon="solar:arrow-left-outline" width={18} />
           Volver a Agentes
@@ -874,7 +874,7 @@ export function AgencyDetailClient() {
         {!isOperator && (
           <GlassCard className="p-5">
             <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Comisión generada</span>
-            <p className="mt-2 text-xl font-semibold text-[#b89eff]">{formatCurrency(s.total_commission)}</p>
+            <p className="mt-2 text-xl font-semibold text-[#f0e6d2]">{formatCurrency(s.total_commission)}</p>
           </GlassCard>
         )}
         <GlassCard className="p-5">
@@ -920,7 +920,7 @@ export function AgencyDetailClient() {
         </dl>
         {isOperator && (
           <p className="mt-4 text-xs text-white/40 border-t border-white/[0.08] pt-4">
-            Nivel de socio, comisiones del programa y Newayzi Rewards (puntos, bonos) los gestiona Newayzi. Si necesitas
+            Nivel de socio, comisiones del programa y Almara Rewards (puntos, bonos) los gestiona Almara. Si necesitas
             un ajuste para tu agente, coordina con el equipo.
           </p>
         )}

@@ -38,7 +38,7 @@ export function ConnectionsList({ refreshKey = 0 }: { refreshKey?: number }) {
   if (loading) {
     return (
       <GlassCard className="flex justify-center items-center py-16">
-        <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+        <Spinner size="lg" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }} />
       </GlassCard>
     );
   }
@@ -46,8 +46,8 @@ export function ConnectionsList({ refreshKey = 0 }: { refreshKey?: number }) {
   if (list.length === 0) {
     return (
       <GlassCard className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 flex items-center justify-center mb-4">
-          <Icon icon="solar:link-circle-bold-duotone" className="text-[#9b74ff] text-2xl" />
+        <div className="w-14 h-14 rounded-2xl bg-[#b89a5e]/20 border border-[#b89a5e]/30 flex items-center justify-center mb-4">
+          <Icon icon="solar:link-circle-bold-duotone" className="text-[#d4b97a] text-2xl" />
         </div>
         <p className="font-sora font-bold text-white text-base">Sin conexiones</p>
         <p className="mt-2 text-sm text-white/50">
@@ -136,7 +136,7 @@ export function ConnectionsList({ refreshKey = 0 }: { refreshKey?: number }) {
                 <td className="py-4 px-5 text-right">
                   <Link
                     href={`/admin/connections/${c.id}`}
-                    className="font-sora font-semibold text-[#9b74ff] hover:text-[#b89eff] transition-colors"
+                    className="font-sora font-semibold text-[#d4b97a] hover:text-[#f0e6d2] transition-colors"
                   >
                     {isSuperAdmin ? "Editar" : "Ver detalle"}
                   </Link>

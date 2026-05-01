@@ -52,7 +52,7 @@ function Input({
           placeholder:text-gray-400 placeholder:font-normal
           outline-none transition-all duration-150
           hover:border-gray-300 hover:bg-white
-          focus:border-[#5e2cec] focus:bg-white focus:ring-3 focus:ring-[#5e2cec]/10
+          focus:border-[#b89a5e] focus:bg-white focus:ring-3 focus:ring-[#b89a5e]/10
         "
         style={{ minHeight: "46px" }}
       />
@@ -80,12 +80,12 @@ function PrimaryButton({
       disabled={loading || disabled}
       className="
         w-full min-h-[48px] rounded-[10px] font-sora font-bold text-[0.9375rem] text-white
-        bg-gradient-to-br from-[#3d21c4] to-[#5e2cec]
-        shadow-[0_4px_16px_rgba(94,44,236,0.38)]
-        hover:from-[#5e2cec] hover:to-[#422df6]
-        hover:shadow-[0_6px_22px_rgba(94,44,236,0.46)]
+        bg-gradient-to-br from-[#8a7346] to-[#b89a5e]
+        shadow-[0_4px_16px_rgba(184, 154, 94,0.38)]
+        hover:from-[#b89a5e] hover:to-[#9a7d4a]
+        hover:shadow-[0_6px_22px_rgba(184, 154, 94,0.46)]
         hover:-translate-y-px
-        active:translate-y-0 active:shadow-[0_2px_8px_rgba(94,44,236,0.35)]
+        active:translate-y-0 active:shadow-[0_2px_8px_rgba(184, 154, 94,0.35)]
         transition-all duration-150
         disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0
         flex items-center justify-center gap-2
@@ -198,9 +198,9 @@ function OTPInput({
             "border-[1.5px] rounded-[10px]",
             "outline-none transition-all duration-150",
             digits[i]
-              ? "border-[#5e2cec] bg-white shadow-[0_2px_8px_rgba(94,44,236,0.12)]"
+              ? "border-[#b89a5e] bg-white shadow-[0_2px_8px_rgba(184, 154, 94,0.12)]"
               : "border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-white",
-            "focus:border-[#5e2cec] focus:bg-white focus:ring-3 focus:ring-[#5e2cec]/10",
+            "focus:border-[#b89a5e] focus:bg-white focus:ring-3 focus:ring-[#b89a5e]/10",
           ].join(" ")}
         />
       ))}
@@ -336,7 +336,7 @@ export function CustomSignUp() {
             Crear cuenta
           </h1>
           <p className="font-sora text-gray-500 text-[0.9rem] mt-1.5 leading-relaxed">
-            Únete a la plataforma Newayzi y empieza a gestionar hoy.
+            Únete a la plataforma Almara y empieza a gestionar hoy.
           </p>
         </div>
 
@@ -415,7 +415,7 @@ export function CustomSignUp() {
           ¿Ya tienes cuenta?{" "}
           <Link
             href="/sign-in"
-            className="text-[#5e2cec] font-semibold hover:text-[#422df6] transition-colors"
+            className="text-[#b89a5e] font-semibold hover:text-[#9a7d4a] transition-colors"
           >
             Iniciar sesión
           </Link>
@@ -430,7 +430,7 @@ export function CustomSignUp() {
       <div className="flex flex-col gap-6">
         <div>
           <div className="w-12 h-12 rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center mb-4">
-            <Icon icon="solar:letter-bold-duotone" className="text-[#5e2cec] text-2xl" />
+            <Icon icon="solar:letter-bold-duotone" className="text-[#b89a5e] text-2xl" />
           </div>
           <h1 className="font-sora font-extrabold text-[1.75rem] tracking-tight text-gray-900 leading-tight">
             Verifica tu correo
@@ -470,12 +470,12 @@ export function CustomSignUp() {
             disabled={loading || code.length < 6}
             className="
               w-full min-h-[48px] rounded-[10px] font-sora font-bold text-[0.9375rem] text-white
-              bg-gradient-to-br from-[#3d21c4] to-[#5e2cec]
-              shadow-[0_4px_16px_rgba(94,44,236,0.38)]
-              hover:from-[#5e2cec] hover:to-[#422df6]
-              hover:shadow-[0_6px_22px_rgba(94,44,236,0.46)]
+              bg-gradient-to-br from-[#8a7346] to-[#b89a5e]
+              shadow-[0_4px_16px_rgba(184, 154, 94,0.38)]
+              hover:from-[#b89a5e] hover:to-[#9a7d4a]
+              hover:shadow-[0_6px_22px_rgba(184, 154, 94,0.46)]
               hover:-translate-y-px
-              active:translate-y-0 active:shadow-[0_2px_8px_rgba(94,44,236,0.35)]
+              active:translate-y-0 active:shadow-[0_2px_8px_rgba(184, 154, 94,0.35)]
               transition-all duration-150
               disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0
               flex items-center justify-center gap-2
@@ -508,7 +508,7 @@ export function CustomSignUp() {
             type="button"
             onClick={handleResend}
             disabled={resendLoading}
-            className="flex items-center gap-1.5 font-sora text-[0.8rem] text-[#5e2cec] hover:text-[#422df6] font-medium transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 font-sora text-[0.8rem] text-[#b89a5e] hover:text-[#9a7d4a] font-medium transition-colors disabled:opacity-50"
           >
             {resendLoading && <Icon icon="svg-spinners:ring-resize" className="text-sm" />}
             Reenviar código

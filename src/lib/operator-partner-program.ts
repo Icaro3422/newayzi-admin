@@ -30,7 +30,7 @@ export const PARTNER_TIERS: PartnerTierDef[] = [
     ringInactive: "rgba(255,255,255,0.14)",
     benefits: [
       "Cashback base para tus huéspedes en cada reserva confirmada",
-      "Visibilidad estándar en el catálogo Newayzi",
+      "Visibilidad estándar en el catálogo Almara",
     ],
   },
   {
@@ -60,7 +60,7 @@ export const PARTNER_TIERS: PartnerTierDef[] = [
     ringInactive: "rgba(251, 191, 36, 0.28)",
     benefits: [
       "Máximo cashback para huéspedes",
-      "Visibilidad premium y acompañamiento del equipo Newayzi",
+      "Visibilidad premium y acompañamiento del equipo Almara",
     ],
   },
 ];

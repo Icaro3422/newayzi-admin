@@ -101,7 +101,7 @@ export function PropertyGalleryPanel({ propertyId, pictures, readOnly = false, o
       {!readOnly && (
         <div
           className={`relative flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed transition-colors duration-200 p-8 cursor-pointer
-            ${dragOver ? "border-[#9b74ff] bg-[#9b74ff]/10" : "border-white/20 bg-white/[0.03] hover:border-white/40 hover:bg-white/[0.06]"}`}
+            ${dragOver ? "border-[#d4b97a] bg-[#d4b97a]/10" : "border-white/20 bg-white/[0.03] hover:border-white/40 hover:bg-white/[0.06]"}`}
           onClick={() => fileRef.current?.click()}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
@@ -114,12 +114,12 @@ export function PropertyGalleryPanel({ propertyId, pictures, readOnly = false, o
             </div>
           ) : (
             <>
-              <div className="w-12 h-12 rounded-2xl bg-[#9b74ff]/10 border border-[#9b74ff]/20 flex items-center justify-center">
-                <Icon icon="solar:upload-bold-duotone" className="text-[#9b74ff] text-2xl" />
+              <div className="w-12 h-12 rounded-2xl bg-[#d4b97a]/10 border border-[#d4b97a]/20 flex items-center justify-center">
+                <Icon icon="solar:upload-bold-duotone" className="text-[#d4b97a] text-2xl" />
               </div>
               <div className="text-center">
                 <p className="text-sm font-medium text-white/80">
-                  Arrastra imágenes aquí o <span className="text-[#9b74ff]">haz clic para seleccionar</span>
+                  Arrastra imágenes aquí o <span className="text-[#d4b97a]">haz clic para seleccionar</span>
                 </p>
                 <p className="text-xs text-white/40 mt-1">Hasta 50 imágenes a la vez · JPG, PNG, WebP · Máx. 15 MB por imagen</p>
               </div>
@@ -172,7 +172,7 @@ export function PropertyGalleryPanel({ propertyId, pictures, readOnly = false, o
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-end p-2 gap-1.5">
                   {!pic.is_primary && (
                     <button
-                      className="flex-1 flex items-center justify-center gap-1 text-xs rounded-xl bg-[#9b74ff]/80 hover:bg-[#9b74ff] text-white px-2 py-1.5 transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1 text-xs rounded-xl bg-[#d4b97a]/80 hover:bg-[#d4b97a] text-white px-2 py-1.5 transition-colors"
                       onClick={(e) => { e.stopPropagation(); handleSetPrimary(pic); }}
                       disabled={primaryId === pic.id}
                       title="Establecer como portada"
@@ -199,7 +199,7 @@ export function PropertyGalleryPanel({ propertyId, pictures, readOnly = false, o
 
               {/* Badge portada */}
               {pic.is_primary && (
-                <div className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-[#9b74ff] px-2 py-0.5 text-[10px] font-semibold text-white shadow-lg">
+                <div className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-[#d4b97a] px-2 py-0.5 text-[10px] font-semibold text-white shadow-lg">
                   <Icon icon="solar:star-bold" width={10} />
                   Portada
                 </div>

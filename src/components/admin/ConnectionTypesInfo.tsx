@@ -28,8 +28,8 @@ export function ConnectionTypesInfo() {
   return (
     <GlassCard className="p-5">
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
-          <Icon icon="solar:link-circle-bold-duotone" className="text-[#9b74ff] text-base" />
+        <div className="w-9 h-9 rounded-xl bg-[#b89a5e]/25 flex items-center justify-center shrink-0">
+          <Icon icon="solar:link-circle-bold-duotone" className="text-[#d4b97a] text-base" />
         </div>
         <div>
           <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Tipos de conexión</p>

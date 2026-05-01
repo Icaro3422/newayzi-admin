@@ -15,7 +15,7 @@ export default function AdminAvailabilityPage() {
           role === "operador"
             ? "Calendario de disponibilidad de tus propiedades. Filtra por propiedad y fechas."
             : role === "agente"
-            ? "Solo lectura. Las propiedades visibles dependen de tu agencia (operador que te invitó o alcance definido por Newayzi)."
+            ? "Solo lectura. Las propiedades visibles dependen de tu agencia (operador que te invitó o alcance definido por Almara)."
             : "Mapa calendario y lista detallada. Filtra por operador, propiedad y fechas."
         }
       />

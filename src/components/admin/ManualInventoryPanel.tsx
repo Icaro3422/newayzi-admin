@@ -264,7 +264,7 @@ export function ManualInventoryPanel({
         {loadingImports ? (
           <Spinner
             size="sm"
-            classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#9b74ff]" }}
+            classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#d4b97a]" }}
           />
         ) : imports.length === 0 ? (
           <p className="text-sm text-white/38">Aún no hay importaciones.</p>

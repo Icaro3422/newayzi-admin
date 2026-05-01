@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 188" fill="none" aria-hidden="true">
+  <!-- A Almara (dos ménsulas inferiores + hueco central); terminaciones cuadradas: butt + miter -->
+  <path
+    d="M 46 166 L 24 166 L 100 12 L 176 166 L 148 166"
+    stroke="#ffffff"
+    stroke-width="14"
+    stroke-linecap="butt"
+    stroke-linejoin="miter"
+    stroke-miterlimit="8"
+  />
+</svg>

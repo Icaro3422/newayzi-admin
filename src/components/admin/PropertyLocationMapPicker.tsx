@@ -54,7 +54,7 @@ export function PropertyLocationMapPicker({ mapKey, lat, lng, onChange }: Props)
     });
     map.addControl(new mapboxgl.NavigationControl({ visualizePitch: false }), "top-right");
 
-    const marker = new mapboxgl.Marker({ color: "#5e2cec", draggable: true })
+    const marker = new mapboxgl.Marker({ color: "#b89a5e", draggable: true })
       .setLngLat([lng, lat])
       .addTo(map);
 
@@ -127,7 +127,7 @@ export function PropertyLocationMapPicker({ mapKey, lat, lng, onChange }: Props)
   if (!isLoaded) {
     return (
       <div className="h-[280px] flex items-center justify-center rounded-xl border border-white/10 bg-black/30">
-        <Spinner size="md" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#9b74ff]" }} />
+        <Spinner size="md" classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#d4b97a]" }} />
       </div>
     );
   }

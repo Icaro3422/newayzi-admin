@@ -72,7 +72,7 @@ export function AgenciesList({
       <GlassCard className="flex justify-center items-center py-16">
         <Spinner
           size="lg"
-          classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }}
+          classNames={{ circle1: "border-b-[#b89a5e]", circle2: "border-b-[#b89a5e]" }}
         />
       </GlassCard>
     );
@@ -81,8 +81,8 @@ export function AgenciesList({
   if (list.length === 0) {
     return (
       <GlassCard className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 flex items-center justify-center mb-4">
-          <Icon icon="solar:bag-4-bold-duotone" className="text-[#9b74ff] text-2xl" />
+        <div className="w-14 h-14 rounded-2xl bg-[#b89a5e]/20 border border-[#b89a5e]/30 flex items-center justify-center mb-4">
+          <Icon icon="solar:bag-4-bold-duotone" className="text-[#d4b97a] text-2xl" />
         </div>
         <p className="font-sora font-bold text-white text-base">No hay agencias</p>
         <p className="mt-2 text-sm text-white/50">
@@ -155,7 +155,7 @@ export function AgenciesList({
                 <td className="py-4 px-5">
                   <Link
                     href={`/admin/agents/${a.id}`}
-                    className="font-sora font-semibold text-[#9b74ff] hover:text-[#b89eff] transition-colors"
+                    className="font-sora font-semibold text-[#d4b97a] hover:text-[#f0e6d2] transition-colors"
                   >
                     {a.name}
                   </Link>
@@ -190,7 +190,7 @@ export function AgenciesList({
                       as={Link}
                       href={`/admin/agents/${a.id}`}
                       size="sm"
-                      className="rounded-xl bg-[#5e2cec]/25 border border-[#5e2cec]/40 text-[#b89eff] hover:bg-[#5e2cec]/35 font-semibold"
+                      className="rounded-xl bg-[#b89a5e]/25 border border-[#b89a5e]/40 text-[#f0e6d2] hover:bg-[#b89a5e]/35 font-semibold"
                     >
                       Ver detalle
                     </Button>

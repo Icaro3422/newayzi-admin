@@ -472,14 +472,14 @@ export default function AdminAnalyticsPage() {
           {/* ── Loyalty / Rewards ─────────────────────────────────────────── */}
           {data?.loyalty && (
             <div className="grid sm:grid-cols-2 gap-4">
-              <SectionCard title="Newayzi Rewards" icon="solar:star-bold-duotone">
+              <SectionCard title="Almara Rewards" icon="solar:star-bold-duotone">
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div className="rounded-xl bg-white/5 border border-white/10 p-3">
                     <p className="text-lg font-black text-white">{data.loyalty.total_users}</p>
                     <p className="text-xs text-white/45 mt-0.5">Usuarios con wallet</p>
                   </div>
-                  <div className="rounded-xl bg-[#5e2cec]/10 border border-[#5e2cec]/20 p-3">
-                    <p className="text-lg font-black text-[#b89eff]">
+                  <div className="rounded-xl bg-[#b89a5e]/10 border border-[#b89a5e]/20 p-3">
+                    <p className="text-lg font-black text-[#f0e6d2]">
                       {formatPts(data.loyalty.total_points_active)}
                     </p>
                     <p className="text-xs text-white/45 mt-0.5">Puntos activos</p>
