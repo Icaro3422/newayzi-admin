@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Spinner,
@@ -15,12 +15,15 @@ import {
   Select,
   SelectItem,
   Chip,
+  Switch,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import {
   adminApi,
   type AgencyDetail,
   type AgentWallet,
+  type Operator,
+  type PropertyListItem,
   LEVEL_OPTIONS,
   WALLET_REASON_OPTIONS,
   type WalletMovementReason,
@@ -44,7 +47,8 @@ function GlassCard({
   );
 }
 
-function formatCurrency(value: string | number): string {
+function formatCurrency(value: string | number | undefined): string {
+  if (value === undefined || value === "") return "—";
   const n = typeof value === "string" ? parseFloat(value) : value;
   if (Number.isNaN(n)) return "—";
   return new Intl.NumberFormat("es-CO", {
@@ -394,22 +398,405 @@ function AgencyWalletSection({ agencyId, isSuperAdmin }: { agencyId: number; isS
   );
 }
 
+// ─── Gestionar datos / eliminar (operador dueño o super_admin) ───────────────
+
+function AgencyManageSection({
+  agency,
+  onUpdated,
+  onDeleted,
+}: {
+  agency: AgencyDetail;
+  onUpdated: (a: AgencyDetail) => void;
+  onDeleted: () => void;
+}) {
+  const [name, setName] = useState(agency.name);
+  const [email, setEmail] = useState(agency.contact_email ?? "");
+  const [phone, setPhone] = useState(agency.contact_phone ?? "");
+  const [active, setActive] = useState(agency.is_active);
+  const [saving, setSaving] = useState(false);
+  const [delOpen, setDelOpen] = useState(false);
+  const [delBusy, setDelBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setName(agency.name);
+    setEmail(agency.contact_email ?? "");
+    setPhone(agency.contact_phone ?? "");
+    setActive(agency.is_active);
+  }, [agency.id, agency.updated, agency.name, agency.contact_email, agency.contact_phone, agency.is_active]);
+
+  async function handleSave() {
+    setErr(null);
+    setSaving(true);
+    try {
+      const updated = await adminApi.patchAgency(agency.id, {
+        name: name.trim(),
+        contact_email: email.trim().toLowerCase(),
+        contact_phone: phone.trim(),
+        is_active: active,
+      });
+      if (updated) onUpdated(updated);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error al guardar";
+      setErr(msg.replace(/^API \d+: /, "").replace(/^\{[^}]*"detail"\s*:\s*"([^"]*)".*$/, "$1").slice(0, 280));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    setDelBusy(true);
+    setErr(null);
+    try {
+      await adminApi.deleteAgency(agency.id);
+      setDelOpen(false);
+      onDeleted();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "No se pudo eliminar";
+      setErr(msg.replace(/^API \d+: /, "").slice(0, 280));
+    } finally {
+      setDelBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <GlassCard>
+        <h3 className="font-sora font-bold text-white text-base mb-1 flex items-center gap-2">
+          <Icon icon="solar:pen-new-square-bold-duotone" width={20} className="text-[#b89eff]" />
+          Gestionar agente
+        </h3>
+        <p className="text-xs text-white/45 mb-4">
+          Actualizá datos de contacto o desactivá el acceso. Eliminar quita la agencia, el usuario en Clerk y el perfil
+          en el centro de usuarios (las reservas históricas se conservan sin agencia vinculada).
+        </p>
+        {err && (
+          <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            {err}
+          </div>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="Nombre de la agencia"
+            value={name}
+            onValueChange={setName}
+            classNames={{
+              inputWrapper: "rounded-xl border border-white/15",
+              input: "!text-white/95",
+              label: "!text-white/65",
+            }}
+          />
+          <Input
+            label="Email de contacto"
+            type="email"
+            value={email}
+            onValueChange={setEmail}
+            classNames={{
+              inputWrapper: "rounded-xl border border-white/15",
+              input: "!text-white/95",
+              label: "!text-white/65",
+            }}
+          />
+          <Input
+            label="Teléfono"
+            value={phone}
+            onValueChange={setPhone}
+            classNames={{
+              inputWrapper: "rounded-xl border border-white/15",
+              input: "!text-white/95",
+              label: "!text-white/65",
+            }}
+          />
+          <div className="flex flex-col justify-end gap-2 pb-1">
+            <span className="text-xs text-white/50">Estado</span>
+            <div className="flex items-center gap-3">
+              <Switch
+                isSelected={active}
+                onValueChange={setActive}
+                color="primary"
+                classNames={{ wrapper: "group-data-[selected=true]:bg-[#5e2cec]" }}
+              />
+              <span className="text-sm text-white/80">Agencia activa</span>
+            </div>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <Button
+            className="btn-newayzi-primary"
+            size="sm"
+            isLoading={saving}
+            onPress={handleSave}
+            startContent={!saving && <Icon icon="solar:diskette-bold" width={16} />}
+          >
+            Guardar cambios
+          </Button>
+          <Button
+            size="sm"
+            className="bg-red-500/15 border border-red-500/35 text-red-300 hover:bg-red-500/25"
+            onPress={() => {
+              setErr(null);
+              setDelOpen(true);
+            }}
+            startContent={<Icon icon="solar:trash-bin-trash-bold" width={16} />}
+          >
+            Eliminar agencia
+          </Button>
+        </div>
+      </GlassCard>
+
+      <Modal
+        isOpen={delOpen}
+        onOpenChange={(o) => {
+          setDelOpen(o);
+          if (!o) setErr(null);
+        }}
+        backdrop="blur"
+        classNames={{
+          base: "admin-modal-dark !bg-[#0f1220] rounded-[28px] border border-white/[0.12] backdrop-blur-xl shadow-2xl shadow-black/50",
+          header: "border-b border-white/[0.08] !text-white",
+          body: "!text-white/95",
+          footer: "border-t border-white/[0.08]",
+          closeButton: "!text-white/90 hover:!bg-white/10 rounded-full",
+          backdrop: "!bg-black/70 backdrop-blur-md",
+        }}
+      >
+        <ModalContent>
+          <ModalHeader>¿Eliminar esta agencia?</ModalHeader>
+          <ModalBody className="py-4">
+            <p className="text-sm text-white/70">
+              Se eliminará <strong className="text-white">{agency.name}</strong> y el acceso del usuario al panel
+              (Clerk + perfil CRM). Esta acción no se puede deshacer.
+            </p>
+            {err && (
+              <p className="mt-3 text-sm text-red-300">{err}</p>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" className="text-white/80" onPress={() => setDelOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-red-600 text-white font-semibold"
+              isLoading={delBusy}
+              onPress={handleDelete}
+            >
+              Eliminar definitivamente
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    </>
+  );
+}
+
+// ─── Inventario (solo plataforma, agencia sin operador fijo) ─────────────────
+
+function AgencyInventoryScopeSection({
+  agency,
+  onSaved,
+}: {
+  agency: AgencyDetail;
+  onSaved: (a: AgencyDetail) => void;
+}) {
+  const lockedToOperator = agency.operator_id != null;
+  const [operators, setOperators] = useState<Operator[]>([]);
+  const [properties, setProperties] = useState<PropertyListItem[]>([]);
+  const [listsLoading, setListsLoading] = useState(true);
+  const [opSelected, setOpSelected] = useState<Set<number>>(() => new Set(agency.scoped_operator_ids ?? []));
+  const [propSelected, setPropSelected] = useState<Set<number>>(() => new Set(agency.scoped_property_ids ?? []));
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOpSelected(new Set(agency.scoped_operator_ids ?? []));
+    setPropSelected(new Set(agency.scoped_property_ids ?? []));
+  }, [
+    agency.id,
+    agency.updated,
+    agency.scoped_operator_ids,
+    agency.scoped_property_ids,
+  ]);
+
+  useEffect(() => {
+    if (lockedToOperator) return;
+    let cancelled = false;
+    setListsLoading(true);
+    Promise.all([adminApi.getOperators(), adminApi.getProperties({ is_active: true })])
+      .then(([opsRes, propsRes]) => {
+        if (cancelled) return;
+        setOperators(opsRes?.results ?? []);
+        setProperties(propsRes?.results ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOperators([]);
+          setProperties([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setListsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lockedToOperator, agency.id]);
+
+  function toggleOp(id: number) {
+    setOpSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleProp(id: number) {
+    setPropSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleSave() {
+    setSaveError(null);
+    setSaving(true);
+    try {
+      const updated = await adminApi.patchAgencyInventoryScope(agency.id, {
+        scoped_operator_ids: Array.from(opSelected),
+        scoped_property_ids: Array.from(propSelected),
+      });
+      if (updated) onSaved(updated);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "No se pudo guardar";
+      setSaveError(msg.replace(/^API \d+: /, "").slice(0, 240));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (lockedToOperator) return null;
+
+  return (
+    <GlassCard>
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+          <h3 className="font-sora font-bold text-white text-base flex items-center gap-2">
+            <Icon icon="solar:map-point-wave-bold-duotone" width={20} className="text-[#b89eff]" />
+            Alcance de inventario
+          </h3>
+          <p className="mt-1 text-xs text-white/50 max-w-xl">
+            Agencia creada por Newayzi: podés limitar qué operadores y propiedades ven los agentes. Si dejás ambas listas
+            vacías, el inventario es el catálogo completo (comportamiento por defecto). La unión de operadores y propiedades
+            define el alcance.
+          </p>
+        </div>
+      </div>
+      {saveError && (
+        <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+          {saveError}
+        </div>
+      )}
+      {listsLoading ? (
+        <div className="flex justify-center py-8">
+          <Spinner size="md" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">Operadores</p>
+            <div className="max-h-56 overflow-y-auto rounded-xl border border-white/[0.08] bg-white/[0.03] p-2 space-y-1">
+              {operators.length === 0 ? (
+                <p className="text-sm text-white/40 py-2 px-2">No hay operadores.</p>
+              ) : (
+                operators.map((o) => (
+                  <label
+                    key={o.id}
+                    className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-white/[0.05] cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      className="rounded border-white/20 bg-white/5 text-[#5e2cec] focus:ring-[#5e2cec]/40"
+                      checked={opSelected.has(o.id)}
+                      onChange={() => toggleOp(o.id)}
+                    />
+                    <span className="text-sm text-white/85">{o.name}</span>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">Propiedades</p>
+            <div className="max-h-56 overflow-y-auto rounded-xl border border-white/[0.08] bg-white/[0.03] p-2 space-y-1">
+              {properties.length === 0 ? (
+                <p className="text-sm text-white/40 py-2 px-2">No hay propiedades activas.</p>
+              ) : (
+                properties.map((p) => (
+                  <label
+                    key={p.id}
+                    className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-white/[0.05] cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      className="rounded border-white/20 bg-white/5 text-[#5e2cec] focus:ring-[#5e2cec]/40"
+                      checked={propSelected.has(p.id)}
+                      onChange={() => toggleProp(p.id)}
+                    />
+                    <span className="text-sm text-white/85 truncate" title={p.name}>
+                      {p.name}
+                    </span>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <Button
+          className="btn-newayzi-primary"
+          size="sm"
+          isLoading={saving}
+          isDisabled={listsLoading}
+          onPress={handleSave}
+          startContent={!saving && <Icon icon="solar:diskette-bold" width={16} />}
+        >
+          Guardar alcance
+        </Button>
+        <p className="text-[11px] text-white/35">
+          {opSelected.size + propSelected.size === 0
+            ? "Sin selección: inventario completo."
+            : `${opSelected.size} operador(es), ${propSelected.size} propiedad(es).`}
+        </p>
+      </div>
+    </GlassCard>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function AgencyDetailClient() {
   const params = useParams();
+  const router = useRouter();
   const id = Number(params?.id);
   const [agency, setAgency] = useState<AgencyDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const { me } = useAdmin();
   const isSuperAdmin = me?.role === "super_admin";
+  const isOperator = me?.role === "operador";
+  const canManageAgency = isSuperAdmin || isOperator;
 
   useEffect(() => {
     if (!id) return;
-    adminApi.getAgency(id).then((data) => {
-      setAgency(data ?? null);
-      setLoading(false);
-    });
+    adminApi
+      .getAgency(id)
+      .then((data) => {
+        setAgency(data ?? null);
+      })
+      .catch(() => setAgency(null))
+      .finally(() => setLoading(false));
   }, [id]);
 
   if (loading) {
@@ -469,38 +856,57 @@ export function AgencyDetailClient() {
         </Chip>
       </div>
 
-      {/* KPIs */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <GlassCard className="p-5">
-          <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Nivel</span>
-          <p className="mt-2 text-xl font-semibold text-white">{agency.level_name ?? "—"}</p>
-        </GlassCard>
+      {/* KPIs: operador solo rendimiento comercial; super_admin ve también nivel de socio y comisiones */}
+      <div
+        className={`grid gap-4 md:grid-cols-2 ${isOperator ? "lg:grid-cols-3" : "lg:grid-cols-4"}`}
+      >
+        {!isOperator && (
+          <GlassCard className="p-5">
+            <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Nivel de socio</span>
+            <p className="mt-2 text-xl font-semibold text-white">{agency.level_name ?? "—"}</p>
+            <p className="mt-1 text-[11px] text-white/40">Según ventas acumuladas del programa de agencias</p>
+          </GlassCard>
+        )}
         <GlassCard className="p-5">
           <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Ventas totales</span>
           <p className="mt-2 text-xl font-semibold text-white">{formatCurrency(s.total_sales)}</p>
         </GlassCard>
-        <GlassCard className="p-5">
-          <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Comisión generada</span>
-          <p className="mt-2 text-xl font-semibold text-[#b89eff]">{formatCurrency(s.total_commission)}</p>
-        </GlassCard>
+        {!isOperator && (
+          <GlassCard className="p-5">
+            <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Comisión generada</span>
+            <p className="mt-2 text-xl font-semibold text-[#b89eff]">{formatCurrency(s.total_commission)}</p>
+          </GlassCard>
+        )}
         <GlassCard className="p-5">
           <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Reservas</span>
           <p className="mt-2 text-xl font-semibold text-white">{s.bookings_count}</p>
         </GlassCard>
+        {isOperator && (
+          <GlassCard className="p-5">
+            <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Última actividad</span>
+            <p className="mt-2 text-lg font-semibold text-white">
+              {s.updated_at ? new Date(s.updated_at).toLocaleString("es-CO") : "—"}
+            </p>
+          </GlassCard>
+        )}
       </div>
 
       {/* Business summary */}
       <GlassCard>
-        <h3 className="font-sora font-bold text-white text-base mb-4">Resumen de negocio</h3>
+        <h3 className="font-sora font-bold text-white text-base mb-4">
+          {isOperator ? "Actividad del agente" : "Resumen de negocio"}
+        </h3>
         <dl className="grid gap-4 sm:grid-cols-2">
           <div>
             <dt className="text-sm text-white/50">Ventas totales (reservas confirmadas)</dt>
             <dd className="font-medium text-white mt-1">{formatCurrency(s.total_sales)}</dd>
           </div>
-          <div>
-            <dt className="text-sm text-white/50">Comisión acumulada</dt>
-            <dd className="font-medium text-white mt-1">{formatCurrency(s.total_commission)}</dd>
-          </div>
+          {!isOperator && (
+            <div>
+              <dt className="text-sm text-white/50">Comisión acumulada</dt>
+              <dd className="font-medium text-white mt-1">{formatCurrency(s.total_commission)}</dd>
+            </div>
+          )}
           <div>
             <dt className="text-sm text-white/50">Número de reservas</dt>
             <dd className="font-medium text-white mt-1">{s.bookings_count}</dd>
@@ -512,10 +918,31 @@ export function AgencyDetailClient() {
             </dd>
           </div>
         </dl>
+        {isOperator && (
+          <p className="mt-4 text-xs text-white/40 border-t border-white/[0.08] pt-4">
+            Nivel de socio, comisiones del programa y Newayzi Rewards (puntos, bonos) los gestiona Newayzi. Si necesitas
+            un ajuste para tu agente, coordina con el equipo.
+          </p>
+        )}
       </GlassCard>
 
-      {/* Wallet Rewards */}
-      <AgencyWalletSection agencyId={id} isSuperAdmin={isSuperAdmin} />
+      {canManageAgency && (
+        <AgencyManageSection
+          agency={agency}
+          onUpdated={(a) => setAgency(a)}
+          onDeleted={() => router.push("/admin/agents")}
+        />
+      )}
+
+      {isSuperAdmin && (
+        <AgencyInventoryScopeSection
+          agency={agency}
+          onSaved={(a) => setAgency(a)}
+        />
+      )}
+
+      {/* Wallet Rewards: solo plataforma; operador no llama al API ni ve movimientos */}
+      {!isOperator && <AgencyWalletSection agencyId={id} isSuperAdmin={isSuperAdmin} />}
     </div>
   );
 }

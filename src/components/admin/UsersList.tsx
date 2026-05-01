@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Select,
   SelectItem,
@@ -52,6 +53,7 @@ function roleLabel(role: AdminRole | null): string {
 export function UsersList() {
   const { canAccess } = useAdmin();
   const canEdit = canAccess("users");
+  const canCorporateCredit = canAccess("corporate-credits");
   const [list, setList] = useState<AdminUserListItem[]>([]);
   const [operators, setOperators] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -317,6 +319,16 @@ export function UsersList() {
                 {canEdit && (
                   <td className="py-4 px-5 text-right">
                     <div className="flex items-center justify-end gap-1">
+                      {canCorporateCredit && (
+                        <Link
+                          href={`/admin/corporate-credits?profile_id=${u.id}`}
+                          className="inline-flex items-center justify-center min-w-8 w-8 h-8 rounded-lg text-cyan-400/80 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors"
+                          title="Cargar crédito corporativo"
+                          aria-label="Cargar crédito corporativo"
+                        >
+                          <Icon icon="solar:buildings-2-bold-duotone" className="text-lg" />
+                        </Link>
+                      )}
                       <Button
                         isIconOnly
                         size="sm"

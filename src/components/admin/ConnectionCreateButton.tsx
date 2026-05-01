@@ -9,6 +9,7 @@ import {
   ModalBody,
   ModalFooter,
   Input,
+  Textarea,
   Select,
   SelectItem,
 } from "@heroui/react";
@@ -24,6 +25,8 @@ const PMS_ICONS: Record<string, string> = {
   cloudbeds: "solar:cloud-bold-duotone",
   stays: "solar:home-smile-bold-duotone",
   generic: "solar:link-circle-bold-duotone",
+  siteminder_dashboard: "solar:global-bold-duotone",
+  rategain: "solar:graph-up-bold-duotone",
 };
 
 const PMS_DESCRIPTIONS: Record<string, string> = {
@@ -31,12 +34,24 @@ const PMS_DESCRIPTIONS: Record<string, string> = {
   cloudbeds: "Plataforma de gestión hotelera CloudBeds",
   stays: "Sistema de reservas Stays",
   generic: "Cualquier PMS vía API genérica (Booking, OTAs propias, etc.)",
+  siteminder_dashboard:
+    "SiteMinder (dashboard web): sesión con email/contraseña y endpoint JSON interno (XHR) configurable",
+  rategain:
+    "RateGain Smart Distribution — API REST (ApiKey/ApiSecret) para catálogo, disponibilidad y tarifas",
 };
 
 /** Campos de credenciales requeridos por cada tipo de PMS */
 const PMS_CONFIG_FIELDS: Record<
   string,
-  { key: string; label: string; type?: string; required?: boolean; placeholder?: string; description?: string }[]
+  {
+    key: string;
+    label: string;
+    type?: string;
+    required?: boolean;
+    placeholder?: string;
+    description?: string;
+    inputType?: "input" | "textarea";
+  }[]
 > = {
   kunas: [
     { key: "token", label: "Token", required: true, placeholder: "Token (de la URL del panel Kunas)", description: "Token de autenticación" },
@@ -51,11 +66,84 @@ const PMS_CONFIG_FIELDS: Record<
     { key: "base_url", label: "URL de la API", required: true, placeholder: "https://partner.stays.net", type: "url", description: "URL base del endpoint Stays" },
     { key: "username", label: "Usuario", required: true, placeholder: "Email o usuario API" },
     { key: "password", label: "Contraseña", required: true, placeholder: "Contraseña API", type: "password" },
+    { key: "property_id", label: "Property ID (opcional)", required: false, placeholder: "Solo esta propiedad Stays", description: "Si se indica, solo se sincronizan listings de esa propiedad." },
+    { key: "listing_ids", label: "Listing IDs (opcional, JSON array)", required: false, placeholder: '["ABC12","XYZ99"]', description: "Lista de IDs de listing (room types) a incluir; se puede combinar con property_id." },
+    {
+      key: "stays_refresh_reservation_after_create",
+      label: "Refrescar reserva tras crear",
+      required: false,
+      placeholder: "true",
+      description: "Si es true, tras POST de reserva en Stays se hace GET para guardar el snapshot completo en Newayzi (una llamada API extra por reserva).",
+    },
   ],
   generic: [
     { key: "base_url", label: "URL de la API", required: true, placeholder: "https://api.ejemplo.com", type: "url" },
     { key: "username", label: "Usuario", required: true, placeholder: "Usuario o API key" },
     { key: "password", label: "Contraseña", required: true, placeholder: "Contraseña o API secret", type: "password" },
+  ],
+  siteminder_dashboard: [
+    {
+      key: "base_url",
+      label: "URL del dashboard",
+      required: true,
+      placeholder: "https://platform.siteminder.com",
+      type: "url",
+      description: "Origen HTTPS del panel (sin barra final).",
+    },
+    { key: "email", label: "Email del operador", required: true, placeholder: "usuario@hotel.com" },
+    { key: "password", label: "Contraseña", required: true, placeholder: "Contraseña del dashboard", type: "password" },
+    {
+      key: "inventory_url",
+      label: "URL del inventario GET (JSON, opcional)",
+      required: false,
+      placeholder: "/api/... (modo http_get)",
+      description:
+        "Solo modo http_get: GET tras login. Para GraphQL usa el campo de query abajo y deja esto vacío.",
+    },
+    {
+      key: "graphql_path",
+      label: "Ruta GraphQL (opcional)",
+      required: false,
+      placeholder: "/api/cm-beef/graphql",
+      description: "POST a este path bajo base_url (por defecto cm-beef).",
+    },
+    {
+      key: "graphql_query",
+      label: "Query GraphQL (opcional)",
+      required: false,
+      placeholder: "query { ... }",
+      description:
+        "Pega la query desde DevTools (Payload). Activa modo GraphQL automáticamente. Ajusta properties_list_path al JSON (p. ej. data.miListado).",
+      inputType: "textarea",
+    },
+    {
+      key: "properties_list_path",
+      label: "Ruta a la lista en la respuesta (opcional)",
+      required: false,
+      placeholder: "data.propiedades",
+      description: "Navegación con puntos dentro del JSON (GET o GraphQL).",
+    },
+  ],
+  rategain: [
+    {
+      key: "base_url",
+      label: "SD-Domain (base URL)",
+      required: true,
+      placeholder: "https://partner.ejemplo.com",
+      type: "url",
+      description: "Origen HTTPS sin barra final (ver documentación RateGain Smart Distribution).",
+    },
+    { key: "api_key", label: "Api Key", required: true, placeholder: "ApiKey de onboarding", type: "password" },
+    { key: "api_secret", label: "Api Secret", required: true, placeholder: "ApiSecret", type: "password" },
+    {
+      key: "property_ids",
+      label: "Property IDs (opcional, JSON o comas)",
+      required: false,
+      placeholder: "Vacío = descubrir todas vía API (destinos + bestproperties)",
+      description:
+        "Si lo dejas vacío, el sync consulta getDestinations y bestproperties para listar todos los propertyId. Rellena solo si quieres limitar a hoteles concretos.",
+      inputType: "textarea",
+    },
   ],
 };
 
@@ -107,14 +195,39 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
 
     setSaving(true);
     try {
-      const config: Record<string, string> = {};
+      const config: Record<string, unknown> = {};
       for (const f of fields) {
         const v = (configValues[f.key] ?? "").trim();
         if (v) config[f.key] = v;
       }
       // CloudBeds acepta api_key o access_token
-      if (pmsType === "cloudbeds" && config.api_key) {
+      if (pmsType === "cloudbeds" && typeof config.api_key === "string" && config.api_key) {
         config.access_token = config.api_key;
+      }
+
+      if (pmsType === "rategain" && typeof config.property_ids === "string") {
+        const raw = config.property_ids.trim();
+        if (!raw) {
+          delete config.property_ids;
+        } else {
+          let ids: string[] = [];
+          try {
+            const parsed = JSON.parse(raw) as unknown;
+            if (Array.isArray(parsed)) {
+              ids = parsed.map((x) => String(x).trim()).filter(Boolean);
+            }
+          } catch {
+            ids = raw
+              .split(/[\s,]+/)
+              .map((s) => s.trim())
+              .filter(Boolean);
+          }
+          if (ids.length) {
+            config.property_ids = ids;
+          } else {
+            delete config.property_ids;
+          }
+        }
       }
 
       const payload = {
@@ -188,7 +301,7 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
               <ModalHeader>Conectar un PMS</ModalHeader>
               <ModalBody className="space-y-3">
                 <p className="text-white/60 text-[0.82rem]">
-                  Elige el sistema de gestión (PMS) que utilizas. Solo verás los tipos disponibles en Newayzi — tus credenciales son propias y nunca se comparten con otros operadores.
+                  Elige el PMS donde tienes el inventario. Introduce las credenciales que te da tu proveedor; luego podrás sincronizar catálogo y disponibilidad desde el detalle de la conexión. Tus credenciales son solo tuyas y no se comparten con otros operadores.
                 </p>
                 <div className="grid grid-cols-1 gap-2.5">
                   {connectionTypes.map((t) => (
@@ -285,25 +398,44 @@ export function ConnectionCreateButton({ onCreated }: { onCreated?: () => void }
                     <p className="text-sm font-medium text-white/80">
                       Credenciales {selectedType ? `para ${selectedType.label}` : "de la API"}
                     </p>
-                    {fields.map((f) => (
-                      <Input
-                        key={f.key}
-                        label={f.label}
-                        placeholder={f.placeholder}
-                        value={configValues[f.key] ?? ""}
-                        onValueChange={(v) => setConfigValues((prev) => ({ ...prev, [f.key]: v }))}
-                        isRequired={f.required}
-                        type={f.type ?? "text"}
-                        description={f.description}
-                        autoComplete={f.key === "password" ? "new-password" : f.key === "username" ? "username" : "off"}
-                        classNames={{
-                          inputWrapper: inputDark,
-                          input: "!text-white/95 placeholder:!text-white/38",
-                          label: "!text-white/70",
-                          description: "!text-white/50",
-                        }}
-                      />
-                    ))}
+                    {fields.map((f) =>
+                      f.inputType === "textarea" ? (
+                        <Textarea
+                          key={f.key}
+                          label={f.label}
+                          placeholder={f.placeholder}
+                          value={configValues[f.key] ?? ""}
+                          onValueChange={(v) => setConfigValues((prev) => ({ ...prev, [f.key]: v }))}
+                          isRequired={f.required}
+                          minRows={4}
+                          description={f.description}
+                          classNames={{
+                            inputWrapper: `${inputDark} border-white/[0.12]`,
+                            input: "!text-white/95 placeholder:!text-white/38 min-h-[100px]",
+                            label: "!text-white/70",
+                            description: "!text-white/50",
+                          }}
+                        />
+                      ) : (
+                        <Input
+                          key={f.key}
+                          label={f.label}
+                          placeholder={f.placeholder}
+                          value={configValues[f.key] ?? ""}
+                          onValueChange={(v) => setConfigValues((prev) => ({ ...prev, [f.key]: v }))}
+                          isRequired={f.required}
+                          type={f.type ?? "text"}
+                          description={f.description}
+                          autoComplete={f.key === "password" ? "new-password" : f.key === "username" ? "username" : "off"}
+                          classNames={{
+                            inputWrapper: inputDark,
+                            input: "!text-white/95 placeholder:!text-white/38",
+                            label: "!text-white/70",
+                            description: "!text-white/50",
+                          }}
+                        />
+                      ),
+                    )}
                   </div>
                 )}
 

@@ -40,6 +40,80 @@ function gaugeMax(price: number) {
   return Math.ceil(raw / pow10) * pow10;
 }
 
+
+function buildPriceGauge(
+  price: number,
+  currency: string,
+  arcColors: [number, string][],
+  pointerColor: string,
+) {
+  const max = gaugeMax(price);
+  const formatted = formatPrice(price, currency);
+  return {
+    backgroundColor: "transparent",
+    tooltip: {
+      ...tooltipBase,
+      formatter: () => `<div style="font-weight:600">${formatted}</div>`,
+    },
+    series: [
+      {
+        type: "gauge" as const,
+        startAngle: 200,
+        endAngle: -20,
+        min: 0,
+        max,
+        splitNumber: 3,
+        radius: "86%",
+        center: ["50%", "60%"],
+        axisLine: {
+          lineStyle: { width: 11, color: arcColors },
+        },
+        pointer: {
+          icon: "path://M12.8,0.7l12,40.1H0.7L12.8,0.7z",
+          length: "52%",
+          width: 7,
+          offsetCenter: [0, -4],
+          itemStyle: { color: pointerColor },
+        },
+        axisTick: {
+          distance: -15,
+          length: 4,
+          lineStyle: { color: "rgba(255,255,255,0.2)", width: 1 },
+        },
+        splitLine: {
+          distance: -17,
+          length: 9,
+          lineStyle: { color: "rgba(255,255,255,0.18)", width: 1 },
+        },
+        axisLabel: {
+          color: "rgba(255,255,255,0.35)",
+          fontSize: 7,
+          distance: -24,
+          formatter: (v: number) => {
+            if (v >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
+            if (v >= 1e3) return `${(v / 1e3).toFixed(0)}k`;
+            return String(v);
+          },
+        },
+        title: { show: false },
+        detail: {
+          valueAnimation: true,
+          width: "72%",
+          lineHeight: 18,
+          borderRadius: 6,
+          offsetCenter: [0, "42%"],
+          fontSize: 13,
+          fontWeight: 700,
+          fontFamily: "Sora, system-ui, sans-serif",
+          color: "#f5f5f5",
+          formatter: () => formatted,
+        },
+        data: [{ value: price, name: "" }],
+      },
+    ],
+  };
+}
+
 type BarSeriesPoint = {
   value: number;
   itemStyle: { color: ReturnType<typeof barGradient> };
@@ -423,74 +497,43 @@ export function OperatorInfrastructureCharts({
     );
   }, [pmsUnitsBarCategoriesAndData]);
 
-  const priceGaugeOption = useMemo(() => {
+  const priceGaugeOptions = useMemo(() => {
     if (!showPriceChart || averagePriceSynced == null || !Number.isFinite(averagePriceSynced)) {
       return null;
     }
-    const max = gaugeMax(averagePriceSynced);
-    const formatted = formatPrice(averagePriceSynced, currency);
-
+    const weekly = averagePriceSynced * 7;
+    const monthly = averagePriceSynced * 30;
     return {
-      backgroundColor: "transparent",
-      tooltip: {
-        ...tooltipBase,
-        formatter: () => `<div style="font-weight:600">${formatted}</div><div style="opacity:0.75;font-size:11px;margin-top:4px">Precio promedio (unidades sincronizadas)</div>`,
-      },
-      series: [
-        {
-          type: "gauge" as const,
-          startAngle: 200,
-          endAngle: -20,
-          min: 0,
-          max,
-          splitNumber: 4,
-          radius: "88%",
-          center: ["50%", "58%"],
-          axisLine: {
-            lineStyle: {
-              width: 14,
-              color: [
-                [0.35, "rgba(94, 44, 236, 0.35)"],
-                [0.65, "rgba(155, 116, 255, 0.55)"],
-                [1, "rgba(34, 211, 238, 0.5)"],
-              ],
-            },
-          },
-          pointer: {
-            icon: "path://M12.8,0.7l12,40.1H0.7L12.8,0.7z",
-            length: "58%",
-            width: 10,
-            offsetCenter: [0, -4],
-            itemStyle: { color: "#e9d5ff" },
-          },
-          axisTick: { distance: -18, length: 6, lineStyle: { color: "rgba(255,255,255,0.25)", width: 1 } },
-          splitLine: { distance: -20, length: 12, lineStyle: { color: "rgba(255,255,255,0.2)", width: 1 } },
-          axisLabel: {
-            color: "rgba(255,255,255,0.4)",
-            fontSize: 9,
-            distance: -32,
-            formatter: (v: number) => {
-              if (v >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
-              if (v >= 1e3) return `${(v / 1e3).toFixed(0)}k`;
-              return String(v);
-            },
-          },
-          title: { show: false },
-          detail: {
-            valueAnimation: true,
-            width: "70%",
-            lineHeight: 22,
-            borderRadius: 8,
-            offsetCenter: [0, "38%"],
-            fontSize: 17,
-            fontWeight: 700,
-            fontFamily: "Sora, system-ui, sans-serif",
-            color: "#f5f5f5",
-            formatter: () => formatted,
-          },
-          data: [{ value: averagePriceSynced, name: "Precio prom." }],
-        },
-      ],
+      noche: buildPriceGauge(
+        averagePriceSynced,
+        currency,
+        [
+          [0.35, "rgba(94, 44, 236, 0.35)"],
+          [0.65, "rgba(155, 116, 255, 0.55)"],
+          [1, "rgba(139, 92, 246, 0.6)"],
+        ],
+        "#e9d5ff",
+      ),
+      semana: buildPriceGauge(
+        weekly,
+        currency,
+        [
+          [0.35, "rgba(6, 78, 115, 0.4)"],
+          [0.65, "rgba(8, 145, 178, 0.55)"],
+          [1, "rgba(34, 211, 238, 0.65)"],
+        ],
+        "#67e8f9",
+      ),
+      mes: buildPriceGauge(
+        monthly,
+        currency,
+        [
+          [0.35, "rgba(120, 53, 15, 0.4)"],
+          [0.65, "rgba(217, 119, 6, 0.55)"],
+          [1, "rgba(251, 191, 36, 0.6)"],
+        ],
+        "#fcd34d",
+      ),
     };
   }, [showPriceChart, averagePriceSynced, currency]);
 
@@ -812,17 +855,46 @@ export function OperatorInfrastructureCharts({
         </div>
       </div>
 
-      {priceGaugeOption ? (
+      {priceGaugeOptions ? (
         <div className="min-w-0">
           <p className="text-white/45 text-[0.62rem] uppercase tracking-[0.12em] font-semibold mb-2">
-            Precio promedio (sync)
+            Precio promedio por período (sync)
           </p>
-          <ReactECharts
-            option={priceGaugeOption}
-            style={{ height: 200, width: "100%" }}
-            opts={{ renderer: "svg" }}
-            className="min-w-0 max-w-md mx-auto lg:mx-0"
-          />
+          <div className="grid grid-cols-3 gap-3">
+            <div className="min-w-0">
+              <p className="text-center text-white/35 text-[0.6rem] uppercase tracking-[0.1em] font-semibold mb-1">
+                Por noche
+              </p>
+              <ReactECharts
+                option={priceGaugeOptions.noche}
+                style={{ height: 175, width: "100%" }}
+                opts={{ renderer: "svg" }}
+              />
+            </div>
+            <div className="min-w-0">
+              <p className="text-center text-white/35 text-[0.6rem] uppercase tracking-[0.1em] font-semibold mb-1">
+                Por semana
+              </p>
+              <ReactECharts
+                option={priceGaugeOptions.semana}
+                style={{ height: 175, width: "100%" }}
+                opts={{ renderer: "svg" }}
+              />
+            </div>
+            <div className="min-w-0">
+              <p className="text-center text-white/35 text-[0.6rem] uppercase tracking-[0.1em] font-semibold mb-1">
+                Por mes
+              </p>
+              <ReactECharts
+                option={priceGaugeOptions.mes}
+                style={{ height: 175, width: "100%" }}
+                opts={{ renderer: "svg" }}
+              />
+            </div>
+          </div>
+          <p className="text-white/25 text-[0.6rem] mt-2 text-center leading-relaxed">
+            Precio mínimo noche × 7 (semana) y × 30 (mes). Basado en alojamientos sincronizados.
+          </p>
         </div>
       ) : null}
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { CreatePropertyModal } from "./CreatePropertyModal";
 import {
   Button,
   Select,
@@ -345,10 +346,13 @@ export function PropertiesList() {
   const [loading, setLoading] = useState(true);
   const [filterActive, setFilterActive] = useState<string>("all");
   const [filterCity, setFilterCity] = useState("");
+  const [filterName, setFilterName] = useState("");
+  const [debouncedName, setDebouncedName] = useState("");
   const [filterPms, setFilterPms] = useState<string>("all");
   const [patching, setPatching] = useState<number | null>(null);
   const [deleteModal, setDeleteModal] = useState<PropertyListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     adminApi
@@ -358,14 +362,26 @@ export function PropertiesList() {
   }, []);
 
   useEffect(() => {
+    const t = setTimeout(() => setDebouncedName(filterName.trim()), 350);
+    return () => clearTimeout(t);
+  }, [filterName]);
+
+  useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
       try {
-        const params: { is_active?: boolean; city?: string; pms_connection_id?: number; operator_id?: number } = {};
+        const params: {
+          is_active?: boolean;
+          city?: string;
+          name?: string;
+          pms_connection_id?: number;
+          operator_id?: number;
+        } = {};
         if (filterActive === "true") params.is_active = true;
         if (filterActive === "false") params.is_active = false;
         if (filterCity.trim()) params.city = filterCity.trim();
+        if (debouncedName) params.name = debouncedName;
         if (filterPms !== "all") params.pms_connection_id = parseInt(filterPms, 10);
         if (isOperador && operatorId) params.operator_id = operatorId;
         const res = await adminApi.getProperties(params);
@@ -381,7 +397,7 @@ export function PropertiesList() {
     return () => {
       cancelled = true;
     };
-  }, [filterActive, filterCity, filterPms, isOperador, operatorId]);
+  }, [filterActive, filterCity, debouncedName, filterPms, isOperador, operatorId]);
 
   async function togglePublished(p: PropertyListItem) {
     if (!canEditProperty) return;
@@ -444,6 +460,24 @@ export function PropertiesList() {
 
   return (
     <div className="space-y-5">
+      {canEditProperty && role !== "agente" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-white/[0.09] bg-white/[0.04] backdrop-blur-sm px-4 py-3 sm:px-5">
+          <p className="text-[0.8125rem] text-white/50 max-w-xl leading-snug hidden sm:block">
+            ¿Sin inventario en PMS? Crea la propiedad aquí y completa semanas, fotos y políticas en la ficha.
+          </p>
+          <Button
+            className="btn-newayzi-primary font-semibold shrink-0 ml-auto"
+            size="md"
+            startContent={<Icon icon="solar:add-circle-bold-duotone" width={20} />}
+            onPress={() => setCreateOpen(true)}
+          >
+            Nueva propiedad (manual)
+          </Button>
+        </div>
+      )}
+
+      <CreatePropertyModal isOpen={createOpen} onOpenChange={setCreateOpen} role={role} />
+
       <GlassCard className="p-4 sm:p-5">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-9 h-9 rounded-xl bg-[#5e2cec]/25 flex items-center justify-center shrink-0">
@@ -452,7 +486,7 @@ export function PropertiesList() {
           <div className="min-w-0">
             <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Filtros</p>
             <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
-              Estado, ciudad y conexión PMS
+              Estado, nombre, ciudad y conexión PMS
             </p>
           </div>
         </div>
@@ -482,6 +516,20 @@ export function PropertiesList() {
               Inactivos
             </SelectItem>
           </Select>
+          <Input
+            label="Nombre"
+            placeholder="Buscar por nombre de propiedad"
+            value={filterName}
+            onValueChange={setFilterName}
+            className="w-full sm:min-w-[14rem] sm:flex-1 sm:max-w-md"
+            size="sm"
+            startContent={<Icon icon="solar:magnifer-outline" className="text-white/40" width={18} />}
+            classNames={{
+              inputWrapper: inputDark,
+              input: "!text-white/95 placeholder:!text-white/38",
+              label: "!text-white/65",
+            }}
+          />
           <Input
             label="Ciudad"
             placeholder="Filtrar por ciudad"
@@ -531,7 +579,20 @@ export function PropertiesList() {
             <Icon icon="solar:buildings-2-bold-duotone" className="text-[#9b74ff] text-2xl" />
           </div>
           <p className="font-sora font-bold text-white text-base">Sin resultados</p>
-          <p className="mt-2 text-sm text-white/50">No hay propiedades que coincidan con los filtros.</p>
+          <p className="mt-2 text-sm text-white/50 max-w-md">
+            No hay propiedades que coincidan con los filtros. Si aún no tienes ninguna vinculada al PMS, puedes dar de alta
+            una propiedad manualmente y luego cargar inventario (Excel) y fotos desde la ficha.
+          </p>
+          {canEditProperty && role !== "agente" && (
+            <Button
+              className="mt-6 btn-newayzi-primary font-semibold"
+              size="md"
+              startContent={<Icon icon="solar:add-circle-bold-duotone" width={20} />}
+              onPress={() => setCreateOpen(true)}
+            >
+              Crear propiedad manual
+            </Button>
+          )}
         </GlassCard>
       ) : (
         <>

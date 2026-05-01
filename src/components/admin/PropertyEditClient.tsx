@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import Link from "next/link";
 import {
   Button,
@@ -16,13 +16,26 @@ import {
   ModalFooter,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { adminApi, type PropertyDetail, type PropertyPicture, type PropertyFaq } from "@/lib/admin-api";
+import {
+  adminApi,
+  LEVEL_OPTIONS,
+  type AdminCitySearchRow,
+  type LoyaltyDealItem,
+  type LoyaltyLevelValue,
+  type PropertyDetail,
+  type PropertyFaq,
+  type PropertyPicture,
+  type RoomTypeAdminSummary,
+} from "@/lib/admin-api";
 import { normalizeImageUrl } from "@/lib/normalize-image-url";
 import { useAdmin } from "@/contexts/AdminContext";
 import { useRouter, useParams } from "next/navigation";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { PropertyCancellationPolicyPanel } from "./PropertyCancellationPolicyPanel";
 import { PropertyGalleryPanel } from "./PropertyGalleryPanel";
+import { ManualInventoryPanel } from "./ManualInventoryPanel";
+import { PropertyPricingConfigPanel } from "./PropertyPricingConfigPanel";
+import { PropertyLocationMapPicker } from "./PropertyLocationMapPicker";
 
 /* ─── Primitivos de UI ─────────────────────────────────── */
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -33,19 +46,35 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
   );
 }
 
-function SectionHeader({ icon, title, subtitle, iconBg = "from-[#5e2cec]/20 to-[#9b74ff]/20", iconColor = "text-[#9b74ff]" }: {
-  icon: string; title: string; subtitle?: string;
-  iconBg?: string; iconColor?: string;
+function SectionHeader({
+  icon,
+  title,
+  subtitle,
+  iconBg = "from-[#5e2cec]/20 to-[#9b74ff]/20",
+  iconColor = "text-[#9b74ff]",
+  action,
+}: {
+  icon: string;
+  title: string;
+  subtitle?: string;
+  iconBg?: string;
+  iconColor?: string;
+  action?: ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 mb-5">
-      <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${iconBg} border border-white/10 flex items-center justify-center flex-shrink-0`}>
-        <Icon icon={icon} className={`${iconColor} text-lg`} />
+    <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div
+          className={`w-9 h-9 rounded-xl bg-gradient-to-br ${iconBg} border border-white/10 flex items-center justify-center flex-shrink-0`}
+        >
+          <Icon icon={icon} className={`${iconColor} text-lg`} />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-base font-bold text-white/90">{title}</h2>
+          {subtitle && <p className="text-xs text-white/50">{subtitle}</p>}
+        </div>
       </div>
-      <div>
-        <h2 className="text-base font-bold text-white/90">{title}</h2>
-        {subtitle && <p className="text-xs text-white/50">{subtitle}</p>}
-      </div>
+      {action ? <div className="shrink-0 flex items-center gap-2">{action}</div> : null}
     </div>
   );
 }
@@ -79,6 +108,21 @@ function formatPmsMoney(amount: string | number, currencyCode: string): string {
   }
 }
 
+/** Mensaje legible si el backend devolvió JSON `{ detail: "..." }` en el body del error. */
+function formatAdminApiError(e: unknown): string {
+  if (!(e instanceof Error)) return String(e);
+  const raw = e.message.trim();
+  if (raw.startsWith("{")) {
+    try {
+      const j = JSON.parse(raw) as { detail?: unknown };
+      if (typeof j.detail === "string") return j.detail;
+    } catch {
+      /* ignore */
+    }
+  }
+  return raw;
+}
+
 /* ─── Componente principal ─────────────────────────────── */
 export function PropertyEditClient() {
   const router = useRouter();
@@ -92,6 +136,10 @@ export function PropertyEditClient() {
   const [saving, setSaving] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [roomTypeToDelete, setRoomTypeToDelete] = useState<RoomTypeAdminSummary | null>(null);
+  const [deletingRoomTypeId, setDeletingRoomTypeId] = useState<number | null>(null);
+  const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // ── Campos editables: contenido principal
   const [name, setName] = useState("");
@@ -115,6 +163,20 @@ export function PropertyEditClient() {
   const [phone, setPhone] = useState("");
   const [timezone, setTimezone] = useState("");
 
+  // ── Coordenadas GPS (mapa picker)
+  const [locationLat, setLocationLat] = useState<number>(4.711);
+  const [locationLng, setLocationLng] = useState<number>(-74.0721);
+  const [locationChanged, setLocationChanged] = useState(false);
+  const [mapKey, setMapKey] = useState<number>(0);
+
+  // ── Selector de ciudad
+  const [cityId, setCityId] = useState<number | null>(null);
+  const [cityDisplay, setCityDisplay] = useState<{ name: string; country: string; code: string } | null>(null);
+  const [cityQuery, setCityQuery] = useState("");
+  const [cityResults, setCityResults] = useState<AdminCitySearchRow[]>([]);
+  const [citySearching, setCitySearching] = useState(false);
+  const [cityOpen, setCityOpen] = useState(false);
+
   // ── Campos editables: horarios
   const [check_in_from, setCheckInFrom] = useState("");
   const [check_in_until, setCheckInUntil] = useState("");
@@ -131,6 +193,13 @@ export function PropertyEditClient() {
   // ── Galería
   const [pictures, setPictures] = useState<PropertyPicture[]>([]);
   const [aiSuggesting, setAiSuggesting] = useState(false);
+  const [allProperties, setAllProperties] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedDealLevel, setSelectedDealLevel] = useState<LoyaltyLevelValue>("member");
+  const [levelDeals, setLevelDeals] = useState<LoyaltyDealItem[]>([]);
+  const [newDealPropertyId, setNewDealPropertyId] = useState("");
+  const [newDealDiscount, setNewDealDiscount] = useState("0");
+  const [dealsLoading, setDealsLoading] = useState(false);
+  const [dealsSaving, setDealsSaving] = useState(false);
 
   function isDescriptionEmpty(html: string): boolean {
     const text = html
@@ -178,6 +247,10 @@ export function PropertyEditClient() {
     }
   }
 
+  const refreshProperty = useCallback(() => {
+    adminApi.getProperty(propertyId).then((p) => setProperty(p ?? null));
+  }, [propertyId]);
+
   useEffect(() => {
     if (Number.isNaN(propertyId) || propertyId <= 0) { setLoading(false); return; }
     let cancelled = false;
@@ -201,6 +274,25 @@ export function PropertyEditClient() {
         setCheckInUntil(p.check_in_until ?? "");
         setCheckOutFrom(p.check_out_from ?? "");
         setCheckOutUntil(p.check_out_until ?? "");
+        setCityId(p.city_id ?? null);
+        if (p.city_name) {
+          setCityDisplay({
+            name: p.city_name,
+            country: p.city_country_name ?? "",
+            code: p.city_country_code ?? "",
+          });
+        }
+        // Inicializar coordenadas GPS desde la propiedad
+        if (p.location?.lat != null && p.location?.lng != null) {
+          setLocationLat(p.location.lat);
+          setLocationLng(p.location.lng);
+        } else {
+          // Sin coords propias: centrar en Colombia por defecto
+          setLocationLat(4.711);
+          setLocationLng(-74.0721);
+        }
+        setLocationChanged(false);
+        setMapKey((k) => k + 1);
         const am = Array.isArray(p.amenities) ? p.amenities : [];
         setAmenities([...new Set(am.map((a) => (typeof a === "string" ? a : (a as { name?: string })?.name ?? "")).filter(Boolean))]);
         setImportantInfo(Array.isArray(p.important_info) ? p.important_info : []);
@@ -230,6 +322,149 @@ export function PropertyEditClient() {
     if (q && a) { setFaqs([...faqs, { question: q, answer: a }]); setNewFaqQ(""); setNewFaqA(""); }
   }
 
+  // ── Búsqueda de ciudades (debounced)
+  useEffect(() => {
+    if (cityQuery.length < 2) { setCityResults([]); return; }
+    let cancelled = false;
+    setCitySearching(true);
+    const t = setTimeout(() => {
+      adminApi.searchAdminCities(cityQuery).then((r) => {
+        if (!cancelled) setCityResults(r?.results ?? []);
+      }).catch(() => {
+        if (!cancelled) setCityResults([]);
+      }).finally(() => {
+        if (!cancelled) setCitySearching(false);
+      });
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [cityQuery]);
+
+  useEffect(() => {
+    let cancelled = false;
+    adminApi.getProperties().then((res) => {
+      if (cancelled) return;
+      const rows = (res?.results ?? []).map((p) => ({ id: p.id, name: p.name || `Propiedad ${p.id}` }));
+      setAllProperties(rows);
+    }).catch(() => {
+      if (!cancelled) setAllProperties([]);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDealsLoading(true);
+    adminApi
+      .getPropertyLoyaltyDeals(selectedDealLevel)
+      .then((res) => {
+        if (cancelled) return;
+        setLevelDeals(res?.results ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setLevelDeals([]);
+      })
+      .finally(() => {
+        if (!cancelled) setDealsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDealLevel]);
+
+  function normalizeDealsForSave(deals: LoyaltyDealItem[]) {
+    return deals.map((d, index) => ({
+      property_id: d.property_id,
+      order: index,
+      discount_percent: Number(d.discount_percent) || 0,
+    }));
+  }
+
+  async function saveLoyaltyDeals(nextDeals: LoyaltyDealItem[]) {
+    setDealsSaving(true);
+    try {
+      const payload = normalizeDealsForSave(nextDeals);
+      const res = await adminApi.putPropertyLoyaltyDeals(selectedDealLevel, payload);
+      setLevelDeals(res?.results ?? []);
+      addToast({ title: "Deals loyalty guardados", color: "success" });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "No se pudieron guardar los deals loyalty.";
+      addToast({ title: "Error al guardar deals", description: msg, color: "danger" });
+    } finally {
+      setDealsSaving(false);
+    }
+  }
+
+  function removeDeal(propertyId: number) {
+    const nextDeals = levelDeals.filter((d) => d.property_id !== propertyId);
+    void saveLoyaltyDeals(nextDeals);
+  }
+
+  function moveDeal(propertyId: number, direction: -1 | 1) {
+    const idx = levelDeals.findIndex((d) => d.property_id === propertyId);
+    if (idx < 0) return;
+    const swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= levelDeals.length) return;
+    const nextDeals = [...levelDeals];
+    const temp = nextDeals[idx];
+    nextDeals[idx] = nextDeals[swapIdx];
+    nextDeals[swapIdx] = temp;
+    void saveLoyaltyDeals(nextDeals);
+  }
+
+  function updateDealDiscount(propertyId: number, nextDiscount: string) {
+    const numeric = Number(nextDiscount);
+    if (!Number.isFinite(numeric)) return;
+    const clamped = Math.max(0, Math.min(100, numeric));
+    const nextDeals = levelDeals.map((d) =>
+      d.property_id === propertyId ? { ...d, discount_percent: clamped } : d
+    );
+    setLevelDeals(nextDeals);
+  }
+
+  async function persistDealDiscount(propertyId: number) {
+    const nextDeals = levelDeals.map((d) =>
+      d.property_id === propertyId
+        ? { ...d, discount_percent: Math.max(0, Math.min(100, Number(d.discount_percent) || 0)) }
+        : d
+    );
+    await saveLoyaltyDeals(nextDeals);
+  }
+
+  function addCurrentPropertyDeal() {
+    if (!property) return;
+    if (levelDeals.some((d) => d.property_id === property.id)) return;
+    const nextDiscountNum = Math.max(0, Math.min(100, Number(newDealDiscount) || 0));
+    const nextDeals: LoyaltyDealItem[] = [
+      ...levelDeals,
+      {
+        property_id: property.id,
+        order: levelDeals.length,
+        discount_percent: nextDiscountNum,
+        property_name: property.name,
+        city_name: property.city_name,
+      },
+    ];
+    void saveLoyaltyDeals(nextDeals);
+  }
+
+  function addSelectedPropertyDeal() {
+    const pid = Number(newDealPropertyId);
+    if (!Number.isFinite(pid) || pid <= 0) return;
+    if (levelDeals.some((d) => d.property_id === pid)) return;
+    const selectedProp = allProperties.find((p) => p.id === pid);
+    const nextDiscountNum = Math.max(0, Math.min(100, Number(newDealDiscount) || 0));
+    const nextDeals: LoyaltyDealItem[] = [
+      ...levelDeals,
+      {
+        property_id: pid,
+        order: levelDeals.length,
+        discount_percent: nextDiscountNum,
+        property_name: selectedProp?.name ?? `Propiedad ${pid}`,
+      },
+    ];
+    void saveLoyaltyDeals(nextDeals);
+  }
+
   async function handleSave() {
     if (!canEditProperty || !property) return;
     setSaving(true);
@@ -254,6 +489,9 @@ export function PropertyEditClient() {
         amenities,
         important_info: importantInfo,
         faqs,
+        ...(cityId && cityId !== property?.city_id ? { city_id: cityId } : {}),
+        // Siempre guardar la ubicación del mapa (puede haberse movido el pin)
+        location: { lat: locationLat, lng: locationLng },
       });
       setProperty(updated);
       router.refresh();
@@ -280,6 +518,50 @@ export function PropertyEditClient() {
     } finally {
       setDeleting(false);
       setDeleteModalOpen(false);
+    }
+  }
+
+  async function handleDeleteRoomType() {
+    if (!canEditProperty || !roomTypeToDelete) return;
+    setDeletingRoomTypeId(roomTypeToDelete.id);
+    try {
+      await adminApi.deleteRoomTypeAdmin(propertyId, roomTypeToDelete.id);
+      addToast({ title: "Tipo de habitación eliminado", color: "success" });
+      setRoomTypeToDelete(null);
+      refreshProperty();
+      router.refresh();
+    } catch (e: unknown) {
+      addToast({
+        title: "No se pudo eliminar",
+        description: formatAdminApiError(e),
+        color: "danger",
+      });
+    } finally {
+      setDeletingRoomTypeId(null);
+    }
+  }
+
+  async function handleDeleteAllRoomTypes() {
+    if (!canEditProperty) return;
+    setBulkDeleting(true);
+    try {
+      const r = await adminApi.deleteAllRoomTypesForProperty(propertyId);
+      addToast({
+        title: "Tipos de habitación eliminados",
+        description: r.deleted > 0 ? `Se eliminaron ${r.deleted} tipo(s).` : undefined,
+        color: "success",
+      });
+      setBulkDeleteModalOpen(false);
+      refreshProperty();
+      router.refresh();
+    } catch (e: unknown) {
+      addToast({
+        title: "No se pudieron eliminar todos",
+        description: formatAdminApiError(e),
+        color: "danger",
+      });
+    } finally {
+      setBulkDeleting(false);
     }
   }
 
@@ -349,6 +631,50 @@ export function PropertyEditClient() {
             <Button variant="flat" onPress={() => setDeleteModalOpen(false)}>Cancelar</Button>
             <Button color="danger" onPress={handleDelete} isLoading={deleting} startContent={!deleting ? <Icon icon="solar:trash-bin-trash-outline" width={18} /> : undefined}>
               Eliminar
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={!!roomTypeToDelete} onOpenChange={(open) => !open && setRoomTypeToDelete(null)} placement="center">
+        <ModalContent>
+          <ModalHeader>Eliminar tipo de habitación</ModalHeader>
+          <ModalBody>
+            <p>
+              ¿Eliminar &quot;{roomTypeToDelete?.name}&quot; ({roomTypeToDelete?.code})? Se borrarán tarifas, bloqueos e imágenes asociados. No es posible si hay reservas vinculadas.
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={() => setRoomTypeToDelete(null)}>Cancelar</Button>
+            <Button
+              color="danger"
+              onPress={handleDeleteRoomType}
+              isLoading={deletingRoomTypeId != null}
+              startContent={deletingRoomTypeId == null ? <Icon icon="solar:trash-bin-trash-outline" width={18} /> : undefined}
+            >
+              Eliminar
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Modal isOpen={bulkDeleteModalOpen} onOpenChange={setBulkDeleteModalOpen} placement="center">
+        <ModalContent>
+          <ModalHeader>Eliminar todos los tipos de habitación</ModalHeader>
+          <ModalBody>
+            <p>
+              Se eliminarán los {property?.room_types?.length ?? 0} tipos de habitación de esta propiedad (tarifas, bloqueos, imágenes y mapeos PMS incluidos). Esta acción no se puede deshacer. Si algún tipo tiene reservas, la operación fallará por completo.
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={() => setBulkDeleteModalOpen(false)}>Cancelar</Button>
+            <Button
+              color="danger"
+              onPress={handleDeleteAllRoomTypes}
+              isLoading={bulkDeleting}
+              startContent={!bulkDeleting ? <Icon icon="solar:trash-bin-trash-outline" width={18} /> : undefined}
+            >
+              Eliminar todos
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -448,13 +774,234 @@ export function PropertyEditClient() {
         {!readOnly && <div className="mt-5"><SaveButton /></div>}
       </GlassCard>
 
-      {/* ── 3. Contacto y ubicación ── */}
+      {/* ── 3. Loyalty deals por nivel ── */}
+      <GlassCard>
+        <SectionHeader
+          icon="solar:gift-bold-duotone"
+          title="Loyalty deals por nivel"
+          subtitle="Configura orden y descuento por nivel para recomendaciones y ofertas loyalty."
+          iconBg="from-violet-500/20 to-fuchsia-600/20"
+          iconColor="text-fuchsia-300"
+        />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <select
+              className="rounded-xl border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm text-white/90"
+              value={selectedDealLevel}
+              onChange={(e) => setSelectedDealLevel(e.target.value as LoyaltyLevelValue)}
+              disabled={dealsSaving || readOnly}
+            >
+              {LEVEL_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value} className="text-black">
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <Input
+              label="Descuento (%)"
+              type="number"
+              min={0}
+              max={100}
+              value={newDealDiscount}
+              onValueChange={setNewDealDiscount}
+              isDisabled={dealsSaving || readOnly}
+              classNames={{ inputWrapper: inputDark, input: "!text-white/95", label: "!text-white/65" }}
+            />
+            <Button
+              className="btn-newayzi-primary rounded-xl"
+              onPress={addCurrentPropertyDeal}
+              isDisabled={dealsSaving || readOnly || !property}
+              startContent={<Icon icon="solar:add-circle-bold-duotone" width={18} />}
+            >
+              Añadir esta propiedad al nivel
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+            <select
+              className="rounded-xl border border-white/[0.12] bg-white/[0.04] px-3 py-2 text-sm text-white/90"
+              value={newDealPropertyId}
+              onChange={(e) => setNewDealPropertyId(e.target.value)}
+              disabled={dealsSaving || readOnly}
+            >
+              <option value="" className="text-black">Selecciona otra propiedad…</option>
+              {allProperties.map((p) => (
+                <option key={p.id} value={p.id} className="text-black">
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="flat"
+              className="rounded-xl border border-white/[0.12] bg-white/[0.06] text-white/90"
+              onPress={addSelectedPropertyDeal}
+              isDisabled={dealsSaving || readOnly || !newDealPropertyId}
+            >
+              Agregar seleccionada
+            </Button>
+          </div>
+
+          {dealsLoading ? (
+            <div className="flex items-center gap-2 text-white/60 text-sm">
+              <Spinner size="sm" />
+              Cargando deals loyalty…
+            </div>
+          ) : levelDeals.length === 0 ? (
+            <p className="text-sm text-white/45">No hay deals configurados para este nivel.</p>
+          ) : (
+            <div className="space-y-2">
+              {levelDeals.map((deal, idx) => (
+                <div
+                  key={`${deal.property_id}-${idx}`}
+                  className="rounded-xl border border-white/[0.09] bg-white/[0.04] px-3 py-2 grid grid-cols-1 lg:grid-cols-[1fr_auto_auto_auto] gap-2 items-center"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm text-white/90 font-medium truncate">
+                      #{idx + 1} · {deal.property_name || `Propiedad ${deal.property_id}`}
+                    </p>
+                    <p className="text-xs text-white/45">{deal.city_name || "—"} · ID {deal.property_id}</p>
+                  </div>
+                  <Input
+                    label="Desc. %"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={String(deal.discount_percent ?? 0)}
+                    onValueChange={(v) => updateDealDiscount(deal.property_id, v)}
+                    onBlur={() => void persistDealDiscount(deal.property_id)}
+                    isDisabled={dealsSaving || readOnly}
+                    classNames={{ inputWrapper: inputDark, input: "!text-white/95", label: "!text-white/65" }}
+                  />
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      className="rounded-lg border border-white/[0.12] bg-white/[0.05] text-white/85"
+                      isDisabled={dealsSaving || readOnly || idx === 0}
+                      onPress={() => moveDeal(deal.property_id, -1)}
+                    >
+                      ↑
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      className="rounded-lg border border-white/[0.12] bg-white/[0.05] text-white/85"
+                      isDisabled={dealsSaving || readOnly || idx === levelDeals.length - 1}
+                      onPress={() => moveDeal(deal.property_id, 1)}
+                    >
+                      ↓
+                    </Button>
+                  </div>
+                  <Button
+                    size="sm"
+                    color="danger"
+                    variant="flat"
+                    className="rounded-lg"
+                    isDisabled={dealsSaving || readOnly}
+                    onPress={() => removeDeal(deal.property_id)}
+                  >
+                    Quitar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </GlassCard>
+
+      {/* ── 4. Contacto y ubicación ── */}
       <GlassCard>
         <SectionHeader icon="solar:map-point-bold-duotone" title="Contacto y ubicación" subtitle="Dirección, teléfono, ciudad y zona horaria." iconBg="from-blue-500/20 to-cyan-600/20" iconColor="text-cyan-400" />
 
-        {/* Datos de solo lectura */}
+        {/* Datos de solo lectura + selector de ciudad */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.07]">
-          <InfoRow label="Ciudad" value={property.city_name} />
+          {/* Ciudad — editable para corregir la asignación */}
+          <div className="col-span-full sm:col-span-1 flex flex-col gap-0.5 relative">
+            <span className="text-xs text-white/45 font-sora">Ciudad</span>
+            {readOnly ? (
+              <span className="text-sm text-white/90 font-sora">
+                {cityDisplay ? `${cityDisplay.name}${cityDisplay.country ? `, ${cityDisplay.country}` : ""}` : (property.city_name ?? "—")}
+              </span>
+            ) : (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => { setCityOpen((v) => !v); setCityQuery(""); setCityResults([]); }}
+                  className="w-full text-left text-sm text-white/90 font-sora bg-white/[0.06] border border-white/[0.12] rounded-xl px-3 py-2 hover:bg-white/[0.1] transition flex items-center gap-2"
+                >
+                  {cityDisplay ? (
+                    <>
+                      {cityDisplay.code && (
+                        <span className="text-xs bg-white/10 rounded px-1 py-0.5 uppercase font-mono">{cityDisplay.code}</span>
+                      )}
+                      <span>{cityDisplay.name}</span>
+                      {cityDisplay.country && <span className="text-white/40 text-xs">{cityDisplay.country}</span>}
+                    </>
+                  ) : (
+                    <span className="text-white/40">Seleccionar ciudad…</span>
+                  )}
+                  <Icon icon="solar:alt-arrow-down-bold" className="ml-auto text-white/40" width={14} />
+                </button>
+
+                {cityOpen && (
+                  <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#18122b] border border-white/[0.12] rounded-2xl shadow-2xl overflow-hidden">
+                    <div className="p-2 border-b border-white/[0.08]">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={cityQuery}
+                        onChange={(e) => setCityQuery(e.target.value)}
+                        placeholder="Buscar ciudad…"
+                        className="w-full bg-white/[0.06] rounded-xl px-3 py-2 text-sm text-white/90 outline-none placeholder:text-white/35 border border-white/[0.1] focus:border-[#5e2cec]/60"
+                      />
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                      {citySearching && (
+                        <div className="flex items-center justify-center py-4">
+                          <Spinner size="sm" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#9b74ff]" }} />
+                        </div>
+                      )}
+                      {!citySearching && cityQuery.length < 2 && (
+                        <p className="text-xs text-white/35 text-center py-4">Escribe al menos 2 caracteres</p>
+                      )}
+                      {!citySearching && cityQuery.length >= 2 && cityResults.length === 0 && (
+                        <p className="text-xs text-white/35 text-center py-4">Sin resultados</p>
+                      )}
+                      {cityResults.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setCityId(c.id);
+                            setCityDisplay({ name: c.name, country: c.country_name, code: c.country_code });
+                            setCityOpen(false);
+                            setCityQuery("");
+                            // Si la ciudad tiene centro y la propiedad no tiene coords propias, centrar el mapa
+                            if (c.center?.lat != null && c.center?.lng != null) {
+                              const propHasCoords = property?.location?.lat != null && property?.location?.lng != null;
+                              if (!propHasCoords || !locationChanged) {
+                                setLocationLat(c.center.lat);
+                                setLocationLng(c.center.lng);
+                                setMapKey((k) => k + 1);
+                              }
+                            }
+                          }}
+                          className="w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-white/[0.06] transition"
+                        >
+                          <span className="text-xs bg-white/10 rounded px-1.5 py-0.5 uppercase font-mono shrink-0">{c.country_code || "??"}</span>
+                          <span className="text-sm text-white/90">{c.name}</span>
+                          <span className="text-xs text-white/40 ml-1">{c.country_name}</span>
+                          {c.has_active_properties && (
+                            <span className="ml-auto text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 rounded-full px-2 py-0.5 shrink-0">En catálogo</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <InfoRow label="Tipo de propiedad" value={property.property_type} />
           <InfoRow label="Moneda" value={property.currency} />
           {property.location && (
@@ -505,6 +1052,40 @@ export function PropertyEditClient() {
             classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/38", label: "!text-white/65" }}
           />
         </div>
+
+        {/* Mapa de ubicación exacta */}
+        <div className="mt-5">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-sm font-sora text-white/80 font-medium">Ubicación en el mapa</p>
+              <p className="text-xs text-white/40 mt-0.5">
+                {locationChanged
+                  ? `Pin en ${locationLat.toFixed(5)}, ${locationLng.toFixed(5)} — Se guardará al guardar cambios`
+                  : property?.location
+                  ? `Coordenadas actuales: ${locationLat.toFixed(5)}, ${locationLng.toFixed(5)}`
+                  : "Sin ubicación guardada — mueve el pin para establecerla"}
+              </p>
+            </div>
+            {locationChanged && !readOnly && (
+              <span className="text-[10px] bg-amber-500/15 text-amber-300 border border-amber-500/20 rounded-full px-2.5 py-1 font-medium">
+                Ubicación modificada
+              </span>
+            )}
+          </div>
+          <PropertyLocationMapPicker
+            mapKey={mapKey}
+            lat={locationLat}
+            lng={locationLng}
+            onChange={(lat, lng) => {
+              if (!readOnly) {
+                setLocationLat(lat);
+                setLocationLng(lng);
+                setLocationChanged(true);
+              }
+            }}
+          />
+        </div>
+
         {!readOnly && <div className="mt-5"><SaveButton /></div>}
       </GlassCard>
 
@@ -652,6 +1233,20 @@ export function PropertyEditClient() {
             subtitle="Todos los tipos sincronizados; abre cada uno para editar texto, datos y galería."
             iconBg="from-teal-500/20 to-green-600/20"
             iconColor="text-teal-400"
+            action={
+              !readOnly && (property.room_types?.length ?? 0) > 0 ? (
+                <Button
+                  size="sm"
+                  color="danger"
+                  variant="flat"
+                  className="font-medium"
+                  startContent={<Icon icon="solar:trash-bin-trash-outline" width={16} />}
+                  onPress={() => setBulkDeleteModalOpen(true)}
+                >
+                  Eliminar todos
+                </Button>
+              ) : undefined
+            }
           />
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {property.room_types.map((rt) => (
@@ -698,7 +1293,7 @@ export function PropertyEditClient() {
                       </span>
                     )}
                   </div>
-                  <div className="mt-auto pt-3">
+                  <div className="mt-auto pt-3 flex flex-col gap-2">
                     <Button
                       as={Link}
                       href={`/admin/properties/${propertyId}/room-types/${rt.id}`}
@@ -708,6 +1303,19 @@ export function PropertyEditClient() {
                     >
                       Ver y editar
                     </Button>
+                    {!readOnly && (
+                      <Button
+                        size="sm"
+                        color="danger"
+                        variant="flat"
+                        className="w-full font-medium"
+                        startContent={<Icon icon="solar:trash-bin-trash-outline" width={16} />}
+                        isLoading={deletingRoomTypeId === rt.id}
+                        onPress={() => setRoomTypeToDelete(rt)}
+                      >
+                        Eliminar
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -718,6 +1326,30 @@ export function PropertyEditClient() {
           </p>
         </GlassCard>
       ) : null}
+
+      {/* ── Inventario manual (sin PMS) ── */}
+      <div className="rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6">
+        <SectionHeader
+          icon="solar:database-bold-duotone"
+          title="Inventario manual"
+          subtitle="Excel de semanas y unidades físicas cuando no hay conexión PMS."
+          iconBg="from-emerald-500/20 to-teal-500/20"
+          iconColor="text-emerald-300"
+        />
+        <ManualInventoryPanel
+          propertyId={propertyId}
+          roomTypes={property.room_types ?? []}
+          readOnly={readOnly}
+          onRefresh={refreshProperty}
+          restrictPricingToManualWeeks={property.restrict_pricing_to_manual_weeks ?? false}
+          onRestrictPricingChange={async (v) => {
+            const updated = await adminApi.patchProperty(propertyId, {
+              restrict_pricing_to_manual_weeks: v,
+            });
+            setProperty(updated);
+          }}
+        />
+      </div>
 
       {/* ── 9. Galería de imágenes ── */}
       <div className="rounded-[28px] border border-white/[0.09] bg-white/[0.045] backdrop-blur-xl p-6">
@@ -734,6 +1366,9 @@ export function PropertyEditClient() {
         <SectionHeader icon="solar:shield-minimalistic-bold-duotone" title="Política de Cancelación" subtitle="Reglas de reembolso vinculadas al contrato del operador." iconBg="from-orange-500/20 to-red-500/20" iconColor="text-orange-400" />
         <PropertyCancellationPolicyPanel propertyId={propertyId} readOnly={readOnly} />
       </div>
+
+      {/* ── 11. Configuración de precio y semanas fijas ── */}
+      <PropertyPricingConfigPanel propertyId={propertyId} readOnly={readOnly} />
     </div>
   );
 }

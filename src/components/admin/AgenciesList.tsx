@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, Spinner } from "@heroui/react";
+import {
+  Button,
+  Spinner,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+} from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { adminApi, type Agency } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
@@ -23,8 +31,8 @@ function GlassCard({
   );
 }
 
-function formatCurrency(value: string): string {
-  const n = parseFloat(value);
+function formatCurrency(value: string | undefined): string {
+  const n = parseFloat(value ?? "");
   if (Number.isNaN(n)) return "—";
   return new Intl.NumberFormat("es-CO", {
     style: "currency",
@@ -33,10 +41,22 @@ function formatCurrency(value: string): string {
   }).format(n);
 }
 
-export function AgenciesList({ refreshKey = 0 }: { refreshKey?: number }) {
-  const { canAccess } = useAdmin();
+export function AgenciesList({
+  refreshKey = 0,
+  onRefresh,
+}: {
+  refreshKey?: number;
+  onRefresh?: () => void;
+}) {
+  const { me } = useAdmin();
+  const isOperator = me?.role === "operador";
+  const isSuperAdmin = me?.role === "super_admin";
+  const canManage = isOperator || isSuperAdmin;
   const [list, setList] = useState<Agency[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<Agency | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -72,7 +92,25 @@ export function AgenciesList({ refreshKey = 0 }: { refreshKey?: number }) {
     );
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    setDeleteErr(null);
+    try {
+      await adminApi.deleteAgency(deleteTarget.id);
+      setDeleteTarget(null);
+      onRefresh?.();
+      setList((prev) => prev.filter((x) => x.id !== deleteTarget.id));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error al eliminar";
+      setDeleteErr(msg.replace(/^API \d+: /, "").slice(0, 240));
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
   return (
+    <>
     <GlassCard className="p-0 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
@@ -84,15 +122,19 @@ export function AgenciesList({ refreshKey = 0 }: { refreshKey?: number }) {
               <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
                 Contacto
               </th>
-              <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
-                Nivel
-              </th>
+              {!isOperator && (
+                <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
+                  Nivel
+                </th>
+              )}
               <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
                 Ventas
               </th>
-              <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
-                Comisión
-              </th>
+              {!isOperator && (
+                <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
+                  Comisión
+                </th>
+              )}
               <th className="text-left py-4 px-5 text-white/50 text-[0.65rem] uppercase tracking-[0.12em] font-semibold">
                 Reservas
               </th>
@@ -121,11 +163,15 @@ export function AgenciesList({ refreshKey = 0 }: { refreshKey?: number }) {
                 <td className="py-4 px-5 text-white/70 text-sm">
                   {a.contact_email || a.contact_phone || "—"}
                 </td>
-                <td className="py-4 px-5 text-white/70 text-sm">{a.level_name ?? "—"}</td>
+                {!isOperator && (
+                  <td className="py-4 px-5 text-white/70 text-sm">{a.level_name ?? "—"}</td>
+                )}
                 <td className="py-4 px-5 text-white/70 text-sm">{formatCurrency(a.total_sales)}</td>
-                <td className="py-4 px-5 text-white/70 text-sm">
-                  {formatCurrency(a.total_commission)}
-                </td>
+                {!isOperator && (
+                  <td className="py-4 px-5 text-white/70 text-sm">
+                    {formatCurrency(a.total_commission)}
+                  </td>
+                )}
                 <td className="py-4 px-5 text-white/70 text-sm">{a.bookings_count}</td>
                 <td className="py-4 px-5">
                   <span
@@ -139,14 +185,29 @@ export function AgenciesList({ refreshKey = 0 }: { refreshKey?: number }) {
                   </span>
                 </td>
                 <td className="py-4 px-5 text-right">
-                  <Button
-                    as={Link}
-                    href={`/admin/agents/${a.id}`}
-                    size="sm"
-                    className="rounded-xl bg-[#5e2cec]/25 border border-[#5e2cec]/40 text-[#b89eff] hover:bg-[#5e2cec]/35 font-semibold"
-                  >
-                    Ver detalle
-                  </Button>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button
+                      as={Link}
+                      href={`/admin/agents/${a.id}`}
+                      size="sm"
+                      className="rounded-xl bg-[#5e2cec]/25 border border-[#5e2cec]/40 text-[#b89eff] hover:bg-[#5e2cec]/35 font-semibold"
+                    >
+                      Ver detalle
+                    </Button>
+                    {canManage && (
+                      <Button
+                        size="sm"
+                        className="rounded-xl bg-red-500/15 border border-red-500/35 text-red-300 hover:bg-red-500/25 font-semibold"
+                        onPress={() => {
+                          setDeleteErr(null);
+                          setDeleteTarget(a);
+                        }}
+                        startContent={<Icon icon="solar:trash-bin-trash-bold" width={16} />}
+                      >
+                        Eliminar
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -154,5 +215,48 @@ export function AgenciesList({ refreshKey = 0 }: { refreshKey?: number }) {
         </table>
       </div>
     </GlassCard>
+
+    <Modal
+      isOpen={!!deleteTarget}
+      onOpenChange={(open) => {
+        if (!open) {
+          setDeleteTarget(null);
+          setDeleteErr(null);
+        }
+      }}
+      backdrop="blur"
+      classNames={{
+        base: "admin-modal-dark !bg-[#0f1220] rounded-[28px] border border-white/[0.12] backdrop-blur-xl shadow-2xl shadow-black/50",
+        header: "border-b border-white/[0.08] !text-white",
+        body: "!text-white/95",
+        footer: "border-t border-white/[0.08]",
+        closeButton: "!text-white/90 hover:!bg-white/10 rounded-full",
+        backdrop: "!bg-black/70 backdrop-blur-md",
+      }}
+    >
+      <ModalContent>
+        <ModalHeader>Eliminar agencia</ModalHeader>
+        <ModalBody className="py-4">
+          <p className="text-sm text-white/70">
+            ¿Eliminar <strong className="text-white">{deleteTarget?.name}</strong>? Se revoca el acceso en Clerk y se
+            borra el perfil del usuario en el sistema.
+          </p>
+          {deleteErr && <p className="mt-3 text-sm text-red-300">{deleteErr}</p>}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="flat" className="text-white/80" onPress={() => setDeleteTarget(null)}>
+            Cancelar
+          </Button>
+          <Button
+            className="bg-red-600 text-white font-semibold"
+            isLoading={deleteBusy}
+            onPress={confirmDelete}
+          >
+            Eliminar
+          </Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
+    </>
   );
 }

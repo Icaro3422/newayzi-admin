@@ -25,10 +25,12 @@ function pathnameToModule(pathname: string): string | null {
   if (pathname.startsWith("/admin/payments")) return "payments";
   if (pathname.startsWith("/admin/bookings")) return "bookings";
   if (pathname.startsWith("/admin/users")) return "users";
+  if (pathname.startsWith("/admin/corporate-credits")) return "corporate-credits";
   if (pathname.startsWith("/admin/communications")) return "communications";
   if (pathname.startsWith("/admin/analytics")) return "analytics";
   if (pathname.startsWith("/admin/reviews")) return "reviews";
   if (pathname.startsWith("/admin/coupons")) return "coupons";
+  if (pathname.startsWith("/admin/seo-articles")) return "seo-content";
   return null;
 }
 
@@ -46,10 +48,13 @@ const NAV_ITEMS_BASE: { href: string; label: string; icon: string; module: strin
   { href: "/admin/analytics",    label: "Analytics",       icon: "solar:chart-2-bold-duotone",                module: "analytics"     },
   { href: "/admin/reviews",      label: "Reseñas",         icon: "solar:stars-bold-duotone",                  module: "reviews"       },
   { href: "/admin/coupons",      label: "Cupones",         icon: "solar:tag-price-bold-duotone",              module: "coupons"       },
+  { href: "/admin/seo-articles", label: "Guías SEO (IA)",  icon: "solar:document-text-bold-duotone",          module: "seo-content"   },
   { href: "/admin/users",          label: "Usuarios y roles",   icon: "solar:user-id-bold-duotone",          module: "users"          },
   { href: "/admin/agent-wallets",  label: "Billeteras Rewards", icon: "solar:wallet-bold-duotone",           module: "agent-wallets"  },
+  { href: "/admin/corporate-credits", label: "Créditos corporativos", icon: "solar:buildings-2-bold-duotone", module: "corporate-credits" },
   { href: "/admin/wallet",         label: "Mi Billetera",       icon: "solar:wallet-bold-duotone",           module: "wallet"         },
   { href: "/admin/communications", label: "Comunicaciones",     icon: "solar:letter-bold-duotone",           module: "communications" },
+  { href: "/admin/simulator",      label: "Simulador",          icon: "solar:calculator-bold-duotone",       module: "simulator"      },
 ];
 
 /** Labels específicos por rol — el operador ve "sus" recursos con etiquetas propias */
@@ -118,11 +123,21 @@ function AccessDeniedView({
           <h1 className="font-sora font-bold text-xl text-white mb-3">
             {isPermissionDenied ? "Acceso restringido" : "No se pudo verificar tu acceso"}
           </h1>
-          <p className="text-white/70 text-[0.9375rem] leading-relaxed mb-6">
+          <p className="text-white/70 text-[0.9375rem] leading-relaxed mb-3">
             {isPermissionDenied
               ? "No tienes permisos para acceder al administrador. Si crees que deberías tener acceso, comunícate con el equipo de Newayzi."
               : "Hubo un problema al cargar tu sesión. Si el problema persiste, contacta al equipo de Newayzi."}
           </p>
+          {error.trim() ? (
+            <div className="mb-6 rounded-xl border border-white/[0.12] bg-black/25 px-3 py-2.5 text-left">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-white/40 mb-1">
+                Detalle (consola del navegador: filtra <span className="text-white/60">newayzi-admin</span>)
+              </p>
+              <p className="text-white/85 text-[0.8125rem] font-mono leading-snug break-words whitespace-pre-wrap">
+                {error}
+              </p>
+            </div>
+          ) : null}
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               type="button"
@@ -279,7 +294,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const router   = useRouter();
   const { signOut } = useClerk();
   const { user } = useUser();
-  const { canAccess, loading, error, mustChangePassword, clearMustChangePassword, role, refetchMe } = useAdmin();
+  const { me, canAccess, loading, error, mustChangePassword, clearMustChangePassword, role, refetchMe } = useAdmin();
 
   // Aplicar overrides de label según el rol actual
   const roleOverrides = role ? (ROLE_NAV_OVERRIDES[role] ?? {}) : {};
@@ -311,7 +326,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 
-  if (loading) {
+  // Pantalla completa de carga SOLO en la carga inicial (cuando aún no hay datos de sesión).
+  // En re-fetchs (refresco de token Clerk, etc.) ya tenemos `me`, así que mostramos
+  // el contenido normal para evitar desmontar páginas con carga larga (ej: disponibilidad).
+  if (loading && !me) {
     return (
       <div className="flex h-screen items-center justify-center font-sora" style={{ background: BG_GRADIENT }}>
         {shellBg}
@@ -329,7 +347,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     const isPermissionDenied =
       error.includes("permisos") ||
       error.includes("No tienes permisos") ||
-      error.includes("403");
+      error.includes("403") ||
+      error.includes("perfil de administrador") ||
+      error.includes("administrador asignado");
     return (
       <AccessDeniedView
         error={error}

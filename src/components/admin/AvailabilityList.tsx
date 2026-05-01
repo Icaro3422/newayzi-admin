@@ -28,7 +28,7 @@ import {
 } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 
-type ViewMode = "calendar" | "table" | "blocks";
+type ViewMode = "calendar" | "table" | "blocks" | "cities";
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 
@@ -759,6 +759,315 @@ function SlotDetailModal({
   );
 }
 
+/* ─── AvailabilityKPIs ─────────────────────────────────────── */
+
+function AvailabilityKPIs({
+  uniqueProperties,
+  uniqueCities,
+  totalAvailable,
+  totalRooms,
+  totalLocked,
+  globalPct,
+  loading,
+}: {
+  uniqueProperties: number;
+  uniqueCities: number;
+  totalAvailable: number;
+  totalRooms: number;
+  totalLocked: number;
+  globalPct: number;
+  loading: boolean;
+}) {
+  const kpis = [
+    {
+      label: "Alojamientos",
+      value: loading ? "—" : String(uniqueProperties),
+      icon: "solar:buildings-3-bold-duotone",
+      color: "text-violet-300",
+      bg: "bg-violet-500/15 border-violet-500/25",
+    },
+    {
+      label: "Ciudades",
+      value: loading ? "—" : String(uniqueCities),
+      icon: "solar:city-bold-duotone",
+      color: "text-cyan-300",
+      bg: "bg-cyan-500/15 border-cyan-500/25",
+    },
+    {
+      label: "Unidades disponibles",
+      value: loading ? "—" : String(totalAvailable),
+      icon: "solar:check-circle-bold-duotone",
+      color: "text-emerald-300",
+      bg: "bg-emerald-500/15 border-emerald-500/25",
+    },
+    {
+      label: "Unidades bloqueadas",
+      value: loading ? "—" : String(totalLocked),
+      icon: "solar:lock-bold-duotone",
+      color: "text-red-300",
+      bg: "bg-red-500/15 border-red-500/25",
+    },
+    {
+      label: "% Disponibilidad",
+      value: loading ? "—" : totalRooms > 0 ? `${globalPct}%` : "—",
+      icon: "solar:chart-bold-duotone",
+      color: globalPct >= 50 ? "text-emerald-300" : globalPct >= 25 ? "text-amber-300" : "text-red-300",
+      bg: globalPct >= 50 ? "bg-emerald-500/15 border-emerald-500/25" : globalPct >= 25 ? "bg-amber-500/15 border-amber-500/25" : "bg-red-500/15 border-red-500/25",
+    },
+    {
+      label: "Total capacidad",
+      value: loading ? "—" : String(totalRooms),
+      icon: "solar:bed-bold-duotone",
+      color: "text-blue-300",
+      bg: "bg-blue-500/15 border-blue-500/25",
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {kpis.map((k) => (
+        <div
+          key={k.label}
+          className={`rounded-2xl border ${k.bg} px-4 py-3 flex flex-col gap-1`}
+        >
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <Icon icon={k.icon} className={`${k.color} text-base shrink-0`} />
+            <p className="text-[0.6rem] uppercase tracking-[0.1em] font-semibold text-white/40 leading-tight">
+              {k.label}
+            </p>
+          </div>
+          {loading ? (
+            <div className="h-6 w-12 rounded bg-white/10 animate-pulse" />
+          ) : (
+            <p className={`font-sora font-bold text-xl leading-none ${k.color}`}>
+              {k.value}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── CityBreakdownPanel ───────────────────────────────────── */
+
+type CityStatEntry = {
+  city: string;
+  propertiesCount: number;
+  propertyIds: Set<number>;
+  totalAvailable: number;
+  totalRooms: number;
+  totalLocked: number;
+  avgAvailPct: number;
+  minPrice: number | null;
+  maxPrice: number | null;
+  currency: string;
+  daysCount: number;
+};
+
+function CityBreakdownPanel({
+  cityStats,
+  loading,
+}: {
+  cityStats: CityStatEntry[];
+  loading: boolean;
+}) {
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<"city" | "available" | "pct" | "props">("available");
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let arr = q ? cityStats.filter((c) => c.city.toLowerCase().includes(q)) : [...cityStats];
+    arr.sort((a, b) => {
+      if (sortKey === "city") return a.city.localeCompare(b.city);
+      if (sortKey === "available") return b.totalAvailable - a.totalAvailable;
+      if (sortKey === "pct") return b.avgAvailPct - a.avgAvailPct;
+      if (sortKey === "props") return b.propertiesCount - a.propertiesCount;
+      return 0;
+    });
+    return arr;
+  }, [cityStats, search, sortKey]);
+
+  if (loading) {
+    return (
+      <GlassCard>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 animate-pulse">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="rounded-2xl border border-white/[0.08] bg-white/[0.04] h-32" />
+          ))}
+        </div>
+      </GlassCard>
+    );
+  }
+
+  if (cityStats.length === 0) {
+    return (
+      <GlassCard>
+        <div className="py-16 text-center text-white/50">
+          No hay datos de disponibilidad por ciudad. Ajusta los filtros o espera sincronización PMS.
+        </div>
+      </GlassCard>
+    );
+  }
+
+  const sortOptions: { key: typeof sortKey; label: string }[] = [
+    { key: "available", label: "Más disponibles" },
+    { key: "pct", label: "Mayor %" },
+    { key: "props", label: "Más alojamientos" },
+    { key: "city", label: "A-Z" },
+  ];
+
+  return (
+    <GlassCard className="space-y-5">
+      {/* Header + controls */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-[180px]">
+          <Input
+            placeholder="Buscar ciudad…"
+            size="sm"
+            value={search}
+            onValueChange={setSearch}
+            startContent={<Icon icon="solar:magnifer-outline" className="text-white/40" width={16} />}
+            classNames={{ inputWrapper: inputDark, input: "!text-white/90 placeholder:!text-white/35", label: "!text-white/65" }}
+          />
+        </div>
+        <div className="flex gap-1 flex-wrap">
+          {sortOptions.map((o) => (
+            <button
+              key={o.key}
+              onClick={() => setSortKey(o.key)}
+              className={`text-[0.65rem] font-semibold uppercase tracking-[0.09em] rounded-full px-3 py-1.5 border transition-colors ${
+                sortKey === o.key
+                  ? "bg-[#5e2cec]/30 border-[#5e2cec]/50 text-violet-200"
+                  : "bg-white/[0.06] border-white/[0.1] text-white/50 hover:text-white/70"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-xs text-white/35 ml-auto">{filtered.length} ciudad{filtered.length !== 1 ? "es" : ""}</span>
+      </div>
+
+      {/* City cards grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        {filtered.map((c) => {
+          const isExpanded = expanded === c.city;
+          const availColor =
+            c.avgAvailPct === 0
+              ? "text-red-300 border-red-500/30 bg-red-500/10"
+              : c.avgAvailPct >= 50
+              ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10"
+              : c.avgAvailPct >= 25
+              ? "text-amber-300 border-amber-500/30 bg-amber-500/10"
+              : "text-orange-300 border-orange-500/30 bg-orange-500/10";
+          const barColor =
+            c.avgAvailPct === 0 ? "bg-red-500" : c.avgAvailPct >= 50 ? "bg-emerald-500" : c.avgAvailPct >= 25 ? "bg-amber-500" : "bg-orange-500";
+
+          return (
+            <div
+              key={c.city}
+              className="rounded-2xl border border-white/[0.1] bg-white/[0.035] hover:border-[#5e2cec]/35 hover:bg-white/[0.06] transition-all overflow-hidden"
+            >
+              {/* Card header */}
+              <div className="px-4 pt-4 pb-3">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-[#5e2cec]/20 flex items-center justify-center shrink-0">
+                      <Icon icon="solar:city-bold-duotone" className="text-violet-300 text-base" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-sora font-bold text-white text-sm leading-tight truncate">{c.city}</p>
+                      <p className="text-[0.6rem] text-white/45 mt-0.5">
+                        {c.propertiesCount} alojamiento{c.propertiesCount !== 1 ? "s" : ""} · {c.daysCount} día{c.daysCount !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`shrink-0 text-[0.7rem] font-bold rounded-full px-2.5 py-1 border ${availColor}`}>
+                    {c.avgAvailPct}%
+                  </span>
+                </div>
+
+                {/* Availability bar */}
+                <div className="w-full h-1.5 rounded-full bg-white/10 mb-3">
+                  <div
+                    className={`h-full rounded-full ${barColor} transition-all`}
+                    style={{ width: `${Math.max(2, c.avgAvailPct)}%` }}
+                  />
+                </div>
+
+                {/* Stats row */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-xl border border-white/[0.07] bg-white/[0.04] px-2 py-1.5 text-center">
+                    <p className="text-[0.55rem] uppercase tracking-[0.08em] text-white/35 mb-0.5">Disponibles</p>
+                    <p className="font-bold text-emerald-300 text-base leading-none">{c.totalAvailable}</p>
+                  </div>
+                  <div className="rounded-xl border border-white/[0.07] bg-white/[0.04] px-2 py-1.5 text-center">
+                    <p className="text-[0.55rem] uppercase tracking-[0.08em] text-white/35 mb-0.5">Capacidad</p>
+                    <p className="font-bold text-white/75 text-base leading-none">{c.totalRooms || "—"}</p>
+                  </div>
+                  <div className="rounded-xl border border-white/[0.07] bg-white/[0.04] px-2 py-1.5 text-center">
+                    <p className="text-[0.55rem] uppercase tracking-[0.08em] text-white/35 mb-0.5">Bloqueadas</p>
+                    <p className={`font-bold text-base leading-none ${c.totalLocked > 0 ? "text-red-300" : "text-white/35"}`}>{c.totalLocked}</p>
+                  </div>
+                </div>
+
+                {/* Price range */}
+                {c.minPrice != null && (
+                  <div className="mt-2.5 flex items-center gap-1.5">
+                    <Icon icon="solar:tag-price-bold-duotone" className="text-violet-300 shrink-0" width={14} />
+                    <p className="text-[0.68rem] text-white/60">
+                      Precio/noche:{" "}
+                      <span className="text-white/85 font-semibold">
+                        {c.minPrice === c.maxPrice
+                          ? formatPrice(c.minPrice, c.currency)
+                          : `${formatPrice(c.minPrice!, c.currency)} – ${formatPrice(c.maxPrice!, c.currency)}`}
+                      </span>
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Expand toggle */}
+              <button
+                onClick={() => setExpanded(isExpanded ? null : c.city)}
+                className="w-full flex items-center justify-center gap-1.5 py-2 border-t border-white/[0.07] text-[0.6rem] uppercase tracking-[0.1em] text-white/35 hover:text-white/60 hover:bg-white/[0.03] transition-colors"
+              >
+                <Icon icon={isExpanded ? "solar:alt-arrow-up-outline" : "solar:alt-arrow-down-outline"} width={12} />
+                {isExpanded ? "Ocultar" : "Ver propiedades"}
+              </button>
+
+              {/* Expanded property list */}
+              {isExpanded && (
+                <div className="border-t border-white/[0.06] bg-white/[0.02] px-4 py-3 space-y-2">
+                  <p className="text-[0.6rem] uppercase tracking-[0.1em] text-white/35 mb-2">Alojamientos en {c.city}</p>
+                  {/* We'll list the property IDs we collected */}
+                  <p className="text-xs text-white/55">
+                    {c.propertiesCount} alojamiento{c.propertiesCount !== 1 ? "s" : ""} activo{c.propertiesCount !== 1 ? "s" : ""} en el período
+                  </p>
+                  <div className="text-[0.65rem] text-white/40 leading-relaxed">
+                    {c.totalAvailable} unidades disponibles de {c.totalRooms || "?"} totales
+                    {c.totalLocked > 0 && ` · ${c.totalLocked} bloqueadas`}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-white/[0.06] text-xs text-white/40">
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500/60" /> Alta ≥50%</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500/60" /> Media 25–49%</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-orange-500/60" /> Baja &lt;25%</span>
+        <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-500/60" /> Sin disponibilidad</span>
+      </div>
+    </GlassCard>
+  );
+}
+
 /* ─── BlocksPanel ──────────────────────────────────────────── */
 
 function BlocksPanel({
@@ -790,10 +1099,15 @@ function BlocksPanel({
     const params: Parameters<typeof adminApi.getAvailabilityBlocks>[0] = { status: statusFilter };
     const pid = parseInt(propertyId, 10);
     if (!Number.isNaN(pid) && pid > 0) params.property_id = pid;
-    adminApi.getAvailabilityBlocks(params).then((res) => {
-      setBlocks(res?.results ?? []);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    adminApi
+      .getAvailabilityBlocks(params)
+      .then((res) => {
+        setBlocks(res?.results ?? []);
+      })
+      .catch(() => {
+        setBlocks([]);
+      })
+      .finally(() => setLoading(false));
   }, [propertyId, statusFilter, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load(); }, [load]);
@@ -929,13 +1243,28 @@ function BlocksPanel({
 export function AvailabilityList() {
   const { role, me } = useAdmin();
   const isOperador = role === "operador";
+  const isAgente = role === "agente";
   const myOperatorId = me?.operator_id ?? null;
+  const agency = me?.agency;
   const canManage = role === "super_admin" || role === "operador";
+
+  const agentOperatorList = useMemo(
+    () =>
+      agency?.scoped_operators_detail?.map((o) => ({ id: o.id, name: o.name } as Operator)) ?? [],
+    [agency?.scoped_operators_detail]
+  );
+  const showOperatorFilter =
+    !isOperador &&
+    (!isAgente ||
+      (agency?.scope_mode === "platform_scoped" && agentOperatorList.length > 1));
 
   const [list, setList] = useState<AvailabilityItem[]>([]);
   const [properties, setProperties] = useState<PropertyListItem[]>([]);
   const [operators, setOperators] = useState<Operator[]>([]);
   const [loading, setLoading] = useState(true);
+  /** Progreso de carga granular: null = sin progreso activo, {loaded,total} = cargando por propiedad */
+  const [loadProgress, setLoadProgress] = useState<{ loaded: number; total: number } | null>(null);
+  const loadAbortRef = useRef<AbortController | null>(null);
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10);
   });
@@ -951,44 +1280,167 @@ export function AvailabilityList() {
   const [showCreateBlock, setShowCreateBlock] = useState(false);
   const [blocksRefreshKey, setBlocksRefreshKey] = useState(0);
 
-  function load() {
-    setLoading(true);
-    const params: { date_from?: string; date_to?: string; property_id?: number; operator_id?: number } = {};
-    if (dateFrom) params.date_from = dateFrom;
-    if (dateTo) params.date_to = dateTo;
-    const pid = parseInt(propertyId, 10);
-    if (!Number.isNaN(pid)) params.property_id = pid;
-    const effectiveOperatorId = isOperador && myOperatorId
-      ? myOperatorId
-      : parseInt(operatorId, 10);
-    if (!Number.isNaN(effectiveOperatorId) && effectiveOperatorId > 0) {
-      params.operator_id = effectiveOperatorId;
+  useEffect(() => {
+    if (!agency) return;
+    if (agency.scope_mode === "single_operator" && agency.scoped_operator_ids[0]) {
+      setOperatorId(String(agency.scoped_operator_ids[0]));
+    } else if (
+      agency.scope_mode === "platform_scoped" &&
+      agency.scoped_operators_detail?.length === 1
+    ) {
+      setOperatorId(String(agency.scoped_operators_detail[0].id));
     }
-    adminApi.getAvailability(params).then((res) => {
-      setList(res?.results ?? []);
-      setLoading(false);
+  }, [agency]);
+
+  const load = useCallback(() => {
+    // Cancela cualquier carga previa
+    loadAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    loadAbortRef.current = ctrl;
+
+    setList([]);
+    setLoadProgress(null);
+    setLoading(true);
+
+    // Calcula el operador efectivo (misma lógica que antes)
+    let effectiveOperatorId: number | undefined;
+    if (isOperador && myOperatorId) {
+      effectiveOperatorId = myOperatorId;
+    } else if (isAgente && agency) {
+      if (agency.scope_mode === "single_operator" && agency.scoped_operator_ids[0]) {
+        effectiveOperatorId = agency.scoped_operator_ids[0];
+      } else if (
+        agency.scope_mode === "platform_scoped" &&
+        agency.scoped_operators_detail?.length === 1
+      ) {
+        effectiveOperatorId = agency.scoped_operators_detail[0].id;
+      } else if (agency.scope_mode === "platform_scoped" && operatorId) {
+        const n = parseInt(operatorId, 10);
+        if (!Number.isNaN(n) && n > 0) effectiveOperatorId = n;
+      }
+    } else {
+      const n = parseInt(operatorId, 10);
+      if (!Number.isNaN(n) && n > 0) effectiveOperatorId = n;
+    }
+
+    const baseDates: { date_from?: string; date_to?: string } = {};
+    if (dateFrom) baseDates.date_from = dateFrom;
+    if (dateTo) baseDates.date_to = dateTo;
+
+    const specificPid = parseInt(propertyId, 10);
+    const hasFilter =
+      (!Number.isNaN(specificPid) && specificPid > 0) ||
+      effectiveOperatorId !== undefined;
+
+    // ── Caso 1: filtro específico (operador, propiedad fija o roles acotados) ──
+    // Request único y pequeño → no hay riesgo de 401 por token expirado.
+    if (hasFilter) {
+      const params: { date_from?: string; date_to?: string; property_id?: number; operator_id?: number } = {
+        ...baseDates,
+      };
+      if (!Number.isNaN(specificPid) && specificPid > 0) params.property_id = specificPid;
+      if (effectiveOperatorId !== undefined) params.operator_id = effectiveOperatorId;
+
+      adminApi
+        .getAvailability(params)
+        .then((res) => {
+          if (ctrl.signal.aborted) return;
+          setList(res?.results ?? []);
+        })
+        .catch(() => { if (!ctrl.signal.aborted) setList([]); })
+        .finally(() => { if (!ctrl.signal.aborted) { setLoading(false); setLoadProgress(null); } });
+      return;
+    }
+
+    // ── Caso 2: super_admin sin filtro → carga granular por propiedad ──
+    // Espera a que la lista de propiedades esté disponible. Cuando properties
+    // cambie, `load` se recrea y este efecto se vuelve a disparar.
+    if (properties.length === 0) {
+      // Sigue en loading, se re-disparará cuando properties cargue
+      return;
+    }
+
+    const total = properties.length;
+    setLoadProgress({ loaded: 0, total });
+
+    // Worker pool: 4 requests concurrentes, cada uno toma la siguiente propiedad del queue
+    const queue = [...properties];
+    let done = 0;
+
+    async function worker() {
+      while (queue.length > 0 && !ctrl.signal.aborted) {
+        const prop = queue.shift();
+        if (!prop) break;
+        try {
+          const res = await adminApi.getAvailability({ ...baseDates, property_id: prop.id });
+          if (!ctrl.signal.aborted && res?.results?.length) {
+            setList((prev) => [...prev, ...res.results]);
+          }
+        } catch {
+          // Propiedad falló — continúa con la siguiente
+        }
+        done++;
+        if (!ctrl.signal.aborted) {
+          setLoadProgress({ loaded: done, total });
+        }
+      }
+    }
+
+    Promise.all([worker(), worker(), worker(), worker()]).finally(() => {
+      if (!ctrl.signal.aborted) {
+        setLoading(false);
+        setLoadProgress(null);
+      }
     });
-  }
+  }, [
+    dateFrom,
+    dateTo,
+    propertyId,
+    operatorId,
+    isOperador,
+    isAgente,
+    myOperatorId,
+    agency,
+    properties,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
+    const loadPlatformOps = role !== "operador" && !isAgente;
     Promise.all([
       adminApi.getProperties({ is_active: true }),
-      isOperador ? Promise.resolve(null) : adminApi.getOperators(),
-    ]).then(([propsRes, opsRes]) => {
-      if (cancelled) return;
-      const props = propsRes?.results ?? [];
-      const ops = opsRes?.results ?? [];
-      const filteredProps = isOperador && me?.operator_name
-        ? props.filter((p) => !p.operator_name || p.operator_name === me.operator_name)
-        : props;
-      setProperties([...new Map(filteredProps.map((p) => [p.id, p])).values()]);
-      setOperators([...new Map(ops.map((o) => [o.id, o])).values()]);
-    });
-    return () => { cancelled = true; };
-  }, [isOperador, myOperatorId, me?.operator_name]);
+      loadPlatformOps ? adminApi.getOperators() : Promise.resolve({ results: [] as Operator[] }),
+    ])
+      .then(([propsRes, opsRes]) => {
+        if (cancelled) return;
+        const props = propsRes?.results ?? [];
+        let ops: Operator[] = [];
+        if (loadPlatformOps) {
+          ops = opsRes?.results ?? [];
+        } else if (isAgente && agentOperatorList.length > 0) {
+          ops = agentOperatorList;
+        }
+        const filteredProps =
+          isOperador && me?.operator_name
+            ? props.filter((p) => !p.operator_name || p.operator_name === me.operator_name)
+            : props;
+        setProperties([...new Map(filteredProps.map((p) => [p.id, p])).values()]);
+        setOperators([...new Map(ops.map((o) => [o.id, o])).values()]);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProperties([]);
+          setOperators([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [role, isAgente, isOperador, me?.operator_name, agency, agentOperatorList]);
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    load();
+  }, [load]);
 
   /* Computed calendar data */
   const { dates, propertyRows } = useMemo(() => {
@@ -1085,6 +1537,77 @@ export function AvailabilityList() {
 
   const hasAvailability = useMemo(() => list.some((a) => a.available > 0), [list]);
 
+  /* City-level aggregations */
+  const cityStats = useMemo((): CityStatEntry[] => {
+    const propCity = new Map<number, string>();
+    for (const p of properties) {
+      propCity.set(p.id, p.city_name ?? "Sin ciudad");
+    }
+    const byCity = new Map<
+      string,
+      {
+        city: string;
+        propertyIds: Set<number>;
+        totalAvailable: number;
+        totalRooms: number;
+        totalLocked: number;
+        prices: number[];
+        currency: string;
+        datesSet: Set<string>;
+      }
+    >();
+    for (const a of list) {
+      const city = propCity.get(a.property_id) ?? "Sin ciudad";
+      if (!byCity.has(city)) {
+        byCity.set(city, {
+          city,
+          propertyIds: new Set(),
+          totalAvailable: 0,
+          totalRooms: 0,
+          totalLocked: 0,
+          prices: [],
+          currency: a.currency ?? "COP",
+          datesSet: new Set(),
+        });
+      }
+      const entry = byCity.get(city)!;
+      entry.propertyIds.add(a.property_id);
+      entry.totalAvailable += a.available;
+      entry.totalRooms += a.total_rooms ?? 0;
+      entry.totalLocked += a.locked ?? 0;
+      if (a.price_per_night) {
+        const p = parseFloat(a.price_per_night);
+        if (!Number.isNaN(p) && p > 0) entry.prices.push(p);
+      }
+      if (a.currency) entry.currency = a.currency;
+      entry.datesSet.add(a.date);
+    }
+    return Array.from(byCity.values()).map((e) => ({
+      city: e.city,
+      propertyIds: e.propertyIds,
+      propertiesCount: e.propertyIds.size,
+      totalAvailable: e.totalAvailable,
+      totalRooms: e.totalRooms,
+      totalLocked: e.totalLocked,
+      avgAvailPct: e.totalRooms > 0 ? Math.round((e.totalAvailable / e.totalRooms) * 100) : 0,
+      minPrice: e.prices.length > 0 ? Math.min(...e.prices) : null,
+      maxPrice: e.prices.length > 0 ? Math.max(...e.prices) : null,
+      currency: e.currency,
+      daysCount: e.datesSet.size,
+    }));
+  }, [list, properties]);
+
+  /* Platform KPIs */
+  const kpis = useMemo(() => {
+    const uniqueProperties = new Set(list.map((a) => a.property_id)).size;
+    const totalAvailable = list.reduce((s, a) => s + a.available, 0);
+    const totalRooms = list.reduce((s, a) => s + (a.total_rooms ?? 0), 0);
+    const totalLocked = list.reduce((s, a) => s + (a.locked ?? 0), 0);
+    const globalPct = totalRooms > 0 ? Math.round((totalAvailable / totalRooms) * 100) : 0;
+    const uniqueCities = cityStats.length;
+    return { uniqueProperties, totalAvailable, totalRooms, totalLocked, globalPct, uniqueCities };
+  }, [list, cityStats]);
+
   function handleBlocksChanged() {
     setBlocksRefreshKey((k) => k + 1);
     load();
@@ -1101,7 +1624,7 @@ export function AvailabilityList() {
           <div>
             <p className="text-white/40 text-[0.6rem] uppercase tracking-[0.15em] font-semibold">Filtros</p>
             <p className="font-sora font-bold text-white text-base leading-tight mt-0.5">
-              {isOperador ? "Propiedad y fechas" : "Operador, propiedad y fechas"}
+              {showOperatorFilter ? "Operador, propiedad y fechas" : "Propiedad y fechas"}
             </p>
           </div>
           {canManage && (
@@ -1116,7 +1639,7 @@ export function AvailabilityList() {
           )}
         </div>
         <div className="flex flex-wrap items-end gap-4">
-          {!isOperador && (
+          {showOperatorFilter && (
             <Select
               label="Operador"
               placeholder="Todos"
@@ -1124,7 +1647,16 @@ export function AvailabilityList() {
               onSelectionChange={(s) => { const v = Array.from(s)[0] as string; setOperatorId(v === "__all__" ? "" : v); }}
               size="sm"
               className="w-48"
-              items={[{ id: "__all__", name: "Todos los operadores" }, ...operators]}
+              items={[
+                {
+                  id: "__all__",
+                  name:
+                    isAgente && agency?.scope_mode === "platform_scoped"
+                      ? "Todos (en tu alcance)"
+                      : "Todos los operadores",
+                },
+                ...operators,
+              ]}
               classNames={{ trigger: inputDark, label: "!text-white/65", value: "!text-white/92 font-medium", innerWrapper: "!text-white", selectorIcon: "!text-white/50", popoverContent: "bg-[#0f1220] border border-white/[0.1]" }}
             >
               {(item) => <SelectItem key={String(item.id)} className="text-white">{item.name}</SelectItem>}
@@ -1165,7 +1697,60 @@ export function AvailabilityList() {
             Filtrar
           </Button>
         </div>
+        {isAgente && agency?.inventory_hint && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-[#5e2cec]/25 bg-[#5e2cec]/10 px-4 py-3">
+            <Icon icon="solar:info-circle-bold-duotone" className="text-[#b89eff] shrink-0 text-lg" />
+            <p className="text-sm text-white/80 leading-snug">{agency.inventory_hint}</p>
+          </div>
+        )}
       </GlassCard>
+
+      {/* Barra de progreso de carga granular (visible cuando ya hay datos parciales) */}
+      {loading && list.length > 0 && loadProgress && (
+        <div className="rounded-2xl border border-[#5e2cec]/25 bg-[#5e2cec]/10 px-5 py-3 flex items-center gap-4">
+          <Spinner size="sm" classNames={{ circle1: "border-b-[#9b74ff]", circle2: "border-b-[#9b74ff]" }} />
+          <div className="flex-1 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[0.75rem] text-[#b89eff] font-medium">
+                Cargando disponibilidad…
+              </span>
+              <span className="text-[0.7rem] text-white/45 tabular-nums">
+                {loadProgress.loaded} / {loadProgress.total} propiedades
+              </span>
+            </div>
+            <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#5e2cec] to-[#9b74ff] transition-all duration-300"
+                style={{ width: `${loadProgress.total > 0 ? Math.round((loadProgress.loaded / loadProgress.total) * 100) : 0}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* KPIs */}
+      {list.length > 0 && (
+        <AvailabilityKPIs
+          uniqueProperties={kpis.uniqueProperties}
+          uniqueCities={kpis.uniqueCities}
+          totalAvailable={kpis.totalAvailable}
+          totalRooms={kpis.totalRooms}
+          totalLocked={kpis.totalLocked}
+          globalPct={kpis.globalPct}
+          loading={loading && list.length === 0}
+        />
+      )}
+      {loading && list.length === 0 && !loadProgress && (
+        <AvailabilityKPIs
+          uniqueProperties={0}
+          uniqueCities={0}
+          totalAvailable={0}
+          totalRooms={0}
+          totalLocked={0}
+          globalPct={0}
+          loading={true}
+        />
+      )}
 
       {/* Tabs */}
       <Tabs
@@ -1181,10 +1766,13 @@ export function AvailabilityList() {
       >
         <Tab key="calendar" title={<span className="flex items-center gap-2"><Icon icon="solar:calendar-outline" width={18} />Mapa calendario</span>} />
         <Tab key="table" title={<span className="flex items-center gap-2"><Icon icon="solar:list-outline" width={18} />Lista detallada</span>} />
+        <Tab key="cities" title={<span className="flex items-center gap-2"><Icon icon="solar:city-bold-duotone" width={18} />Por ciudad</span>} />
         <Tab key="blocks" title={<span className="flex items-center gap-2"><Icon icon="solar:lock-outline" width={18} />Bloqueos</span>} />
       </Tabs>
 
-      {viewMode === "blocks" ? (
+      {viewMode === "cities" ? (
+        <CityBreakdownPanel cityStats={cityStats} loading={loading && list.length === 0} />
+      ) : viewMode === "blocks" ? (
         <BlocksPanel
           properties={properties}
           operators={operators}
@@ -1194,9 +1782,24 @@ export function AvailabilityList() {
           refreshKey={blocksRefreshKey}
           onBlocksChanged={handleBlocksChanged}
         />
-      ) : loading ? (
-        <GlassCard className="flex justify-center items-center py-16">
+      ) : loading && list.length === 0 ? (
+        /* Spinner solo cuando no hay ningún dato aún */
+        <GlassCard className="flex flex-col items-center justify-center py-16 gap-5">
           <Spinner size="lg" classNames={{ circle1: "border-b-[#5e2cec]", circle2: "border-b-[#5e2cec]" }} />
+          {loadProgress && (
+            <div className="w-full max-w-xs space-y-2 px-2">
+              <div className="flex items-center justify-between text-xs text-white/50">
+                <span>Cargando disponibilidad…</span>
+                <span className="tabular-nums">{loadProgress.loaded} / {loadProgress.total}</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[#5e2cec] to-[#9b74ff] transition-all duration-300"
+                  style={{ width: `${loadProgress.total > 0 ? Math.round((loadProgress.loaded / loadProgress.total) * 100) : 0}%` }}
+                />
+              </div>
+            </div>
+          )}
         </GlassCard>
       ) : viewMode === "calendar" ? (
         /* Vista calendario */

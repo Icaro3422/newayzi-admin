@@ -15,7 +15,7 @@ export default function AdminAgentsPage() {
       >
         <AgencyCreateButton onCreated={() => setRefreshKey((k) => k + 1)} />
       </AdminPageHeader>
-      <AgenciesList refreshKey={refreshKey} />
+      <AgenciesList refreshKey={refreshKey} onRefresh={() => setRefreshKey((k) => k + 1)} />
     </div>
   );
 }

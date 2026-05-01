@@ -19,7 +19,8 @@ import { useAdmin } from "@/contexts/AdminContext";
 const inputDark = "rounded-xl border";
 
 export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
-  const { canAccess } = useAdmin();
+  const { canAccess, role } = useAdmin();
+  const isSuperAdmin = role === "super_admin";
   const [open, setOpen] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successEmailSent, setSuccessEmailSent] = useState(false);
@@ -48,13 +49,20 @@ export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
     setError(null);
     try {
       const points = parseFloat(initialPoints) || 0;
-      const res = await adminApi.createAgency({
+      const base = {
         name: name.trim(),
         contact_email: contactEmail.trim(),
         contact_phone: contactPhone.trim() || undefined,
-        initial_level: initialLevel,
-        initial_points: points > 0 ? points : undefined,
-      });
+      };
+      const res = await adminApi.createAgency(
+        isSuperAdmin
+          ? {
+              ...base,
+              initial_level: initialLevel,
+              initial_points: points > 0 ? points : undefined,
+            }
+          : base,
+      );
       setOpen(false);
       resetForm();
       onCreated?.();
@@ -168,47 +176,49 @@ export function AgencyCreateButton({ onCreated }: { onCreated?: () => void }) {
               }}
             />
 
-            {/* Newayzi Rewards */}
-            <div className="border-t border-white/[0.08] pt-4">
-              <p className="text-xs text-white/50 uppercase tracking-wider font-medium mb-3 flex items-center gap-1.5">
-                <Icon icon="solar:star-bold" width={14} className="text-[#b89eff]" />
-                Newayzi Rewards — configuración inicial
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <Select
-                  label="Nivel inicial"
-                  selectedKeys={[initialLevel]}
-                  onSelectionChange={(keys) => {
-                    const val = Array.from(keys)[0] as string;
-                    if (val) setInitialLevel(val);
-                  }}
-                  classNames={selectDark}
-                >
-                  {LEVEL_OPTIONS.map((opt) => (
-                    <SelectItem
-                      key={opt.value}
-                      classNames={{ base: "!text-white/90 hover:!bg-white/10" }}
-                    >
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </Select>
-                <Input
-                  label="Puntos iniciales"
-                  value={initialPoints}
-                  onValueChange={setInitialPoints}
-                  type="number"
-                  min="0"
-                  description="0 = sin puntos de bienvenida"
-                  classNames={{
-                    inputWrapper: inputDark,
-                    input: "!text-white/95 placeholder:!text-white/38",
-                    label: "!text-white/70",
-                    description: "!text-white/50",
-                  }}
-                />
+            {/* Newayzi Rewards: solo plataforma puede fijar nivel/puntos en el alta */}
+            {isSuperAdmin ? (
+              <div className="border-t border-white/[0.08] pt-4">
+                <p className="text-xs text-white/50 uppercase tracking-wider font-medium mb-3 flex items-center gap-1.5">
+                  <Icon icon="solar:star-bold" width={14} className="text-[#b89eff]" />
+                  Newayzi Rewards — configuración inicial
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Select
+                    label="Nivel inicial"
+                    selectedKeys={[initialLevel]}
+                    onSelectionChange={(keys) => {
+                      const val = Array.from(keys)[0] as string;
+                      if (val) setInitialLevel(val);
+                    }}
+                    classNames={selectDark}
+                  >
+                    {LEVEL_OPTIONS.map((opt) => (
+                      <SelectItem
+                        key={opt.value}
+                        classNames={{ base: "!text-white/90 hover:!bg-white/10" }}
+                      >
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                  <Input
+                    label="Puntos iniciales"
+                    value={initialPoints}
+                    onValueChange={setInitialPoints}
+                    type="number"
+                    min="0"
+                    description="0 = sin puntos de bienvenida"
+                    classNames={{
+                      inputWrapper: inputDark,
+                      input: "!text-white/95 placeholder:!text-white/38",
+                      label: "!text-white/70",
+                      description: "!text-white/50",
+                    }}
+                  />
+                </div>
               </div>
-            </div>
+            ) : null}
           </ModalBody>
           <ModalFooter>
             <Button

@@ -19,42 +19,96 @@ function getApiBase(): string {
   const env = process.env.NEXT_PUBLIC_API_URL?.trim();
 
   if (env) {
+    const normalized = normalizeApiUrl(env);
     const isLocalhostUrl =
-      env.includes("localhost") || env.includes("127.0.0.1");
+      normalized.includes("localhost") || normalized.includes("127.0.0.1");
 
     if (typeof window === "undefined") {
-      // Server-side (SSR): usar env tal cual
-      return env.replace(/\/$/, "");
+      return normalized;
     }
 
     const h = window.location.hostname;
     const isLocalBrowser = h === "localhost" || h === "127.0.0.1";
 
     if (!isLocalhostUrl || isLocalBrowser) {
-      // URL apunta a producción, o estamos en local → usar env
-      return env.replace(/\/$/, "");
+      return normalized;
     }
-    // env apunta a localhost pero el browser está en un host real
-    // → ignorar env y usar detección por hostname
   }
 
   if (typeof window !== "undefined") {
+<<<<<<< HEAD
     const h = window.location.hostname;
     if (h === "localhost" || h === "127.0.0.1") return "http://localhost:8000";
     if (isAlmaraTravelHost(h)) return "https://api.almara.travel";
+=======
+    return inferApiBaseFromHostname(window.location.hostname);
+>>>>>>> main
   }
   return "";
 }
 
-// Nota: se evalúa una vez en el browser al cargar el módulo.
-// En SSR nunca se hacen llamadas a la API (todo está en useEffect/useCallback).
-const API_BASE = getApiBase();
+/**
+ * Base URL para fetch en el navegador.
+ *
+ * Estrategia:
+ * - Dominios *.newayzi.com y newayzi.com → llamada directa al API (CORS configurado en Django).
+ * - Otros (preview .vercel.app, localhost etc.) → proxy same-origin /proxy-api si está disponible.
+ * - Desactivar proxy forzado: NEXT_PUBLIC_USE_SAME_ORIGIN_API_PROXY=false
+ */
+function getApiBase(): string {
+  const direct = getDirectApiBase();
+  if (typeof window === "undefined") {
+    return direct;
+  }
+  if (!direct) {
+    return "";
+  }
+
+  // Para dominios propios (*.newayzi.com), CORS está configurado en Django → llamar directo.
+  // Esto evita dependencia del proxy rewrite de Next.js (frágil en Vercel para URLs externas).
+  const hostname = window.location.hostname;
+  if (
+    hostname === "newayzi.com" ||
+    hostname.endsWith(".newayzi.com") ||
+    hostname === "localhost" ||
+    hostname === "127.0.0.1"
+  ) {
+    return normalizeApiUrl(direct);
+  }
+
+  const envUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  const proxyDisabled = process.env.NEXT_PUBLIC_USE_SAME_ORIGIN_API_PROXY === "false";
+  // Sin URL en el bundle no hay rewrite fiable → llamar directo al API.
+  if (proxyDisabled || !envUrl) {
+    return normalizeApiUrl(direct);
+  }
+  try {
+    const apiOrigin = new URL(normalizeApiUrl(direct)).origin;
+    if (window.location.origin === apiOrigin) {
+      return normalizeApiUrl(direct);
+    }
+    // Para origins no-newayzi (ej. preview de Vercel), usar el proxy same-origin.
+    return `${window.location.origin}/proxy-api`;
+  } catch {
+    return normalizeApiUrl(direct);
+  }
+}
+
+/**
+ * Resolver en cada fetch: no usar `const` a nivel de módulo con `getApiBase()`.
+ * Si el chunk se evalúa en SSR sin window ni env, quedaba "" y las rutas `/api/admin/*`
+ * se pedían al mismo Next (portal) → 404.
+ */
+function resolvedApiBase(): string {
+  return getApiBase();
+}
 
 function getWsBase(): string {
   if (typeof window === "undefined") return "";
-  if (!API_BASE) return "";
+  const direct = getDirectApiBase();
+  if (!direct) return "";
   try {
-    const api = new URL(API_BASE);
+    const api = new URL(direct.startsWith("http") ? direct : `https://${direct}`);
     api.protocol = api.protocol === "https:" ? "wss:" : "ws:";
     return api.toString().replace(/\/$/, "");
   } catch {
@@ -100,6 +154,20 @@ export interface AdminLoyalty {
   } | null;
 }
 
+/** Contexto de agencia para rol agente (inventario / invitador). */
+export interface AdminAgencyContext {
+  id: number;
+  name: string;
+  invited_by: "operator" | "platform";
+  parent_operator: { id: number; name: string } | null;
+  scope_mode: "single_operator" | "platform_all" | "platform_scoped";
+  scoped_operator_ids: number[];
+  scoped_property_ids: number[];
+  /** Para filtro de operador en UI cuando el alcance es acotado. */
+  scoped_operators_detail?: { id: number; name: string }[];
+  inventory_hint: string;
+}
+
 export interface AdminMe {
   profile: {
     id: number;
@@ -119,6 +187,7 @@ export interface AdminMe {
   permissions: string[];
   loyalty?: AdminLoyalty | null;
   must_change_password?: boolean;
+  agency?: AdminAgencyContext | null;
 }
 
 export interface PropertyPMSConnection {
@@ -143,7 +212,10 @@ export interface PropertyRewardsInfo {
 export interface PropertyListItem {
   id: number;
   name: string;
+  city_id?: number | null;
   city_name?: string;
+  city_country_name?: string | null;
+  city_country_code?: string | null;
   is_active: boolean;
   is_published: boolean;
   pets_allowed: boolean;
@@ -156,6 +228,19 @@ export interface PropertyListItem {
   rewards_info?: PropertyRewardsInfo | null;
   /** URL miniatura (primera imagen) para listado admin; opcional en API antigua. */
   primary_picture_url?: string | null;
+}
+
+export interface LoyaltyDealItem {
+  property_id: number;
+  order: number;
+  discount_percent: number;
+  property_name?: string;
+  city_name?: string | null;
+}
+
+export interface LoyaltyDealsResponse {
+  level: LoyaltyLevelValue;
+  results: LoyaltyDealItem[];
 }
 
 export interface PropertyPicture {
@@ -171,8 +256,30 @@ export interface PropertyFaq {
   answer: string;
 }
 
+/** Resultado de búsqueda de ciudad para alta manual de propiedades (admin). */
+export interface AdminCitySearchRow {
+  id: number;
+  name: string;
+  country_name: string;
+  country_code: string;
+  /** Centro aproximado del punto de ciudad en el catálogo (WGS84), si existe */
+  center?: { lat: number; lng: number } | null;
+  /** True si hay propiedades activas/publicadas en esta ciudad (aparecerá primero en la búsqueda). */
+  has_active_properties?: boolean;
+}
+
 export interface PropertyDetail extends PropertyListItem {
   description?: string;
+  /** Solo cotizar noches cubiertas por el Excel de inventario manual. */
+  restrict_pricing_to_manual_weeks?: boolean;
+  /** Solo mostrar la propiedad cuando las fechas coincidan exactamente con un PropertyFixedWeekSlot. */
+  enforce_fixed_week_slots?: boolean;
+  /** Multiplicador del precio "tachado" (original) que ve el huésped. Null = usa markup global. */
+  display_price_markup?: string | null;
+  /** Multiplicador del precio real cobrado. Null = usa display_price_markup. */
+  selling_price_markup?: string | null;
+  /** Las habitaciones se muestran solo con capacidad ("Para X personas"), sin nombre ni imagen. */
+  simple_room_display?: boolean;
   // Contacto y ubicación
   address?: string;
   phone?: string;
@@ -197,6 +304,24 @@ export interface PropertyDetail extends PropertyListItem {
   pictures?: PropertyPicture[];
 }
 
+export interface PropertyPricingConfig {
+  display_price_markup: string | null;
+  selling_price_markup: string | null;
+  enforce_fixed_week_slots: boolean;
+  restrict_pricing_to_manual_weeks: boolean;
+  simple_room_display: boolean;
+}
+
+export interface PropertyFixedWeekSlot {
+  id: number;
+  check_in: string;   // YYYY-MM-DD
+  check_out: string;  // YYYY-MM-DD
+  nights: number;
+  season: number | null;
+  note: string;
+  created: string;
+}
+
 export interface RoomTypeBaseRateRow {
   currency: string;
   price_per_night: string;
@@ -217,6 +342,8 @@ export interface RoomTypeAdminSummary {
   num_rooms: number | null;
   num_bathrooms: number | null;
   area_sqm: number | null;
+  /** Amenidades de habitación (p. ej. importadas desde Booking.com). */
+  room_amenities?: string[];
   primary_picture_url: string;
   base_rates: RoomTypeBaseRateRow[];
   physical_rooms_count: number;
@@ -240,6 +367,18 @@ export interface RoomTypePhysicalRoomRow {
   id: number;
   label: string;
   floor: number | null;
+}
+
+export interface ManualInventoryImportRow {
+  id: number;
+  status: string;
+  original_filename: string;
+  rows_processed: number;
+  rows_failed: number;
+  error_summary: Array<Record<string, unknown>>;
+  stats: Record<string, unknown>;
+  created_at: string | null;
+  created_by_label: string;
 }
 
 export interface RoomTypeAdminDetail extends Omit<RoomTypeAdminSummary, "description_preview"> {
@@ -324,6 +463,49 @@ export interface PMSConnectionDetail extends PMSConnectionListItem {
   sync_interval_minutes: number;
 }
 
+/** Reserva que impide borrar propiedades PMS (PROTECT en catálogo). */
+export interface PMSDeleteBlockedBooking {
+  id: number;
+  reference: string;
+  status: string;
+  check_in: string;
+  check_out: string;
+  property_id: number;
+  property_name: string;
+}
+
+/** GET delete-blockers: incluye can_delete y metadatos completos. */
+export interface PMSConnectionDeleteBlockersInfo {
+  can_delete: boolean;
+  booking_count: number;
+  bookings: PMSDeleteBlockedBooking[];
+  has_more_bookings: boolean;
+  bookings_preview_limit: number;
+  affected_property_count: number;
+  code?: string;
+  detail?: string;
+}
+
+/** Cuerpo JSON del 409 al DELETE (sin can_delete ni affected_property_count). */
+export type PMSDeleteBlockedPayload = {
+  detail: string;
+  code: string;
+  booking_count: number;
+  bookings: PMSDeleteBlockedBooking[];
+  has_more_bookings: boolean;
+  bookings_preview_limit: number;
+};
+
+export class PmsDeleteBlockedError extends Error {
+  readonly status = 409;
+  readonly payload: PMSDeleteBlockedPayload;
+  constructor(payload: PMSDeleteBlockedPayload) {
+    super(payload.detail);
+    this.name = "PmsDeleteBlockedError";
+    this.payload = payload;
+  }
+}
+
 export interface ConnectionSyncNowResponse {
   status: "queued" | "ok" | "partial" | "error";
   run_id?: string;
@@ -370,6 +552,7 @@ export interface ConnectionSyncStreamEvent {
     | "phase_started"
     | "item_progress"
     | "phase_summary"
+    | "sync_skipped"
     | "sync_completed"
     | "sync_finished"
     | "sync_error"
@@ -492,19 +675,24 @@ export interface Agency {
   contact_email?: string;
   contact_phone?: string;
   is_active: boolean;
+  /** Solo plataforma; el operador no recibe estos campos en el listado. */
   level_name?: string | null;
   total_sales: string;
-  total_commission: string;
+  total_commission?: string;
   bookings_count: number;
 }
 
 export interface AgencyDetail extends Agency {
+  operator_id?: number | null;
+  scoped_operator_ids?: number[];
+  scoped_property_ids?: number[];
   summary: {
     total_sales: string;
-    total_commission: string;
+    /** Solo plataforma. */
+    total_commission?: string;
     bookings_count: number;
-    level_id: number | null;
-    level_name: string | null;
+    level_id?: number | null;
+    level_name?: string | null;
     updated_at: string | null;
   };
   created: string;
@@ -605,6 +793,62 @@ export interface RegionPaymentMethod {
   payment_method?: PaymentMethod;
 }
 
+/** Respuesta de GET /api/admin/payment-gateway-analytics/ */
+export interface PaymentGatewayAnalytics {
+  period: { from: string; to: string; days: number };
+  filters: { gateway: string | null; include_internal: boolean };
+  totals: {
+    attempts: number;
+    approved: number;
+    rejected: number;
+    error: number;
+    pending: number;
+    cancelled: number;
+  };
+  rates: {
+    success_rate: number | null;
+    failure_rate: number | null;
+    note: string;
+  };
+  approved_amount_total: string;
+  by_day: Array<{
+    date: string;
+    approved: number;
+    rejected: number;
+    error: number;
+    pending: number;
+    cancelled: number;
+  }>;
+  failure_by_code: Array<{
+    gateway: string;
+    code: string;
+    count: number;
+    sample_message?: string;
+  }>;
+  failure_by_status_detail: Array<{
+    gateway: string;
+    status_detail: string;
+    count: number;
+  }>;
+  recent_attempts: PaymentGatewayAnalyticsAttempt[];
+  recent_failures: PaymentGatewayAnalyticsAttempt[];
+}
+
+export interface PaymentGatewayAnalyticsAttempt {
+  id: number;
+  created: string | null;
+  gateway: string;
+  status: string;
+  gateway_response_code: string;
+  gateway_response_message: string;
+  status_detail: string;
+  booking_id: number;
+  booking_reference: string;
+  property_name: string;
+  amount: string;
+  currency: string;
+}
+
 export interface AdminUserListItem {
   id: number;
   clerk_user_id: string;
@@ -618,66 +862,301 @@ export interface AdminUserListItem {
   loyalty_points?: number;
 }
 
-let tokenGetter: (() => Promise<string | null>) | null = null;
-export function setAdminApiToken(getter: () => Promise<string | null>) {
+/** Alineado con Clerk `getToken` (p. ej. `{ skipCache: true }` antes de subidas). */
+export type AdminTokenGetter = (opts?: { skipCache?: boolean }) => Promise<string | null>;
+
+let tokenGetter: AdminTokenGetter | null = null;
+export function setAdminApiToken(getter: AdminTokenGetter) {
   tokenGetter = getter;
 }
 
+/** Repite el JWT en un header de respaldo: algunos proxies quitan `Authorization` en POST multipart. */
+function applyBearerHeaders(headers: Record<string, string>, token: string | null) {
+  if (!token) return;
+  const v = `Bearer ${token}`;
+  headers.Authorization = v;
+  headers["X-Clerk-Authorization"] = v;
+}
+
+/** Para `fetch` puntuales que no usan authFetch (mismo criterio que applyBearerHeaders). */
+function clerkAuthHeaders(token: string | null): Record<string, string> {
+  const h: Record<string, string> = {};
+  applyBearerHeaders(h, token);
+  return h;
+}
+
+/**
+ * 404 del API: authFetch la lanza en lugar de devolver un Response con el body ya consumido.
+ * Evita "Failed to execute 'json' on 'Response': body stream already read" en postJson/patchJson.
+ */
+export class AdminApiNotFoundError extends Error {
+  readonly status = 404;
+  constructor(message: string) {
+    super(message);
+    this.name = "AdminApiNotFoundError";
+  }
+}
+
+/** Logs en consola del navegador para diagnosticar fallos de sesión / API (filtrar por "newayzi-admin"). */
+function logAdminSessionIssue(
+  phase: string,
+  detail: Record<string, unknown>
+): void {
+  if (typeof window === "undefined") return;
+  console.error(`[newayzi-admin] ${phase}`, detail);
+}
+
+/**
+ * Decodifica el payload de un JWT sin verificar firma para leer el campo `exp`.
+ * Devuelve true si el token está expirado o expirará en los próximos `bufferSeconds`.
+ */
+function isTokenExpiringShortly(token: string | null, bufferSeconds = 30): boolean {
+  if (!token) return true;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return false;
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))
+    ) as { exp?: number };
+    if (!payload.exp) return false;
+    return Date.now() / 1000 + bufferSeconds >= payload.exp;
+  } catch {
+    return false;
+  }
+}
+
+/** Getter con skipCache, tipado correctamente para Clerk's getToken. */
+async function getFreshToken(): Promise<string | null> {
+  if (!tokenGetter) return null;
+  return (tokenGetter as (o: { skipCache: boolean }) => Promise<string | null>)({
+    skipCache: true,
+  }).catch(() => null);
+}
+
 async function authFetch(path: string, options: RequestInit = {}) {
-  const url = `${API_BASE.replace(/\/$/, "")}${path}`;
-  const token = tokenGetter ? await tokenGetter() : null;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string>),
-  };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(url, {
-    ...options,
-    headers,
-    credentials: "include",
-  });
+  const base = resolvedApiBase().replace(/\/$/, "");
+  const url = `${base}${path}`;
+
+  function buildHeaders(tok: string | null): Record<string, string> {
+    const h: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(options.headers as Record<string, string>),
+    };
+    applyBearerHeaders(h, tok);
+    return h;
+  }
+
+  async function execFetch(tok: string | null): Promise<Response> {
+    return fetch(url, { ...options, headers: buildHeaders(tok), credentials: "include" });
+  }
+
+  // Obtiene el token cacheado y, si está por expirar (< 30s de vida) o ya expiró,
+  // fuerza un refresco antes de enviar el request — evita el 401 proactivamente.
+  let token = tokenGetter ? await tokenGetter() : null;
+  if (isTokenExpiringShortly(token)) {
+    const refreshed = await getFreshToken();
+    if (refreshed) token = refreshed;
+  }
+
+  let res: Response;
+  try {
+    res = await execFetch(token);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    logAdminSessionIssue("fetch de API falló (red/CORS/bloqueo)", {
+      path,
+      apiBase: base || "(vacío)",
+      message: msg,
+    });
+    if (msg === "Failed to fetch" || msg.includes("NetworkError")) {
+      throw new Error(
+        "No se pudo contactar la API (red, CORS o bloqueo del navegador). Revisa la consola [newayzi-admin] y la pestaña Red."
+      );
+    }
+    throw e instanceof Error ? e : new Error(msg);
+  }
+
+  // Segunda línea de defensa: si el backend devuelve 401 (p.ej. skew de reloj
+  // o el token expiró exactamente entre el chequeo y la llegada al servidor),
+  // forzar un refresco y reintentar UNA sola vez antes de redirigir al login.
+  if (res.status === 401 && tokenGetter) {
+    const freshToken = await getFreshToken();
+    if (freshToken) {
+      const retried = await execFetch(freshToken).catch(() => null);
+      if (retried && retried.status !== 401) {
+        res = retried;
+      }
+    }
+  }
+
   if (!res.ok) {
+    const text = await res.text();
+    let parsedDetail: string | undefined;
+    try {
+      const j = JSON.parse(text) as { detail?: unknown };
+      if (typeof j.detail === "string") parsedDetail = j.detail;
+      else if (Array.isArray(j.detail)) parsedDetail = JSON.stringify(j.detail);
+    } catch {
+      /* cuerpo no JSON */
+    }
     if (res.status === 401) {
-      // Sesión expirada: redirigir al login
+      logAdminSessionIssue("401 en API admin (tras reintento con token fresco)", {
+        path,
+        apiBase: base || "(vacío)",
+        detail: parsedDetail ?? text.slice(0, 400),
+      });
+      // Sesión realmente expirada o inválida: redirigir al login
       if (typeof window !== "undefined") {
         window.location.href = "/sign-in?reason=session_expired";
       }
-      throw new Error("Sesión expirada. Redirigiendo al inicio de sesión...");
+      throw new Error(
+        parsedDetail ?? "Sesión expirada o token inválido. Redirigiendo al inicio de sesión…"
+      );
     }
     if (res.status === 403) {
-      throw new Error("No tienes permisos para realizar esta acción.");
+      logAdminSessionIssue("403 en API admin", {
+        path,
+        detail: parsedDetail ?? text.slice(0, 400),
+      });
+      throw new Error(parsedDetail ?? "No tienes permisos para realizar esta acción.");
     }
-    if (res.status !== 404) {
-      const text = await res.text();
-      throw new Error(`API ${res.status}: ${text || res.statusText}`);
+    if (res.status === 404) {
+      logAdminSessionIssue("404 en API admin (ruta o recurso inexistente)", {
+        path,
+        apiBase: base || "(vacío)",
+        detail: parsedDetail ?? text.slice(0, 400),
+      });
+      throw new AdminApiNotFoundError(
+        parsedDetail ??
+          "Recurso no encontrado (404). Comprueba la URL del API y que el backend desplegado incluya la ruta solicitada."
+      );
     }
+    logAdminSessionIssue(`HTTP ${res.status} en API admin`, {
+      path,
+      apiBase: base || "(vacío)",
+      bodyPreview: text.slice(0, 600),
+    });
+    throw new Error(
+      parsedDetail ?? `API ${res.status}: ${text || res.statusText}`
+    );
   }
   return res;
 }
 
 async function getJson<T>(path: string): Promise<T | null> {
-  const res = await authFetch(path);
-  if (res.status === 404) return null;
-  return res.json() as Promise<T>;
+  try {
+    const res = await authFetch(path);
+    return (await res.json()) as T;
+  } catch (e) {
+    if (e instanceof AdminApiNotFoundError) {
+      return null;
+    }
+    throw e;
+  }
+}
+
+/**
+ * URL para POST multipart: usa el mismo base que el resto del API (CORS configurado en Django).
+ * El Excel de inventario manual es pequeño y pasa bien por la API directa.
+ */
+function getMultipartUrl(path: string): string {
+  const base = resolvedApiBase().replace(/\/$/, "");
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${p}`;
 }
 
 async function authFetchMultipart(path: string, method: string, body: FormData) {
-  const url = `${API_BASE.replace(/\/$/, "")}${path}`;
-  const token = tokenGetter ? await tokenGetter() : null;
+  const url = getMultipartUrl(path);
+  const token = tokenGetter ? await tokenGetter({ skipCache: true }) : null;
   const headers: Record<string, string> = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(url, { method, body, headers, credentials: "include" });
+  applyBearerHeaders(headers, token);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method,
+      body,
+      headers,
+      credentials: "include",
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg === "Failed to fetch" || msg.includes("NetworkError")) {
+      throw new Error(
+        "No se pudo contactar la API (red, CORS o bloqueo del navegador). Abre Herramientas de desarrollador → Red y revisa el POST."
+      );
+    }
+    throw e;
+  }
   if (!res.ok) {
+    if (res.status === 401 && typeof window !== "undefined") {
+      window.location.href = "/sign-in?reason=session_expired";
+    }
     const text = await res.text();
     let detail = text;
-    try { detail = JSON.parse(text).detail ?? text; } catch { /* keep raw text */ }
+    try {
+      detail = JSON.parse(text).detail ?? text;
+    } catch {
+      /* keep raw text */
+    }
     throw new Error(detail || `Error ${res.status}`);
   }
   return res;
 }
 
+/**
+ * POST multipart a S3 con la URL devuelta por presign.
+ * Sin CORS en el bucket, el navegador puede rechazar con "Failed to fetch" aunque S3 haya aceptado el objeto (204).
+ */
+async function uploadToS3PresignedPost(uploadUrl: string, formData: FormData): Promise<void> {
+  try {
+    const s3Res = await fetch(uploadUrl, {
+      method: "POST",
+      body: formData,
+      mode: "cors",
+      credentials: "omit",
+      cache: "no-store",
+    });
+    if (!s3Res.ok && s3Res.status !== 204) {
+      const txt = await s3Res.text().catch(() => "");
+      throw new Error(`S3 respondió ${s3Res.status}: ${txt || s3Res.statusText}`);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("S3 respondió")) {
+      throw e;
+    }
+    const msg = e instanceof Error ? e.message : String(e);
+    const looksLikeCorsOrOpaqueNetwork =
+      msg === "Failed to fetch" ||
+      msg.includes("Failed to fetch") ||
+      msg.includes("Load failed") ||
+      msg.includes("NetworkError");
+    if (looksLikeCorsOrOpaqueNetwork) {
+      if (typeof console !== "undefined" && typeof console.warn === "function") {
+        console.warn(
+          "[newayzi-admin] POST a S3: respuesta no legible por CORS; si en Red ves 204, se asume éxito y se llama a confirm."
+        );
+      }
+      return;
+    }
+    throw e;
+  }
+}
+
 async function patchJson<T>(path: string, body: unknown): Promise<T> {
   const res = await authFetch(path, { method: "PATCH", body: JSON.stringify(body) });
+  return res.json() as Promise<T>;
+}
+
+async function deleteVoid(path: string): Promise<void> {
+  const res = await authFetch(path, { method: "DELETE" });
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text();
+    throw new Error(text || res.statusText);
+  }
+}
+
+async function putJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await authFetch(path, { method: "PUT", body: JSON.stringify(body) });
   return res.json() as Promise<T>;
 }
 
@@ -694,10 +1173,10 @@ async function streamSSE(
   onEvent?: (event: ConnectionSyncStreamEvent) => void,
   signal?: AbortSignal
 ): Promise<ConnectionSyncNowResponse> {
-  const url = `${API_BASE.replace(/\/$/, "")}${path}`;
+  const url = `${resolvedApiBase().replace(/\/$/, "")}${path}`;
   const token = tokenGetter ? await tokenGetter() : null;
   const headers: Record<string, string> = { Accept: "text/event-stream, application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  applyBearerHeaders(headers, token);
 
   const res = await fetch(url, {
     method: "GET",
@@ -784,7 +1263,13 @@ async function streamSSE(
 
 export interface RewardPoolMovement {
   id: number;
-  kind: "contribution" | "cashback_issued" | "redemption" | "breakage" | "adjustment";
+  kind:
+    | "contribution"
+    | "cashback_issued"
+    | "redemption"
+    | "breakage"
+    | "adjustment"
+    | "corporate_contribution";
   amount: number;
   notes: string;
   createdAt: string;
@@ -855,12 +1340,16 @@ export const adminApi = {
   async getProperties(params?: {
     operator_id?: number;
     city?: string;
+    /** Búsqueda parcial por nombre (backend: translations__name__icontains) */
+    name?: string;
     is_active?: boolean;
     pms_connection_id?: number;
   }): Promise<{ results: PropertyListItem[] } | null> {
     const q = new URLSearchParams();
     if (params?.operator_id != null) q.set("operator_id", String(params.operator_id));
     if (params?.city) q.set("city", params.city);
+    const nameTrim = params?.name?.trim();
+    if (nameTrim) q.set("name", nameTrim);
     if (params?.is_active != null) q.set("is_active", String(params.is_active));
     if (params?.pms_connection_id != null)
       q.set("pms_connection_id", String(params.pms_connection_id));
@@ -869,8 +1358,63 @@ export const adminApi = {
     return getJson<{ results: PropertyListItem[] }>(path);
   },
 
+  async searchAdminCities(q: string): Promise<{ results: AdminCitySearchRow[] } | null> {
+    const t = q.trim();
+    if (t.length < 2) return { results: [] };
+    return getJson<{ results: AdminCitySearchRow[] }>(
+      `/api/admin/properties/cities/search/?q=${encodeURIComponent(t)}`
+    );
+  },
+
+  async getAdminCityDuplicates(): Promise<{
+    duplicates: Array<{ cities: Array<AdminCitySearchRow & { property_count: number; is_active: boolean }> }>;
+    total_groups: number;
+  }> {
+    return getJson(`/api/admin/properties/cities/duplicates/`) as Promise<{
+      duplicates: Array<{ cities: Array<AdminCitySearchRow & { property_count: number; is_active: boolean }> }>;
+      total_groups: number;
+    }>;
+  },
+
+  async mergeAdminCities(canonicalId: number, fromIds: number[]): Promise<{
+    merged: boolean;
+    canonical_id: number;
+    from_ids: number[];
+    properties_moved: number;
+  }> {
+    return postJson(`/api/admin/properties/cities/duplicates/`, {
+      canonical_id: canonicalId,
+      from_ids: fromIds,
+    });
+  },
+
+  async createProperty(data: {
+    name: string;
+    city_id: number;
+    timezone?: string;
+    currency?: string;
+    property_type?: string;
+    description?: string;
+    operator_id?: number;
+    address?: string;
+    location?: { lat: number; lng: number } | null;
+  }): Promise<PropertyDetail> {
+    return postJson<PropertyDetail>("/api/admin/properties/", data);
+  },
+
   async getProperty(id: number): Promise<PropertyDetail | null> {
     return getJson<PropertyDetail>(`/api/admin/properties/${id}/`);
+  },
+
+  async getPropertyLoyaltyDeals(level: LoyaltyLevelValue): Promise<LoyaltyDealsResponse | null> {
+    return getJson<LoyaltyDealsResponse>(`/api/admin/properties/loyalty-deals/${level}/`);
+  },
+
+  async putPropertyLoyaltyDeals(
+    level: LoyaltyLevelValue,
+    deals: Array<{ property_id: number; order?: number; discount_percent: number }>
+  ): Promise<LoyaltyDealsResponse> {
+    return putJson<LoyaltyDealsResponse>(`/api/admin/properties/loyalty-deals/${level}/`, { deals });
   },
 
   async patchProperty(
@@ -892,9 +1436,12 @@ export const adminApi = {
       check_in_until: string | null;
       check_out_from: string | null;
       check_out_until: string | null;
+      city_id: number;
       amenities: string[] | Record<string, unknown>[];
       important_info: string[];
       faqs: { question: string; answer: string }[];
+      restrict_pricing_to_manual_weeks: boolean;
+      location: { lat: number; lng: number } | null;
     }>
   ): Promise<PropertyDetail> {
     return patchJson<PropertyDetail>(`/api/admin/properties/${id}/`, data);
@@ -908,24 +1455,198 @@ export const adminApi = {
     }
   },
 
+  async downloadManualInventoryTemplate(): Promise<Blob> {
+    const res = await authFetch("/api/admin/properties/manual-inventory/template/");
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(t || "Error al descargar plantilla");
+    }
+    return res.blob();
+  },
+
+  /**
+   * Importa Excel de inventario manual usando presign → S3 → confirm.
+   *
+   * WAF bloquea cualquier POST con cuerpo grande (multipart o JSON) hacia el API.
+   * La solución: presign y confirm son JSON pequeños (pasan WAF); el upload del
+   * archivo va directo a S3 con mode:"no-cors", lo que bypassa S3 CORS
+   * completamente — S3 valida solo la firma del presigned POST, no el origen.
+   */
+  async importManualInventory(
+    propertyId: number,
+    file: File,
+    replace = true
+  ): Promise<ManualInventoryImportRow> {
+    // 1. Obtener URL prefirmada de S3
+    const presignResp = await postJson<{
+      presigned: { index: number; rel_key: string; upload_url: string; fields: Record<string, string> }[];
+    }>(
+      `/api/admin/properties/${propertyId}/manual-inventory/presign/`,
+      { filename: file.name }
+    );
+
+    const slot = presignResp.presigned[0];
+    if (!slot) throw new Error("El backend no devolvió URL de subida.");
+
+    // 2. Subir el archivo directamente a S3 con mode:"no-cors"
+    //    Con no-cors, el navegador NO envía Origin → S3 no verifica CORS,
+    //    solo verifica la firma. La respuesta es opaca (no legible), pero S3
+    //    procesa el upload si la firma y los campos son correctos.
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(slot.fields)) {
+      fd.append(k, v);
+    }
+    // El archivo VA AL FINAL — requisito de S3 presigned POST
+    fd.append("file", file);
+
+    try {
+      await fetch(slot.upload_url, {
+        method: "POST",
+        body: fd,
+        mode: "no-cors",   // bypassa CORS de S3
+        credentials: "omit",
+        cache: "no-store",
+      });
+    } catch (e) {
+      // Con no-cors, fetch solo lanza si hay fallo de red real (sin conexión, etc.)
+      throw new Error(`No se pudo conectar con S3: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    // No podemos leer la respuesta opaca, pero si no lanzó, la petición se envió.
+    // El paso confirm verifica que S3 la recibió correctamente.
+
+    // 3. Confirmar: Django lee el archivo de S3, lo procesa y lo elimina
+    return postJson<ManualInventoryImportRow>(
+      `/api/admin/properties/${propertyId}/manual-inventory/confirm/`,
+      { rel_key: slot.rel_key, original_filename: file.name, replace }
+    );
+  },
+
+  async getManualInventoryImports(
+    propertyId: number
+  ): Promise<{ results: ManualInventoryImportRow[] } | null> {
+    return getJson<{ results: ManualInventoryImportRow[] }>(
+      `/api/admin/properties/${propertyId}/manual-imports/`
+    );
+  },
+
+  // ── Pricing config ─────────────────────────────────────────────────────────
+
+  async getPricingConfig(propertyId: number): Promise<PropertyPricingConfig | null> {
+    return getJson<PropertyPricingConfig>(`/api/admin/properties/${propertyId}/pricing-config/`);
+  },
+
+  async patchPricingConfig(
+    propertyId: number,
+    data: Partial<PropertyPricingConfig>
+  ): Promise<PropertyPricingConfig> {
+    const res = await authFetch(`/api/admin/properties/${propertyId}/pricing-config/`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+    return res.json() as Promise<PropertyPricingConfig>;
+  },
+
+  // ── Fixed Week Slots ────────────────────────────────────────────────────────
+
+  async getWeekSlots(propertyId: number): Promise<{ results: PropertyFixedWeekSlot[] } | null> {
+    return getJson<{ results: PropertyFixedWeekSlot[] }>(`/api/admin/properties/${propertyId}/week-slots/`);
+  },
+
+  async createWeekSlot(
+    propertyId: number,
+    data: { check_in: string; check_out: string; note?: string; season?: number | null }
+  ): Promise<PropertyFixedWeekSlot> {
+    return postJson<PropertyFixedWeekSlot>(`/api/admin/properties/${propertyId}/week-slots/`, data);
+  },
+
+  async patchWeekSlot(
+    propertyId: number,
+    slotId: number,
+    data: { note?: string; season?: number | null }
+  ): Promise<PropertyFixedWeekSlot> {
+    const res = await authFetch(`/api/admin/properties/${propertyId}/week-slots/${slotId}/`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+    return res.json() as Promise<PropertyFixedWeekSlot>;
+  },
+
+  async deleteWeekSlot(propertyId: number, slotId: number): Promise<void> {
+    await authFetch(`/api/admin/properties/${propertyId}/week-slots/${slotId}/`, { method: "DELETE" });
+  },
+
+  async deleteAllWeekSlots(propertyId: number): Promise<{ deleted: number }> {
+    const res = await authFetch(`/api/admin/properties/${propertyId}/week-slots/`, { method: "DELETE" });
+    return res.json() as Promise<{ deleted: number }>;
+  },
+
+  async ensureRoomTypePhysicalRooms(
+    propertyId: number,
+    roomTypeId: number,
+    data: { desired_count: number; label_prefix?: string }
+  ): Promise<{ created: number; current_count: number; desired_count: number; message?: string }> {
+    return putJson(`/api/admin/properties/${propertyId}/room-types/${roomTypeId}/physical-rooms/`, data);
+  },
+
   async getPropertyPictures(propertyId: number): Promise<PropertyPicture[]> {
     const result = await getJson<PropertyPicture[]>(`/api/admin/properties/${propertyId}/pictures/`);
     return result ?? [];
   },
 
+  /**
+   * Sube vía presign→S3→confirm (cuerpos JSON pequeños al API). El POST multipart directo a
+   * /pictures/ suele ser bloqueado por WAF/CloudFront del API en producción.
+   */
   async uploadPropertyPicture(propertyId: number, file: File, isPrimary = false): Promise<PropertyPicture> {
-    const fd = new FormData();
-    fd.append("image", file);
-    if (isPrimary) fd.append("is_primary", "true");
-    const res = await authFetchMultipart(`/api/admin/properties/${propertyId}/pictures/`, "POST", fd);
-    return res.json() as Promise<PropertyPicture>;
+    return (await adminApi.uploadPropertyPicturesBatch(propertyId, [file], isPrimary))[0];
+  },
+
+  /** Hasta 50 imágenes: presign (JSON) → subida a S3 → confirm (JSON). */
+  async uploadPropertyPicturesBatch(
+    propertyId: number,
+    files: File[],
+    isPrimary = false
+  ): Promise<PropertyPicture[]> {
+    const slice = files.slice(0, 50);
+    if (slice.length === 0) return [];
+
+    const presignResult = await postJson<{
+      presigned: Array<{ index: number; rel_key: string; upload_url: string; fields: Record<string, string> }>;
+    }>(`/api/admin/properties/${propertyId}/pictures/presign/`, {
+      files: slice.map((f) => ({ filename: f.name, content_type: f.type || "image/jpeg" })),
+    });
+
+    const relKeys: string[] = [];
+    for (const { index, rel_key, upload_url, fields } of presignResult.presigned) {
+      const fd = new FormData();
+      for (const [key, value] of Object.entries(fields)) fd.append(key, value);
+      fd.append("file", slice[index]);
+      try {
+        await uploadToS3PresignedPost(upload_url, fd);
+      } catch (err) {
+        const m = err instanceof Error ? err.message : String(err);
+        throw new Error(`Error al subir imagen ${index + 1}: ${m}`);
+      }
+      relKeys.push(rel_key);
+    }
+
+    const confirmed = await postJson<{ pictures?: PropertyPicture[] } | PropertyPicture>(
+      `/api/admin/properties/${propertyId}/pictures/confirm/`,
+      { rel_keys: relKeys, is_primary: isPrimary }
+    );
+    if (
+      confirmed &&
+      typeof confirmed === "object" &&
+      "pictures" in confirmed &&
+      Array.isArray((confirmed as { pictures: PropertyPicture[] }).pictures)
+    ) {
+      return (confirmed as { pictures: PropertyPicture[] }).pictures;
+    }
+    return [confirmed as PropertyPicture];
   },
 
   async setPropertyPicturePrimary(propertyId: number, picId: number): Promise<PropertyPicture> {
-    const fd = new FormData();
-    fd.append("is_primary", "true");
-    const res = await authFetchMultipart(`/api/admin/properties/${propertyId}/pictures/${picId}/`, "PATCH", fd);
-    return res.json() as Promise<PropertyPicture>;
+    return patchJson<PropertyPicture>(`/api/admin/properties/${propertyId}/pictures/${picId}/`, { is_primary: true });
   },
 
   async deletePropertyPicture(propertyId: number, picId: number): Promise<void> {
@@ -949,12 +1670,32 @@ export const adminApi = {
       num_rooms: number | null;
       num_bathrooms: number | null;
       area_sqm: number | string | null;
+      room_amenities: string[];
     }>
   ): Promise<RoomTypeAdminDetail> {
     return patchJson<RoomTypeAdminDetail>(
       `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/`,
       data
     );
+  },
+
+  /** Elimina un tipo de habitación (409 si hay reservas u otros registros protegidos). */
+  async deleteRoomTypeAdmin(propertyId: number, roomTypeId: number): Promise<void> {
+    await deleteVoid(`/api/admin/properties/${propertyId}/room-types/${roomTypeId}/`);
+  },
+
+  /** Elimina todos los tipos de habitación de la propiedad (409 si alguno está protegido). */
+  async deleteAllRoomTypesForProperty(propertyId: number): Promise<{ deleted: number }> {
+    const res = await authFetch(`/api/admin/properties/${propertyId}/room-types/`, { method: "DELETE" });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || res.statusText);
+    }
+    try {
+      return (await res.json()) as { deleted: number };
+    } catch {
+      return { deleted: 0 };
+    }
   },
 
   async getRoomTypePictures(propertyId: number, roomTypeId: number): Promise<RoomTypePicture[]> {
@@ -970,15 +1711,55 @@ export const adminApi = {
     file: File,
     isPrimary = false
   ): Promise<RoomTypePicture> {
-    const fd = new FormData();
-    fd.append("image", file);
-    if (isPrimary) fd.append("is_primary", "true");
-    const res = await authFetchMultipart(
-      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/`,
-      "POST",
-      fd
+    return (await adminApi.uploadRoomTypePicturesBatch(propertyId, roomTypeId, [file], isPrimary))[0];
+  },
+
+  /** Hasta 50 imágenes: presign → S3 → confirm (evita multipart bloqueado por WAF del API). */
+  async uploadRoomTypePicturesBatch(
+    propertyId: number,
+    roomTypeId: number,
+    files: File[],
+    isPrimary = false
+  ): Promise<RoomTypePicture[]> {
+    const slice = files.slice(0, 50);
+    if (slice.length === 0) return [];
+
+    const presignResult = await postJson<{
+      presigned: Array<{ index: number; rel_key: string; upload_url: string; fields: Record<string, string> }>;
+    }>(
+      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/presign/`,
+      {
+        files: slice.map((f) => ({ filename: f.name, content_type: f.type || "image/jpeg" })),
+      }
     );
-    return res.json() as Promise<RoomTypePicture>;
+
+    const relKeys: string[] = [];
+    for (const { index, rel_key, upload_url, fields } of presignResult.presigned) {
+      const fd = new FormData();
+      for (const [key, value] of Object.entries(fields)) fd.append(key, value);
+      fd.append("file", slice[index]);
+      try {
+        await uploadToS3PresignedPost(upload_url, fd);
+      } catch (err) {
+        const m = err instanceof Error ? err.message : String(err);
+        throw new Error(`Error al subir imagen ${index + 1}: ${m}`);
+      }
+      relKeys.push(rel_key);
+    }
+
+    const confirmed = await postJson<{ pictures?: RoomTypePicture[] } | RoomTypePicture>(
+      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/confirm/`,
+      { rel_keys: relKeys, is_primary: isPrimary }
+    );
+    if (
+      confirmed &&
+      typeof confirmed === "object" &&
+      "pictures" in confirmed &&
+      Array.isArray((confirmed as { pictures: RoomTypePicture[] }).pictures)
+    ) {
+      return (confirmed as { pictures: RoomTypePicture[] }).pictures;
+    }
+    return [confirmed as RoomTypePicture];
   },
 
   async setRoomTypePicturePrimary(
@@ -986,14 +1767,10 @@ export const adminApi = {
     roomTypeId: number,
     picId: number
   ): Promise<RoomTypePicture> {
-    const fd = new FormData();
-    fd.append("is_primary", "true");
-    const res = await authFetchMultipart(
+    return patchJson<RoomTypePicture>(
       `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/pictures/${picId}/`,
-      "PATCH",
-      fd
+      { is_primary: true }
     );
-    return res.json() as Promise<RoomTypePicture>;
   },
 
   async deleteRoomTypePicture(propertyId: number, roomTypeId: number, picId: number): Promise<void> {
@@ -1019,7 +1796,7 @@ export const adminApi = {
     name?: string;
     pms_type: string;
     operator_id?: number;
-    config?: Record<string, string>;
+    config?: Record<string, unknown>;
   }): Promise<PMSConnectionListItem> {
     return postJson<PMSConnectionListItem>("/api/admin/pms/connections/", data);
   },
@@ -1032,11 +1809,25 @@ export const adminApi = {
     return getJson<PMSConnectionDetail>(`/api/admin/pms/connections/${id}/`);
   },
 
+  async getConnectionDeleteBlockers(id: number): Promise<PMSConnectionDeleteBlockersInfo> {
+    const data = await getJson<PMSConnectionDeleteBlockersInfo>(
+      `/api/admin/pms/connections/${id}/delete-blockers/`
+    );
+    if (!data) {
+      throw new Error("No se pudo comprobar si la conexión se puede eliminar.");
+    }
+    return data;
+  },
+
   async patchConnection(
     id: number,
-    data: { is_active?: boolean; config?: { base_url?: string; username?: string; password?: string } }
+    data: { is_active?: boolean; config?: Record<string, unknown> }
   ): Promise<PMSConnectionDetail> {
     return patchJson<PMSConnectionDetail>(`/api/admin/pms/connections/${id}/`, data);
+  },
+
+  async testPmsConnection(id: number): Promise<{ ok: boolean; detail?: string }> {
+    return postJson<{ ok: boolean; detail?: string }>(`/api/admin/pms/connections/${id}/test/`, {});
   },
 
   async syncConnectionNow(id: number): Promise<ConnectionSyncNowResponse> {
@@ -1215,10 +2006,27 @@ export const adminApi = {
 
   async deleteConnection(id: number): Promise<void> {
     const res = await authFetch(`/api/admin/pms/connections/${id}/`, { method: "DELETE" });
-    if (res.status !== 204) {
-      const text = await res.text();
-      throw new Error(text || "Error al eliminar conexión");
+    if (res.status === 204) return;
+    const text = await res.text();
+    if (res.status === 409) {
+      try {
+        const j = JSON.parse(text) as Record<string, unknown>;
+        if (typeof j.detail === "string" && typeof j.code === "string") {
+          throw new PmsDeleteBlockedError({
+            detail: j.detail,
+            code: j.code,
+            booking_count: typeof j.booking_count === "number" ? j.booking_count : 0,
+            bookings: Array.isArray(j.bookings) ? (j.bookings as PMSDeleteBlockedBooking[]) : [],
+            has_more_bookings: Boolean(j.has_more_bookings),
+            bookings_preview_limit:
+              typeof j.bookings_preview_limit === "number" ? j.bookings_preview_limit : 80,
+          });
+        }
+      } catch (e) {
+        if (e instanceof PmsDeleteBlockedError) throw e;
+      }
     }
+    throw new Error(text || "Error al eliminar conexión");
   },
 
   async getSyncedUnits(connectionId: number): Promise<SyncedUnit[] | null> {
@@ -1280,6 +2088,31 @@ export const adminApi = {
 
   async getAgency(id: number): Promise<AgencyDetail | null> {
     return getJson<AgencyDetail>(`/api/admin/agencies/${id}/`);
+  },
+
+  async patchAgency(
+    id: number,
+    body: Partial<{
+      name: string;
+      contact_email: string;
+      contact_phone: string;
+      is_active: boolean;
+      scoped_operator_ids: number[];
+      scoped_property_ids: number[];
+    }>
+  ): Promise<AgencyDetail | null> {
+    return patchJson<AgencyDetail>(`/api/admin/agencies/${id}/`, body);
+  },
+
+  async patchAgencyInventoryScope(
+    id: number,
+    body: { scoped_operator_ids?: number[]; scoped_property_ids?: number[] }
+  ): Promise<AgencyDetail | null> {
+    return patchJson<AgencyDetail>(`/api/admin/agencies/${id}/`, body);
+  },
+
+  async deleteAgency(id: number): Promise<void> {
+    return deleteVoid(`/api/admin/agencies/${id}/`);
   },
 
   async getAgencyLevels(): Promise<AgencyLevelConfig[] | null> {
@@ -1390,6 +2223,19 @@ export const adminApi = {
       `/api/admin/regions/${regionId}/payment-methods/`,
       { payment_method_id: paymentMethodId, is_active }
     );
+  },
+
+  async getPaymentGatewayAnalytics(params?: {
+    days?: number;
+    gateway?: string;
+    includeInternal?: boolean;
+  }): Promise<PaymentGatewayAnalytics | null> {
+    const q = new URLSearchParams();
+    if (params?.days != null && params.days > 0) q.set("days", String(params.days));
+    if (params?.gateway) q.set("gateway", params.gateway);
+    if (params?.includeInternal) q.set("include_internal", "1");
+    const suffix = q.toString() ? `?${q.toString()}` : "";
+    return getJson<PaymentGatewayAnalytics>(`/api/admin/payment-gateway-analytics/${suffix}`);
   },
 
   async getUsers(): Promise<{ results: AdminUserListItem[] } | null> {
@@ -1533,10 +2379,23 @@ export interface AdminCoupon {
   max_uses: number | null;
   max_uses_per_user: number;
   times_used: number;
+  /** Reservas no canceladas con este cupón (pending + confirmadas); gobierna max_uses. */
+  active_reservations_with_coupon: number;
+  /** Filas CouponUsage (pagos confirmados con cupón). */
+  coupon_usage_records_count: number;
+  /** Cupos globales restantes según reservas activas; null si max_uses es ilimitado. */
+  max_uses_remaining: number | null;
+  /** True si ya no caben más reservas por límite global. */
+  at_global_use_limit: boolean;
+  /** times_used en BD coincide con coupon_usage_records_count. */
+  ledger_counter_in_sync: boolean;
   valid_from: string;
   valid_until: string | null;
   status: "active" | "paused" | "expired";
   created: string;
+  updated: string;
+  applies_to_property_id: number | null;
+  applies_to_operator_id: number | null;
 }
 
 export interface CouponsListResponse {
@@ -1566,10 +2425,27 @@ export const couponsApi = {
     max_uses_per_user?: number;
     valid_from?: string;
     valid_until?: string | null;
+    applies_to_property_id?: number | null;
+    applies_to_operator_id?: number | null;
   }): Promise<AdminCoupon> {
     return postJson<AdminCoupon>("/api/admin/coupons/", data);
   },
-  async patch(id: number, data: { status?: string }): Promise<AdminCoupon> {
+  async patch(
+    id: number,
+    data: {
+      status?: string;
+      applies_to_property_id?: number | null;
+      applies_to_operator_id?: number | null;
+      min_booking_amount?: string;
+      max_uses?: number | null;
+      max_uses_per_user?: number;
+      valid_from?: string;
+      valid_until?: string | null;
+      discount_type?: "percentage" | "fixed";
+      discount_value?: string;
+      description?: string;
+    }
+  ): Promise<AdminCoupon> {
     return patchJson<AdminCoupon>(`/api/admin/coupons/${id}/`, data);
   },
   async delete(id: number): Promise<void> {
@@ -1578,6 +2454,84 @@ export const couponsApi = {
       const text = await res.text();
       throw new Error(`API ${res.status}: ${text}`);
     }
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────── //
+//  SEO: guías generadas (OpenAI) — solo plataforma admin en backend
+// ─────────────────────────────────────────────────────────────────────────── //
+
+export interface AdminSeoArticle {
+  id: number;
+  slug: string;
+  locale: string;
+  title: string;
+  meta_description: string;
+  hero_title: string;
+  hero_subtitle: string;
+  keywords: string[];
+  content: Record<string, unknown>;
+  article_type: string;
+  property: number | null;
+  city: number | null;
+  status: string;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+  openai_model: string;
+  generation_notes: string;
+}
+
+export interface AdminSeoArticlesListResponse {
+  results: AdminSeoArticle[];
+  count: number;
+}
+
+export interface AdminSeoGenerateResponse {
+  created: number;
+  skipped: number;
+  failed: number;
+  execution_time_ms: number;
+  log_id: number;
+  errors: string[];
+}
+
+export const seoArticlesApi = {
+  async list(params?: { status?: string; limit?: number }): Promise<AdminSeoArticlesListResponse> {
+    const q = new URLSearchParams();
+    if (params?.status) q.set("status", params.status);
+    if (params?.limit != null) q.set("limit", String(params.limit));
+    const qs = q.toString();
+    const res = await authFetch(`/api/admin/seo-articles/${qs ? `?${qs}` : ""}`);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`API ${res.status}: ${text}`);
+    }
+    return (await res.json()) as AdminSeoArticlesListResponse;
+  },
+
+  async patch(
+    id: number,
+    data: Partial<{
+      status: string;
+      generation_notes: string;
+      title: string;
+      meta_description: string;
+      hero_title: string;
+      hero_subtitle: string;
+    }>
+  ): Promise<AdminSeoArticle> {
+    return patchJson<AdminSeoArticle>(`/api/admin/seo-articles/${id}/`, data);
+  },
+
+  async generate(body: {
+    limit?: number;
+    locales?: string[];
+    as_published?: boolean;
+    property_ids?: number[];
+    city_ids?: number[];
+  }): Promise<AdminSeoGenerateResponse> {
+    return postJson<AdminSeoGenerateResponse>("/api/admin/seo-articles/generate/", body);
   },
 };
 
@@ -1815,7 +2769,29 @@ export const adminBookings = {
   ): Promise<{ ok: boolean; refund_type: string; refund_pct: number; refund_amount: string; reason: string }> {
     return postJson(`/api/admin/bookings/${id}/cancel/`, data);
   },
+
+  /** Confirmar (pendiente → confirmada) o expirar (pendiente/confirmada → expirada). Operador, comercial, super_admin. */
+  async patchStatus(
+    id: number,
+    data: { status: "confirmed" | "expired" }
+  ): Promise<{ ok: boolean; status: string; updated: string }> {
+    return patchJson(`/api/admin/bookings/${id}/status/`, data);
+  },
 };
+
+/** Roles que pueden cancelar reservas por API admin. */
+export function canAdminCancelBooking(role: AdminRole | null): boolean {
+  if (!role) return false;
+  if (role === "super_admin") return true;
+  return role === "operador" || role === "agente" || role === "comercial";
+}
+
+/** Operador, comercial o super_admin: cambiar estado sin flujo de cancelación. */
+export function canAdminPatchBookingStatus(role: AdminRole | null): boolean {
+  if (!role) return false;
+  if (role === "super_admin") return true;
+  return role === "operador" || role === "comercial";
+}
 
 /** Metadatos visuales por rol — icono, color, label y descripción */
 export const ROLE_META: Record<AdminRole, { label: string; icon: string; color: string; description: string }> = {
@@ -1852,15 +2828,19 @@ export function canAccessModule(role: AdminRole | null, module: string): boolean
     case "agent-wallets":
       return false; // solo super_admin (ya retornó arriba)
     case "agents":
-    case "payments":
       return role === "operador";
+    case "payments":
+      return false; // solo super_admin (ya cubierto arriba)
     case "bookings":
       return role === "operador" || role === "agente"; // operador: sus propiedades; agente: sus reservas
     case "analytics":
     case "reviews":
     case "coupons":
+    case "seo-content":
     case "users":
+    case "corporate-credits":
     case "audit":
+    case "simulator":
       return false; // solo super_admin (ya retornó arriba)
     default:
       return false;
@@ -1909,7 +2889,7 @@ export interface PlatformStats {
 }
 
 export async function fetchPlatformStats(): Promise<PlatformStats | null> {
-  const base = getApiBase();
+  const base = resolvedApiBase();
   if (!base) return null;
   try {
     const res = await fetch(`${base}/api/catalog/stats/`);
@@ -1982,8 +2962,8 @@ export const WALLET_REASON_OPTIONS: { value: WalletMovementReason; label: string
 export const agentWallets = {
   /** Super admin: listar billeteras de todos los agentes/personal */
   async list(token: string): Promise<AgentWallet[]> {
-    const res = await fetch(`${API_BASE}/api/admin/agent-wallets/`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const res = await fetch(`${resolvedApiBase()}/api/admin/agent-wallets/`, {
+      headers: clerkAuthHeaders(token),
     });
     if (!res.ok) throw new Error(`Error ${res.status}`);
     const data = await res.json();
@@ -1992,8 +2972,8 @@ export const agentWallets = {
 
   /** Ver billetera de un agente específico (super_admin o el propio agente) */
   async get(profileId: number, token: string): Promise<AgentWallet | null> {
-    const res = await fetch(`${API_BASE}/api/admin/users/${profileId}/wallet/`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const res = await fetch(`${resolvedApiBase()}/api/admin/users/${profileId}/wallet/`, {
+      headers: clerkAuthHeaders(token),
     });
     if (!res.ok) return null;
     return res.json();
@@ -2005,9 +2985,9 @@ export const agentWallets = {
     token: string,
     payload: { amount?: number; reason?: WalletMovementReason; note?: string; level?: LoyaltyLevelValue }
   ): Promise<AgentWallet> {
-    const res = await fetch(`${API_BASE}/api/admin/users/${profileId}/wallet/`, {
+    const res = await fetch(`${resolvedApiBase()}/api/admin/users/${profileId}/wallet/`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { ...clerkAuthHeaders(token), "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
@@ -2019,10 +2999,85 @@ export const agentWallets = {
 
   /** El propio agente ve su billetera Newayzi Rewards */
   async getOwn(token: string): Promise<AgentWallet | null> {
-    const res = await fetch(`${API_BASE}/api/agent/wallet/`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const res = await fetch(`${resolvedApiBase()}/api/agent/wallet/`, {
+      headers: clerkAuthHeaders(token),
     });
     if (!res.ok) return null;
+    return res.json();
+  },
+};
+
+export interface CorporateCreditMovementRow {
+  id: number;
+  profile_id: number;
+  profile_email: string;
+  profile_name: string;
+  amount: number;
+  reference_id: string;
+  created_at: string;
+}
+
+export interface CorporateCreditListResponse {
+  total: number;
+  offset: number;
+  limit: number;
+  results: CorporateCreditMovementRow[];
+}
+
+export interface CorporateCreditPostResponse {
+  idempotent: boolean;
+  movement_id: number;
+  profile_id: number;
+  points: number;
+  test_points: number;
+  pool_total_contributed: number;
+}
+
+/** Créditos corporativos prepago (super_admin): puntos + aporte Reward Pool */
+export const corporateCreditsApi = {
+  async list(
+    token: string,
+    params?: { limit?: number; offset?: number }
+  ): Promise<CorporateCreditListResponse> {
+    const q = new URLSearchParams();
+    if (params?.limit != null) q.set("limit", String(params.limit));
+    if (params?.offset != null) q.set("offset", String(params.offset));
+    const qs = q.toString();
+    const url = `${resolvedApiBase()}/api/admin/corporate-credits/${qs ? `?${qs}` : ""}`;
+    const res = await fetch(url, { headers: clerkAuthHeaders(token) });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail ?? `Error ${res.status}`);
+    }
+    return res.json();
+  },
+
+  async credit(
+    token: string,
+    payload: {
+      profile_id: number;
+      amount: number;
+      transfer_reference: string;
+      note?: string;
+    }
+  ): Promise<CorporateCreditPostResponse> {
+    const res = await fetch(`${resolvedApiBase()}/api/admin/corporate-credits/`, {
+      method: "POST",
+      headers: {
+        ...clerkAuthHeaders(token),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        profile_id: payload.profile_id,
+        amount: payload.amount,
+        transfer_reference: payload.transfer_reference,
+        note: payload.note ?? "",
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail ?? `Error ${res.status}`);
+    }
     return res.json();
   },
 };
@@ -2212,5 +3267,12 @@ export const propertyCancellationPolicies = {
       body: JSON.stringify(payload),
     });
     return res.json();
+  },
+
+  /** Desactiva la política de la propiedad; aplica de nuevo la lógica estándar (T&C §19). */
+  async clear(propertyId: number): Promise<void> {
+    await authFetch(`/api/admin/properties/${propertyId}/cancellation-policy/`, {
+      method: "DELETE",
+    });
   },
 };

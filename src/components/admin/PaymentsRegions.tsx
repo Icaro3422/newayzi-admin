@@ -29,17 +29,27 @@ export function PaymentsRegions() {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [regionMethods, setRegionMethods] = useState<Record<string, Record<number, boolean>>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [toggling, setToggling] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoadError(null);
     Promise.all([
       adminApi.getRegions(),
       adminApi.getPaymentMethods(),
-    ]).then(([regs, meths]) => {
-      setRegions(regs ?? []);
-      setMethods(meths ?? []);
-      setLoading(false);
-    });
+    ])
+      .then(([regs, meths]) => {
+        setRegions(regs ?? []);
+        setMethods(meths ?? []);
+      })
+      .catch((e) => {
+        setLoadError(e instanceof Error ? e.message : "No se pudo cargar la configuración");
+        setRegions([]);
+        setMethods([]);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -87,15 +97,25 @@ export function PaymentsRegions() {
     );
   }
 
+  if (loadError) {
+    return (
+      <GlassCard className="flex flex-col items-center justify-center py-16 text-center">
+        <p className="font-sora font-bold text-red-300 text-base">Error al cargar</p>
+        <p className="mt-2 text-sm text-white/50 max-w-md">{loadError}</p>
+      </GlassCard>
+    );
+  }
+
   if (regions.length === 0 || methods.length === 0) {
     return (
       <GlassCard className="flex flex-col items-center justify-center py-16 text-center">
         <div className="w-14 h-14 rounded-2xl bg-[#5e2cec]/20 border border-[#5e2cec]/30 flex items-center justify-center mb-4">
           <Icon icon="solar:card-recive-bold-duotone" className="text-[#9b74ff] text-2xl" />
         </div>
-        <p className="font-sora font-bold text-white text-base">No hay regiones o métodos de pago configurados</p>
+        <p className="font-sora font-bold text-white text-base">No hay regiones o métodos de pago</p>
         <p className="mt-2 text-sm text-white/50 max-w-md">
-          Crea los modelos Region, PaymentMethod y RegionPaymentMethod en el backend.
+          Ejecuta las migraciones del backend (<code className="text-white/70">payments</code>) o crea regiones y
+          pasarelas desde el admin de Django.
         </p>
       </GlassCard>
     );

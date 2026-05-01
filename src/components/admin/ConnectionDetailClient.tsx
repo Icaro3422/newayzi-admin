@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button, Switch, Input, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Popover, PopoverTrigger, PopoverContent } from "@heroui/react";
+import { Button, Switch, Input, Textarea, Spinner, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Popover, PopoverTrigger, PopoverContent } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useParams } from "next/navigation";
 import {
   adminApi,
+  PmsDeleteBlockedError,
   type PMSConnectionDetail,
+  type PMSConnectionDeleteBlockersInfo,
   type UnitsSummary,
   type ConnectionSyncNowResponse,
   type ConnectionSyncStreamEvent,
@@ -40,6 +42,18 @@ function emptySyncCounters(): Record<SyncPhaseKey, PhaseCounter> {
   };
 }
 
+function bookingStatusLabel(status: string): string {
+  const m: Record<string, string> = {
+    confirmed: "Confirmada",
+    pending: "Pendiente",
+    cancelled: "Cancelada",
+    completed: "Completada",
+    checked_in: "Check-in",
+    checked_out: "Check-out",
+  };
+  return m[status] ?? status;
+}
+
 function phaseLabel(phase?: string): string {
   if (phase === "properties") return "Propiedades";
   if (phase === "room_types") return "Tipos de habitación";
@@ -55,6 +69,7 @@ function formatSyncEvent(evt: ConnectionSyncStreamEvent): string {
   if (evt.event === "sync_completed") return "Sincronización completada.";
   if (evt.event === "sync_finished") return "Sincronización finalizada.";
   if (evt.event === "sync_error") return `Error: ${evt.detail || "No se pudo completar."}`;
+  if (evt.event === "sync_skipped") return evt.detail ? String(evt.detail) : "Sincronización omitida.";
   if (evt.event === "item_progress") {
     if (evt.status === "init") return `${phaseLabel(evt.phase)}: ${evt.total ?? "?"} elementos a procesar`;
     const item = evt.item ?? {};
@@ -104,6 +119,9 @@ export function ConnectionDetailClient() {
   const { canEditConnections, canSyncConnection } = useAdmin();
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteBlockers, setDeleteBlockers] = useState<PMSConnectionDeleteBlockersInfo | null>(null);
+  const [deleteBlockersLoading, setDeleteBlockersLoading] = useState(false);
+  const [deleteBlockersError, setDeleteBlockersError] = useState<string | null>(null);
   const [connection, setConnection] = useState<PMSConnectionDetail | null>(null);
   const [unitsSummary, setUnitsSummary] = useState<UnitsSummary | null>(null);
   const [lastSyncSummary, setLastSyncSummary] = useState<LastSyncSummaryResponse | null>(null);
@@ -132,6 +150,20 @@ export function ConnectionDetailClient() {
   const [configToken, setConfigToken] = useState("");
   const [configKunasUser, setConfigKunasUser] = useState("");
   const [configKunasPwd, setConfigKunasPwd] = useState("");
+  const [configSmBaseUrl, setConfigSmBaseUrl] = useState("");
+  const [configSmEmail, setConfigSmEmail] = useState("");
+  const [configSmPwd, setConfigSmPwd] = useState("");
+  const [configSmInventoryUrl, setConfigSmInventoryUrl] = useState("");
+  const [configSmGraphqlPath, setConfigSmGraphqlPath] = useState("");
+  const [configSmGraphqlQuery, setConfigSmGraphqlQuery] = useState("");
+  const [configSmGraphqlVariables, setConfigSmGraphqlVariables] = useState("");
+  const [configSmPropertiesListPath, setConfigSmPropertiesListPath] = useState("");
+  const [configRgBaseUrl, setConfigRgBaseUrl] = useState("");
+  const [configRgApiKey, setConfigRgApiKey] = useState("");
+  const [configRgApiSecret, setConfigRgApiSecret] = useState("");
+  const [configRgPropertyIds, setConfigRgPropertyIds] = useState("");
+  const [configRgMaxDays, setConfigRgMaxDays] = useState("");
+  const [testingRategain, setTestingRategain] = useState(false);
   const [syncRuns, setSyncRuns] = useState<PMSSyncRunStatus[]>([]);
   const [loadingSyncRuns, setLoadingSyncRuns] = useState(false);
   const [runDetailModalOpen, setRunDetailModalOpen] = useState(false);
@@ -177,6 +209,31 @@ export function ConnectionDetailClient() {
       });
     return () => { cancelled = true; };
   }, [id]);
+
+  useEffect(() => {
+    if (!deleteModalOpen || Number.isNaN(id) || id <= 0) return;
+    let cancelled = false;
+    setDeleteBlockersLoading(true);
+    setDeleteBlockersError(null);
+    setDeleteBlockers(null);
+    adminApi
+      .getConnectionDeleteBlockers(id)
+      .then((info) => {
+        if (!cancelled) setDeleteBlockers(info);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setDeleteBlockers(null);
+          setDeleteBlockersError(err instanceof Error ? err.message : "No se pudo comprobar el estado.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDeleteBlockersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [deleteModalOpen, id]);
 
   useEffect(() => {
     if (Number.isNaN(id) || id <= 0) return;
@@ -230,6 +287,38 @@ export function ConnectionDetailClient() {
       setConfigToken(cfg.token ?? "");
       setConfigKunasUser(cfg.username ?? cfg.user ?? "");
     }
+    if (connection.pms_type === "siteminder_dashboard") {
+      setConfigSmBaseUrl(cfg.base_url ?? "");
+      setConfigSmEmail(cfg.email ?? "");
+      setConfigSmInventoryUrl(cfg.inventory_url ?? "");
+      setConfigSmGraphqlPath(cfg.graphql_path ?? "");
+      setConfigSmGraphqlQuery(cfg.graphql_query ?? "");
+      setConfigSmPropertiesListPath(cfg.properties_list_path ?? "");
+      const gv = cfg.graphql_variables as unknown;
+      if (gv && typeof gv === "object") {
+        setConfigSmGraphqlVariables(JSON.stringify(gv, null, 2));
+      } else if (typeof gv === "string") {
+        setConfigSmGraphqlVariables(gv);
+      } else {
+        setConfigSmGraphqlVariables("");
+      }
+    }
+    if (connection.pms_type === "rategain") {
+      const c = connection.config as Record<string, unknown>;
+      setConfigRgBaseUrl(String(c.base_url ?? ""));
+      setConfigRgApiKey(String(c.api_key ?? c.apiKey ?? ""));
+      setConfigRgApiSecret("");
+      const rawIds = c.property_ids;
+      if (Array.isArray(rawIds)) {
+        setConfigRgPropertyIds(JSON.stringify(rawIds));
+      } else if (c.property_id != null && String(c.property_id).trim()) {
+        setConfigRgPropertyIds(JSON.stringify([String(c.property_id).trim()]));
+      } else {
+        setConfigRgPropertyIds("");
+      }
+      const md = c.max_availability_days;
+      setConfigRgMaxDays(md != null && md !== "" ? String(md) : "");
+    }
   }, [connection?.id, connection?.config, connection?.pms_type]);
 
   function resetSyncRealtimeState() {
@@ -252,6 +341,9 @@ export function ConnectionDetailClient() {
     }
     if (evt.event === "sync_error") {
       setRunDetailPhase("Sincronización finalizada con error.");
+    }
+    if (evt.event === "sync_skipped") {
+      setRunDetailPhase("Omitido.");
     }
     const phase = evt.phase as SyncPhaseKey | undefined;
     if (phase) {
@@ -410,6 +502,9 @@ export function ConnectionDetailClient() {
     }
     if (evt.event === "sync_error") {
       setSyncCurrentPhase("Sincronización finalizada con error.");
+    }
+    if (evt.event === "sync_skipped") {
+      setSyncCurrentPhase("Omitido.");
     }
 
     if (!evt.phase) return;
@@ -622,9 +717,12 @@ export function ConnectionDetailClient() {
       }
 
       if (syncResult.status === "ok") {
+        const pricingNote = pricingUnavailable
+          ? " Parte de los precios del PMS no respondió en esta corrida; disponibilidad y catálogo quedaron actualizados."
+          : "";
         addToast({
           title: "Sincronización exitosa",
-          description: `Sincronizados: ${synced}. Duración: ${Math.round(summary?.duration_seconds ?? 0)}s.`,
+          description: `Sincronizados: ${synced}. Duración: ${Math.round(summary?.duration_seconds ?? 0)}s.${pricingNote}`,
           color: "success",
         });
       } else if (syncResult.status === "partial") {
@@ -709,8 +807,139 @@ export function ConnectionDetailClient() {
     } finally { setSavingConfig(false); }
   }
 
+  async function saveSiteMinderConfig() {
+    if (!connection || !canEditConnections || connection.pms_type !== "siteminder_dashboard") return;
+    const prev = { ...(connection.config as Record<string, unknown>) };
+    delete prev.password;
+    const newConfig: Record<string, unknown> = {
+      ...prev,
+      base_url: configSmBaseUrl.trim(),
+      email: configSmEmail.trim(),
+      inventory_url: configSmInventoryUrl.trim(),
+    };
+    if (configSmGraphqlQuery.trim()) {
+      newConfig.graphql_query = configSmGraphqlQuery.trim();
+    } else {
+      delete newConfig.graphql_query;
+    }
+    if (configSmGraphqlPath.trim()) {
+      newConfig.graphql_path = configSmGraphqlPath.trim();
+    } else {
+      delete newConfig.graphql_path;
+    }
+    if (configSmPropertiesListPath.trim()) {
+      newConfig.properties_list_path = configSmPropertiesListPath.trim();
+    } else {
+      delete newConfig.properties_list_path;
+    }
+    const gvRaw = configSmGraphqlVariables.trim();
+    if (gvRaw) {
+      try {
+        newConfig.graphql_variables = JSON.parse(gvRaw) as Record<string, unknown>;
+      } catch {
+        addToast({
+          title: "Variables GraphQL inválidas",
+          description: "Debe ser JSON válido u estar vacío.",
+          color: "danger",
+        });
+        return;
+      }
+    } else {
+      delete newConfig.graphql_variables;
+    }
+    if (configSmPwd) newConfig.password = configSmPwd;
+    setSavingConfig(true);
+    try {
+      const updated = await adminApi.patchConnection(id, { config: newConfig });
+      setConnection(updated);
+      setEditingConfig(false);
+      setConfigSmPwd("");
+    } finally { setSavingConfig(false); }
+  }
+
+  async function saveRategainConfig() {
+    if (!connection || !canEditConnections || connection.pms_type !== "rategain") return;
+    const prev = { ...(connection.config as Record<string, unknown>) };
+    delete prev.api_key;
+    delete prev.apiKey;
+    delete prev.api_secret;
+    delete prev.apiSecret;
+    let propertyIds: string[] = [];
+    const raw = configRgPropertyIds.trim();
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        if (Array.isArray(parsed)) {
+          propertyIds = parsed.map((x) => String(x).trim()).filter(Boolean);
+        }
+      } catch {
+        propertyIds = raw
+          .split(/[\s,]+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+    }
+    const newConfig: Record<string, unknown> = {
+      ...prev,
+      base_url: configRgBaseUrl.trim().replace(/\/+$/, ""),
+    };
+    if (propertyIds.length) {
+      newConfig.property_ids = propertyIds;
+    } else {
+      newConfig.property_ids = [];
+    }
+    delete newConfig.property_id;
+    delete newConfig.propertyID;
+    const ak = configRgApiKey.trim();
+    if (ak && ak !== "••••••••") {
+      newConfig.api_key = ak;
+    }
+    const sec = configRgApiSecret.trim();
+    if (sec) {
+      newConfig.api_secret = sec;
+    }
+    const md = configRgMaxDays.trim();
+    if (md) {
+      const n = parseInt(md, 10);
+      if (!Number.isNaN(n) && n > 0) newConfig.max_availability_days = n;
+    } else {
+      delete newConfig.max_availability_days;
+    }
+    setSavingConfig(true);
+    try {
+      const updated = await adminApi.patchConnection(id, { config: newConfig });
+      setConnection(updated);
+      setEditingConfig(false);
+      setConfigRgApiSecret("");
+    } finally {
+      setSavingConfig(false);
+    }
+  }
+
+  async function testRategainConnection() {
+    if (!connection || connection.pms_type !== "rategain") return;
+    setTestingRategain(true);
+    try {
+      const r = await adminApi.testPmsConnection(id);
+      addToast({
+        title: r.ok ? "Conexión OK" : "Conexión fallida",
+        description: r.detail || (r.ok ? "RateGain respondió correctamente." : "Revisa credenciales, SD-Domain o descubrimiento de propiedades."),
+        color: r.ok ? "success" : "danger",
+      });
+    } catch (e) {
+      addToast({
+        title: "Error al probar",
+        description: e instanceof Error ? e.message : "No se pudo completar la prueba.",
+        color: "danger",
+      });
+    } finally {
+      setTestingRategain(false);
+    }
+  }
+
   async function handleDeleteConnection() {
     if (!connection || !canSyncConnection) return;
+    if (deleteBlockers && !deleteBlockers.can_delete) return;
     setDeleting(true);
     try {
       await adminApi.deleteConnection(id);
@@ -719,8 +948,28 @@ export function ConnectionDetailClient() {
         description: "La conexión y las propiedades sincronizadas desde ella fueron eliminadas.",
         color: "success",
       });
+      setDeleteModalOpen(false);
       router.push("/admin/connections");
     } catch (e) {
+      if (e instanceof PmsDeleteBlockedError) {
+        setDeleteBlockers((prev) => ({
+          can_delete: false,
+          affected_property_count: prev?.affected_property_count ?? 0,
+          booking_count: e.payload.booking_count,
+          bookings: e.payload.bookings,
+          has_more_bookings: e.payload.has_more_bookings,
+          bookings_preview_limit: e.payload.bookings_preview_limit,
+          code: e.payload.code,
+          detail: e.payload.detail,
+        }));
+        addToast({
+          title: "Aún hay reservas que bloquean el borrado",
+          description:
+            "El estado cambió desde la última comprobación. Resuélvelas en Reservas y vuelve a intentar.",
+          color: "warning",
+        });
+        return;
+      }
       addToast({
         title: "Error al eliminar",
         description: e instanceof Error ? e.message : "No se pudo eliminar la conexión.",
@@ -728,7 +977,6 @@ export function ConnectionDetailClient() {
       });
     } finally {
       setDeleting(false);
-      setDeleteModalOpen(false);
     }
   }
 
@@ -827,6 +1075,10 @@ export function ConnectionDetailClient() {
                   </>
                 )}
               </div>
+              <p className="text-white/45 text-xs mt-2 max-w-xl leading-relaxed">
+                Flujo estándar: credenciales de tu PMS → <strong className="text-white/55 font-semibold">Sincronizar ahora</strong> para
+                importar propiedades, habitaciones, disponibilidad y tarifas (igual que Kunas o Stays).
+              </p>
             </div>
           </div>
 
@@ -941,20 +1193,116 @@ export function ConnectionDetailClient() {
           </div>
         </div>
 
-        <Modal isOpen={deleteModalOpen} onOpenChange={setDeleteModalOpen}>
-          <ModalContent className="bg-[#0f1220] border border-white/[0.1]">
+        <Modal
+          isOpen={deleteModalOpen}
+          onOpenChange={(open) => {
+            setDeleteModalOpen(open);
+            if (!open) {
+              setDeleteBlockers(null);
+              setDeleteBlockersError(null);
+            }
+          }}
+          size="2xl"
+          scrollBehavior="inside"
+        >
+          <ModalContent className="bg-[#0f1220] border border-white/[0.1] max-h-[85vh]">
             <ModalHeader className="text-white font-sora">Eliminar conexión</ModalHeader>
-            <ModalBody>
-              <p className="text-white/70 text-sm">
-                Se eliminará la conexión <strong className="text-white">{connection?.name || connection?.pms_type}</strong> y
-                todas las propiedades sincronizadas desde ella. Esta acción no se puede deshacer.
-              </p>
+            <ModalBody className="gap-4">
+              {deleteBlockersLoading && (
+                <div className="flex justify-center py-8">
+                  <Spinner color="secondary" />
+                </div>
+              )}
+              {deleteBlockersError && !deleteBlockersLoading && (
+                <p className="text-amber-300/90 text-sm">{deleteBlockersError}</p>
+              )}
+              {!deleteBlockersLoading && !deleteBlockersError && deleteBlockers && !deleteBlockers.can_delete && (
+                <>
+                  <div className="rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
+                    <p className="font-medium text-amber-200 mb-1">Resolución manual requerida</p>
+                    <p className="text-white/75 leading-relaxed">{deleteBlockers.detail}</p>
+                    <p className="mt-2 text-white/55 text-xs">
+                      Total: {deleteBlockers.booking_count} reserva{deleteBlockers.booking_count === 1 ? "" : "s"}
+                      {deleteBlockers.has_more_bookings
+                        ? ` (mostrando hasta ${deleteBlockers.bookings_preview_limit})`
+                        : ""}
+                      .
+                    </p>
+                  </div>
+                  {deleteBlockers.bookings.length > 0 && (
+                    <div className="overflow-x-auto rounded-xl border border-white/[0.08]">
+                      <table className="w-full text-left text-xs text-white/80">
+                        <thead className="bg-white/[0.06] text-white/50 uppercase tracking-wide">
+                          <tr>
+                            <th className="px-3 py-2 font-medium">Ref.</th>
+                            <th className="px-3 py-2 font-medium">Estado</th>
+                            <th className="px-3 py-2 font-medium">Propiedad</th>
+                            <th className="px-3 py-2 font-medium">Entrada</th>
+                            <th className="px-3 py-2 font-medium">Salida</th>
+                            <th className="px-3 py-2 font-medium w-24" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {deleteBlockers.bookings.map((b) => (
+                            <tr key={b.id} className="border-t border-white/[0.06] hover:bg-white/[0.03]">
+                              <td className="px-3 py-2 font-mono text-white/90">{b.reference}</td>
+                              <td className="px-3 py-2">{bookingStatusLabel(b.status)}</td>
+                              <td className="px-3 py-2 max-w-[200px] truncate" title={b.property_name}>
+                                {b.property_name}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                {new Date(b.check_in).toLocaleDateString("es")}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                {new Date(b.check_out).toLocaleDateString("es")}
+                              </td>
+                              <td className="px-3 py-2">
+                                <Button
+                                  as={Link}
+                                  href={`/admin/bookings/${b.id}`}
+                                  size="sm"
+                                  variant="flat"
+                                  className="!text-violet-300 min-w-0 h-7 text-xs"
+                                >
+                                  Abrir
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+              {!deleteBlockersLoading && !deleteBlockersError && deleteBlockers?.can_delete && (
+                <p className="text-white/70 text-sm">
+                  Se eliminará la conexión{" "}
+                  <strong className="text-white">{connection?.name || connection?.pms_type}</strong> y todas las
+                  propiedades sincronizadas desde ella. No quedan reservas no canceladas en catálogo que bloqueen el
+                  borrado. Esta acción no se puede deshacer.
+                </p>
+              )}
             </ModalBody>
             <ModalFooter>
-              <Button variant="flat" onPress={() => setDeleteModalOpen(false)} className="!text-white/70">
-                Cancelar
+              <Button
+                variant="flat"
+                onPress={() => setDeleteModalOpen(false)}
+                className="!text-white/70"
+              >
+                {deleteBlockers && !deleteBlockers.can_delete ? "Cerrar" : "Cancelar"}
               </Button>
-              <Button color="danger" onPress={handleDeleteConnection} isLoading={deleting}>
+              <Button
+                color="danger"
+                onPress={handleDeleteConnection}
+                isLoading={deleting}
+                isDisabled={
+                  deleteBlockersLoading ||
+                  !!deleteBlockersError ||
+                  !deleteBlockers ||
+                  !deleteBlockers.can_delete
+                }
+              >
                 Eliminar
               </Button>
             </ModalFooter>
@@ -1827,6 +2175,296 @@ export function ConnectionDetailClient() {
               <div className="text-sm text-white/40 space-y-1">
                 <p>Token: <span className="text-white/70">{configToken ? "••••••••" : "—"}</span></p>
                 <p>Usuario: <span className="text-white/70">{configKunasUser || "—"}</span></p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {connection.pms_type === "siteminder_dashboard" && canEditConnections && (
+          <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:key-bold-duotone" width={17} className="text-[#b89eff]" />
+                <p className="text-sm font-semibold text-white/80">SiteMinder (dashboard)</p>
+              </div>
+              {!editingConfig ? (
+                <Button
+                  size="sm"
+                  variant="flat"
+                  onPress={() => setEditingConfig(true)}
+                  className="!text-white/70 bg-white/[0.07] border border-white/[0.12] hover:bg-white/[0.12]"
+                >
+                  Editar
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    className="!text-white/60 bg-white/[0.05] border border-white/[0.1]"
+                    onPress={() => {
+                      setEditingConfig(false);
+                      const cfg = (connection.config ?? {}) as Record<string, string>;
+                      setConfigSmBaseUrl(cfg.base_url ?? "");
+                      setConfigSmEmail(cfg.email ?? "");
+                      setConfigSmInventoryUrl(cfg.inventory_url ?? "");
+                      setConfigSmGraphqlPath(cfg.graphql_path ?? "");
+                      setConfigSmGraphqlQuery(cfg.graphql_query ?? "");
+                      setConfigSmPropertiesListPath(cfg.properties_list_path ?? "");
+                      const gv = cfg.graphql_variables as unknown;
+                      if (gv && typeof gv === "object") {
+                        setConfigSmGraphqlVariables(JSON.stringify(gv, null, 2));
+                      } else if (typeof gv === "string") {
+                        setConfigSmGraphqlVariables(gv);
+                      } else {
+                        setConfigSmGraphqlVariables("");
+                      }
+                      setConfigSmPwd("");
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="btn-newayzi-primary"
+                    onPress={saveSiteMinderConfig}
+                    isLoading={savingConfig}
+                    isDisabled={!configSmBaseUrl.trim() || !configSmEmail.trim()}
+                  >
+                    Guardar
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {editingConfig ? (
+              <div className="space-y-3">
+                <Input
+                  label="URL del dashboard"
+                  value={configSmBaseUrl}
+                  onValueChange={setConfigSmBaseUrl}
+                  placeholder="https://platform.siteminder.com"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Email"
+                  value={configSmEmail}
+                  onValueChange={setConfigSmEmail}
+                  placeholder="usuario@hotel.com"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Contraseña"
+                  type="password"
+                  value={configSmPwd}
+                  onValueChange={setConfigSmPwd}
+                  placeholder="Dejar vacío para mantener la actual"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="URL inventario GET (opcional, modo http_get)"
+                  value={configSmInventoryUrl}
+                  onValueChange={setConfigSmInventoryUrl}
+                  placeholder="/ruta GET que devuelve JSON"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Ruta GraphQL (opcional)"
+                  value={configSmGraphqlPath}
+                  onValueChange={setConfigSmGraphqlPath}
+                  placeholder="/api/cm-beef/graphql"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Textarea
+                  label="Query GraphQL (opcional)"
+                  value={configSmGraphqlQuery}
+                  onValueChange={setConfigSmGraphqlQuery}
+                  placeholder="Pega la query desde DevTools → Payload"
+                  minRows={5}
+                  classNames={{
+                    inputWrapper: `${inputDark} border-white/[0.12]`,
+                    input: "!text-white/95 placeholder:!text-white/30 min-h-[120px]",
+                    label: "!text-white/60",
+                  }}
+                />
+                <Textarea
+                  label="Variables GraphQL JSON (opcional)"
+                  value={configSmGraphqlVariables}
+                  onValueChange={setConfigSmGraphqlVariables}
+                  placeholder='{}'
+                  minRows={3}
+                  classNames={{
+                    inputWrapper: `${inputDark} border-white/[0.12]`,
+                    input: "!text-white/95 placeholder:!text-white/30 font-mono text-xs",
+                    label: "!text-white/60",
+                  }}
+                />
+                <Input
+                  label="Ruta lista en respuesta (properties_list_path)"
+                  value={configSmPropertiesListPath}
+                  onValueChange={setConfigSmPropertiesListPath}
+                  placeholder="ej. data.misPropiedades"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+              </div>
+            ) : (
+              <div className="text-sm text-white/40 space-y-1">
+                <p>Dashboard: <span className="text-white/70">{configSmBaseUrl || "—"}</span></p>
+                <p>Email: <span className="text-white/70">{configSmEmail || "—"}</span></p>
+                <p>Contraseña: <span className="text-white/50 tracking-widest">••••••••</span></p>
+                <p>Inventario GET: <span className="text-white/70">{configSmInventoryUrl || "—"}</span></p>
+                <p>GraphQL path: <span className="text-white/70">{configSmGraphqlPath || "—"}</span></p>
+                <p>Lista (path): <span className="text-white/70">{configSmPropertiesListPath || "—"}</span></p>
+                <p>Query GraphQL: <span className="text-white/70">{configSmGraphqlQuery ? `${configSmGraphqlQuery.slice(0, 80)}…` : "—"}</span></p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {connection.pms_type === "rategain" && canEditConnections && (
+          <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:graph-up-bold-duotone" width={17} className="text-[#b89eff]" />
+                <p className="text-sm font-semibold text-white/80">RateGain Smart Distribution</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="flat"
+                  className="!text-white/70 bg-white/[0.07] border border-white/[0.12] hover:bg-white/[0.12]"
+                  onPress={testRategainConnection}
+                  isLoading={testingRategain}
+                  isDisabled={!configRgBaseUrl.trim() || testingRategain}
+                >
+                  Probar conexión
+                </Button>
+                {!editingConfig ? (
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    onPress={() => setEditingConfig(true)}
+                    className="!text-white/70 bg-white/[0.07] border border-white/[0.12] hover:bg-white/[0.12]"
+                  >
+                    Editar
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      className="!text-white/60 bg-white/[0.05] border border-white/[0.1]"
+                      onPress={() => {
+                        setEditingConfig(false);
+                        const c = (connection.config ?? {}) as Record<string, unknown>;
+                        setConfigRgBaseUrl(String(c.base_url ?? ""));
+                        setConfigRgApiKey(String(c.api_key ?? c.apiKey ?? ""));
+                        setConfigRgApiSecret("");
+                        const rawIds = c.property_ids;
+                        if (Array.isArray(rawIds)) {
+                          setConfigRgPropertyIds(JSON.stringify(rawIds));
+                        } else if (c.property_id != null && String(c.property_id).trim()) {
+                          setConfigRgPropertyIds(JSON.stringify([String(c.property_id).trim()]));
+                        } else {
+                          setConfigRgPropertyIds("");
+                        }
+                        const mdx = c.max_availability_days;
+                        setConfigRgMaxDays(mdx != null && mdx !== "" ? String(mdx) : "");
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="btn-newayzi-primary"
+                      onPress={saveRategainConfig}
+                      isLoading={savingConfig}
+                      isDisabled={!configRgBaseUrl.trim()}
+                    >
+                      Guardar
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {editingConfig ? (
+              <div className="space-y-3">
+                <Input
+                  label="SD-Domain (base URL)"
+                  value={configRgBaseUrl}
+                  onValueChange={setConfigRgBaseUrl}
+                  placeholder="https://partner.ejemplo.com"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Api Key"
+                  type="password"
+                  value={configRgApiKey}
+                  onValueChange={setConfigRgApiKey}
+                  placeholder="Dejar enmascarado para no cambiar"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Api Secret"
+                  type="password"
+                  value={configRgApiSecret}
+                  onValueChange={setConfigRgApiSecret}
+                  placeholder="Dejar vacío para mantener el actual"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Textarea
+                  label="Property IDs (opcional; vacío = todas vía API)"
+                  value={configRgPropertyIds}
+                  onValueChange={setConfigRgPropertyIds}
+                  placeholder="Vacío = descubrir todas (getDestinations + bestproperties)"
+                  minRows={3}
+                  classNames={{
+                    inputWrapper: `${inputDark} border-white/[0.12]`,
+                    input: "!text-white/95 placeholder:!text-white/30 font-mono text-xs",
+                    label: "!text-white/60",
+                  }}
+                />
+                <Input
+                  label="Máx. días disponibilidad (opcional)"
+                  value={configRgMaxDays}
+                  onValueChange={setConfigRgMaxDays}
+                  placeholder="62"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+              </div>
+            ) : (
+              <div className="text-sm text-white/40 space-y-1">
+                <p>
+                  Base URL: <span className="text-white/70">{configRgBaseUrl || "—"}</span>
+                </p>
+                <p>
+                  Api Key: <span className="text-white/70">{configRgApiKey ? "••••••••" : "—"}</span>
+                </p>
+                <p>
+                  Api Secret: <span className="text-white/50 tracking-widest">••••••••</span>
+                </p>
+                <p>
+                  Property IDs:{" "}
+                  <span className="text-white/70 font-mono text-xs">
+                    {configRgPropertyIds.trim()
+                      ? configRgPropertyIds
+                      : "Automático (todas las detectadas en RateGain SD)"}
+                  </span>
+                </p>
+                <p>
+                  Máx. días ARI: <span className="text-white/70">{configRgMaxDays || "predeterminado (62)"}</span>
+                </p>
               </div>
             )}
           </div>

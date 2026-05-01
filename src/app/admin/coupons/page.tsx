@@ -28,6 +28,9 @@ const EMPTY_FORM = {
   max_uses_per_user: "1",
   valid_from: new Date().toISOString().split("T")[0],
   valid_until: "",
+  /** ID numérico en catálogo admin; vacío = sin restricción */
+  applies_to_property_id: "",
+  applies_to_operator_id: "",
 };
 
 export default function AdminCouponsPage() {
@@ -115,6 +118,28 @@ export default function AdminCouponsPage() {
       setFormLoading(false);
       return;
     }
+    const propId = form.applies_to_property_id.trim();
+    const opId = form.applies_to_operator_id.trim();
+    let appliesProperty: number | null = null;
+    let appliesOperator: number | null = null;
+    if (propId) {
+      const n = parseInt(propId, 10);
+      if (Number.isNaN(n) || n < 1) {
+        setFormError("ID de propiedad inválido.");
+        setFormLoading(false);
+        return;
+      }
+      appliesProperty = n;
+    }
+    if (opId) {
+      const n = parseInt(opId, 10);
+      if (Number.isNaN(n) || n < 1) {
+        setFormError("ID de operador inválido.");
+        setFormLoading(false);
+        return;
+      }
+      appliesOperator = n;
+    }
 
     try {
       await couponsApi.create({
@@ -124,10 +149,12 @@ export default function AdminCouponsPage() {
         discount_value: form.discount_value || "0",
         max_discount_amount: form.max_discount_amount ? form.max_discount_amount : null,
         min_booking_amount: form.min_booking_amount || "0",
-        max_uses: form.max_uses ? parseInt(form.max_uses) : null,
-        max_uses_per_user: parseInt(form.max_uses_per_user) || 1,
+        max_uses: form.max_uses ? parseInt(form.max_uses, 10) : null,
+        max_uses_per_user: parseInt(form.max_uses_per_user, 10) || 1,
         valid_from: form.valid_from,
         valid_until: form.valid_until || null,
+        applies_to_property_id: appliesProperty,
+        applies_to_operator_id: appliesOperator,
       });
       setShowForm(false);
       setForm(EMPTY_FORM);
@@ -162,7 +189,7 @@ export default function AdminCouponsPage() {
     <div className="space-y-6">
       <AdminPageHeader
         title="Cupones y promociones"
-        subtitle="Crea y gestiona códigos de descuento para reservas en la plataforma."
+subtitle="El tope global cuenta reservas activas (pendiente de pago + confirmadas). El contador de la BD debe coincidir con los pagos registrados; la tabla muestra ambos y avisos si hay desfase."
       >
         <button
           onClick={() => setShowForm(true)}
@@ -272,6 +299,34 @@ export default function AdminCouponsPage() {
                 className="w-full bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-sm text-white focus:outline-none"
               />
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-white/60 mb-1">
+                ID propiedad (opcional)
+                <span className="text-white/30 normal-case font-normal"> — solo ese alojamiento</span>
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={form.applies_to_property_id}
+                onChange={(e) => setForm((f) => ({ ...f, applies_to_property_id: e.target.value }))}
+                placeholder="Vacío = todas"
+                className="w-full bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-white/60 mb-1">
+                ID operador (opcional)
+                <span className="text-white/30 normal-case font-normal"> — propiedades de ese operador</span>
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={form.applies_to_operator_id}
+                onChange={(e) => setForm((f) => ({ ...f, applies_to_operator_id: e.target.value }))}
+                placeholder="Vacío = todos"
+                className="w-full bg-white/5 border border-white/15 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none"
+              />
+            </div>
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-white/60 mb-1">Descripción</label>
               <input
@@ -338,7 +393,10 @@ export default function AdminCouponsPage() {
               <tr className="border-b border-white/10 bg-white/5">
                 <th className="text-left px-4 py-3 text-white/60 font-semibold text-xs uppercase tracking-wide">Código</th>
                 <th className="text-left px-4 py-3 text-white/60 font-semibold text-xs uppercase tracking-wide">Descuento</th>
-                <th className="text-left px-4 py-3 text-white/60 font-semibold text-xs uppercase tracking-wide">Usos</th>
+                <th className="text-left px-4 py-3 text-white/60 font-semibold text-xs uppercase tracking-wide">
+                  Cupos / límite
+                </th>
+                <th className="text-left px-4 py-3 text-white/60 font-semibold text-xs uppercase tracking-wide">Restricción</th>
                 <th className="text-left px-4 py-3 text-white/60 font-semibold text-xs uppercase tracking-wide">Vigencia</th>
                 <th className="text-left px-4 py-3 text-white/60 font-semibold text-xs uppercase tracking-wide">Estado</th>
                 <th className="text-center px-4 py-3 text-white/60 font-semibold text-xs uppercase tracking-wide">Acciones</th>
@@ -346,7 +404,7 @@ export default function AdminCouponsPage() {
             </thead>
             <tbody className="divide-y divide-white/5">
               {coupons.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-12 text-white/40">No se encontraron cupones</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-white/40">No se encontraron cupones</td></tr>
               ) : coupons.map((c) => (
                 <tr key={c.id} className="hover:bg-white/5 transition-colors">
                   <td className="px-4 py-3">
@@ -355,11 +413,51 @@ export default function AdminCouponsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span className="font-bold text-white">
-                      {c.discount_type === "percentage" ? `${c.discount_value}%` : `$${parseInt(c.discount_value).toLocaleString()}`}
+                      {c.discount_type === "percentage"
+                        ? `${c.discount_value}%`
+                        : `$${Number(c.discount_value).toLocaleString("es-CO")}`}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-white/70">
-                    {c.times_used} / {c.max_uses ?? "∞"}
+                  <td className="px-4 py-3 text-white/70 text-xs leading-relaxed max-w-[200px]">
+                    <div className="font-semibold text-white">
+                      {c.active_reservations_with_coupon ?? 0} reservas activas
+                      {c.max_uses != null ? (
+                        <span className="text-white/50 font-normal">
+                          {" "}
+                          · {c.max_uses_remaining ?? 0} libres / {c.max_uses} tope
+                        </span>
+                      ) : (
+                        <span className="text-white/40 font-normal"> · sin tope global</span>
+                      )}
+                    </div>
+                    <div className="text-white/45 mt-1">
+                      Pagos registrados: {c.coupon_usage_records_count ?? 0} · contador BD:{" "}
+                      {c.times_used}
+                    </div>
+                    {c.ledger_counter_in_sync === false && (
+                      <div className="mt-1 text-amber-400/95 text-[11px] font-semibold">
+                        Aviso: contador ≠ registros de pago (revisar consistencia)
+                      </div>
+                    )}
+                    {c.at_global_use_limit && (
+                      <div className="mt-1 text-red-400/90 text-[11px] font-semibold">
+                        Límite global alcanzado (nuevas reservas bloqueadas)
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-white/50 max-w-[160px]">
+                    {c.applies_to_property_id != null || c.applies_to_operator_id != null ? (
+                      <div className="space-y-0.5">
+                        {c.applies_to_property_id != null && (
+                          <div>Prop. #{c.applies_to_property_id}</div>
+                        )}
+                        {c.applies_to_operator_id != null && (
+                          <div>Op. #{c.applies_to_operator_id}</div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-white/30">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-xs text-white/60">
                     <div>{new Date(c.valid_from).toLocaleDateString("es-CO")}</div>
