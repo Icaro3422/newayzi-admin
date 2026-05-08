@@ -105,6 +105,7 @@ function getWsBaseCandidates(): string[] {
 }
 
 export type AdminRole = "super_admin" | "visualizador" | "comercial" | "operador" | "agente" | "user";
+export type SupportedLocale = "es" | "en";
 
 export interface AdminLoyalty {
   level: string;
@@ -2236,6 +2237,7 @@ export const adminApi = {
     operator_id?: number | null;
     password: string;
     send_invite_email?: boolean;
+    invite_locale?: SupportedLocale;
     initial_level?: string;
     initial_points?: number;
   }): Promise<AdminUserListItem & { email_sent?: boolean }> {

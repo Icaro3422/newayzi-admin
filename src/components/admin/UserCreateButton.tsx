@@ -13,7 +13,7 @@ import {
   SelectItem,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { adminApi, type AdminRole, LEVEL_OPTIONS, type LoyaltyLevelValue } from "@/lib/admin-api";
+import { adminApi, type AdminRole, LEVEL_OPTIONS, type LoyaltyLevelValue, type SupportedLocale } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
 
 const ROLES: { value: AdminRole; label: string; description?: string }[] = [
@@ -40,6 +40,7 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
   const [initial_level, setInitialLevel] = useState<LoyaltyLevelValue>("member");
   const [initial_points, setInitialPoints] = useState<string>("");
   const [send_invite_email, setSendInviteEmail] = useState(true);
+  const [invite_locale, setInviteLocale] = useState<SupportedLocale>("es");
   const [emailSent, setEmailSent] = useState<boolean | null>(null);
   const [operators, setOperators] = useState<{ id: number; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
@@ -75,6 +76,7 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
         operator_id: operator_id ? parseInt(operator_id, 10) : undefined,
         password,
         send_invite_email: role === "user" ? send_invite_email : false,
+        invite_locale: role === "user" ? invite_locale : undefined,
         initial_level,
         initial_points: initial_points ? parseFloat(initial_points) : 0,
       });
@@ -86,6 +88,7 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
       setOperatorId("");
       setPassword("");
       setSendInviteEmail(true);
+      setInviteLocale("es");
       setInitialLevel("member");
       setInitialPoints("");
       setEmailSent(result.email_sent ?? null);
@@ -207,6 +210,32 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
                     Este usuario <strong className="text-slate-200">no tendrá acceso al portal admin</strong>. Podrá iniciar sesión únicamente en el frontend (newayzi.com). Se le pedirá cambiar la contraseña en su primer acceso.
                   </p>
                 </div>
+                <Select
+                  label="Idioma del email"
+                  selectedKeys={[invite_locale]}
+                  onSelectionChange={(s) => {
+                    const v = Array.from(s)[0] as SupportedLocale;
+                    if (v === "es" || v === "en") setInviteLocale(v);
+                  }}
+                  size="sm"
+                  items={[
+                    { value: "es" as const, label: "Español" },
+                    { value: "en" as const, label: "Inglés" },
+                  ]}
+                  classNames={{
+                    trigger: inputDark,
+                    value: "!text-white/92",
+                    label: "!text-white/70",
+                    selectorIcon: "!text-white/50",
+                    popoverContent: "bg-[#0f1220] border border-white/[0.1]",
+                  }}
+                >
+                  {(item) => (
+                    <SelectItem key={item.value} className="text-white">
+                      {item.label}
+                    </SelectItem>
+                  )}
+                </Select>
                 <button
                   type="button"
                   onClick={() => setSendInviteEmail(!send_invite_email)}
