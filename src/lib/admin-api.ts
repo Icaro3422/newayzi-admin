@@ -104,7 +104,7 @@ function getWsBaseCandidates(): string[] {
   return out;
 }
 
-export type AdminRole = "super_admin" | "visualizador" | "comercial" | "operador" | "agente";
+export type AdminRole = "super_admin" | "visualizador" | "comercial" | "operador" | "agente" | "user";
 
 export interface AdminLoyalty {
   level: string;
@@ -2235,10 +2235,11 @@ export const adminApi = {
     role: AdminRole;
     operator_id?: number | null;
     password: string;
+    send_invite_email?: boolean;
     initial_level?: string;
     initial_points?: number;
-  }): Promise<AdminUserListItem> {
-    return postJson<AdminUserListItem>("/api/admin/users/create/", data);
+  }): Promise<AdminUserListItem & { email_sent?: boolean }> {
+    return postJson<AdminUserListItem & { email_sent?: boolean }>("/api/admin/users/create/", data);
   },
 
   async getAuditLogs(params?: { limit?: number }): Promise<{ results: unknown[] } | null> {
@@ -2765,6 +2766,7 @@ export const ROLE_META: Record<AdminRole, { label: string; icon: string; color: 
   visualizador: { label: "Visualizador", icon: "solar:eye-bold-duotone",             color: "#60a5fa", description: "Vista general — solo lectura" },
   operador:     { label: "Operador",     icon: "solar:buildings-2-bold-duotone",     color: "#a78bfa", description: "Gestión de tus propiedades" },
   agente:       { label: "Agente",       icon: "solar:bag-4-bold-duotone",           color: "#fb923c", description: "Disponibilidad y reservas" },
+  user:         { label: "Usuario",      icon: "solar:user-bold-duotone",            color: "#94a3b8", description: "Acceso al frontend solamente — sin permisos en el admin" },
 };
 
 /** Permisos de acceso a módulos */

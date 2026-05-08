@@ -20,6 +20,7 @@ const ROLE_LABELS: Record<AdminRole, string> = {
   comercial: "Comercial",
   operador: "Operador",
   agente: "Agente",
+  user: "Usuario",
 };
 
 const LOYALTY_LEVEL_LABELS: Record<string, string> = {
