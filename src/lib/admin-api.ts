@@ -2235,7 +2235,8 @@ export const adminApi = {
     last_name?: string;
     role: AdminRole;
     operator_id?: number | null;
-    password: string;
+    /** Requerido para roles admin. Para rol "user" se omite (flujo magic link). */
+    password?: string;
     send_invite_email?: boolean;
     invite_locale?: SupportedLocale;
     initial_level?: string;

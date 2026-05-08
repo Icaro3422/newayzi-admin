@@ -60,8 +60,10 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
   }
 
   async function handleCreate() {
-    if (!email.trim() || !password.trim() || !role) return;
-    if (password.length < 8) {
+    const isUserRole = role === "user";
+    if (!email.trim() || !role) return;
+    // Para roles admin la contraseña es requerida; para "user" se genera en el backend
+    if (!isUserRole && (!password.trim() || password.length < 8)) {
       setError("La contraseña debe tener al menos 8 caracteres.");
       return;
     }
@@ -74,9 +76,9 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
         last_name: last_name.trim() || undefined,
         role,
         operator_id: operator_id ? parseInt(operator_id, 10) : undefined,
-        password,
-        send_invite_email: role === "user" ? send_invite_email : false,
-        invite_locale: role === "user" ? invite_locale : undefined,
+        password: isUserRole ? undefined : password,
+        send_invite_email: isUserRole ? true : false,
+        invite_locale: isUserRole ? invite_locale : undefined,
         initial_level,
         initial_points: initial_points ? parseFloat(initial_points) : 0,
       });
@@ -101,10 +103,11 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
     }
   }
 
+  const isUserRole = role === "user";
   const canSubmit =
     email.trim().length > 0 &&
-    password.trim().length >= 8 &&
-    role.length > 0;
+    role.length > 0 &&
+    (isUserRole || password.trim().length >= 8);
 
   return (
     <>
@@ -165,20 +168,22 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
                 label: "!text-white/70",
               }}
             />
-            <Input
-              label="Contraseña temporal"
-              type="password"
-              value={password}
-              onValueChange={setPassword}
-              isRequired
-              description="Mínimo 8 caracteres. Clerk forzará el cambio en el primer inicio de sesión."
-              classNames={{
-                inputWrapper: inputDark,
-                input: "!text-white/95 placeholder:!text-white/38",
-                label: "!text-white/70",
-                description: "!text-white/50",
-              }}
-            />
+            {role !== "user" && (
+              <Input
+                label="Contraseña temporal"
+                type="password"
+                value={password}
+                onValueChange={setPassword}
+                isRequired
+                description="Mínimo 8 caracteres. Clerk forzará el cambio en el primer inicio de sesión."
+                classNames={{
+                  inputWrapper: inputDark,
+                  input: "!text-white/95 placeholder:!text-white/38",
+                  label: "!text-white/70",
+                  description: "!text-white/50",
+                }}
+              />
+            )}
             <Select
               label="Rol"
               selectedKeys={role ? [role] : []}
@@ -203,11 +208,11 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
               )}
             </Select>
             {role === "user" && (
-              <div className="rounded-xl border border-slate-500/20 bg-slate-500/10 px-4 py-3 space-y-3">
+              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 space-y-3">
                 <div className="flex items-start gap-2">
-                  <Icon icon="solar:info-circle-bold-duotone" className="text-slate-300 text-lg shrink-0 mt-0.5" />
-                  <p className="text-xs text-slate-300/80">
-                    Este usuario <strong className="text-slate-200">no tendrá acceso al portal admin</strong>. Podrá iniciar sesión únicamente en el frontend (newayzi.com). Se le pedirá cambiar la contraseña en su primer acceso.
+                  <Icon icon="solar:magic-stick-3-bold-duotone" className="text-emerald-300 text-lg shrink-0 mt-0.5" />
+                  <p className="text-xs text-emerald-200/80">
+                    Se enviará un <strong className="text-emerald-100">enlace de acceso directo</strong> al correo del usuario. Solo debe hacer clic para ingresar — <strong className="text-emerald-100">sin contraseña</strong>. El enlace expira en 48 horas.
                   </p>
                 </div>
                 <Select
@@ -236,16 +241,6 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
                     </SelectItem>
                   )}
                 </Select>
-                <button
-                  type="button"
-                  onClick={() => setSendInviteEmail(!send_invite_email)}
-                  className="flex items-center gap-2 text-xs text-slate-300/80 hover:text-white/90 transition-colors cursor-pointer"
-                >
-                  <div className={`w-8 h-4 rounded-full transition-colors flex items-center px-0.5 ${send_invite_email ? "bg-[#b89a5e]" : "bg-white/20"}`}>
-                    <div className={`w-3 h-3 rounded-full bg-white transition-transform ${send_invite_email ? "translate-x-4" : "translate-x-0"}`} />
-                  </div>
-                  <span>Enviar email de bienvenida con credenciales</span>
-                </button>
               </div>
             )}
             {role === "operador" && (
@@ -364,19 +359,22 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
                 Usuario creado
               </h3>
               <p className="text-sm text-white/60 max-w-sm">
-                El usuario puede iniciar sesión en el <strong className="text-white/80">frontend</strong> con el email y contraseña indicados.
-                Se le pedirá cambiar la contraseña en su primer acceso.
+                {isUserRole
+                  ? "Se envió un enlace de acceso directo al correo del usuario. Solo debe hacer clic para ingresar, sin contraseña."
+                  : "El usuario puede iniciar sesión con el email y contraseña temporal indicados. Se le pedirá cambiar la contraseña en su primer acceso."}
               </p>
               {emailSent === true && (
                 <div className="flex items-center gap-2 rounded-xl bg-emerald-500/15 border border-emerald-400/20 px-3 py-2 text-xs text-emerald-300">
                   <Icon icon="solar:letter-bold-duotone" width={16} />
-                  Email de bienvenida enviado con las credenciales.
+                  {isUserRole ? "Email con enlace de acceso enviado." : "Email de bienvenida enviado con las credenciales."}
                 </div>
               )}
               {emailSent === false && (
                 <div className="flex items-center gap-2 rounded-xl bg-amber-500/15 border border-amber-400/20 px-3 py-2 text-xs text-amber-300">
                   <Icon icon="solar:letter-unread-bold-duotone" width={16} />
-                  No se pudo enviar el email. Comparte las credenciales manualmente.
+                  {isUserRole
+                    ? "No se pudo enviar el email. Puedes reenviar la invitación desde el panel de usuarios."
+                    : "No se pudo enviar el email. Comparte las credenciales manualmente."}
                 </div>
               )}
               <Button
