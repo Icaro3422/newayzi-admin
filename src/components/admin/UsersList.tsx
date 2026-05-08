@@ -20,6 +20,7 @@ import { adminApi, ROLE_META, type AdminUserListItem, type AdminRole } from "@/l
 import { useAdmin } from "@/contexts/AdminContext";
 
 const ROLES: { value: AdminRole; label: string }[] = [
+  { value: "user", label: "Usuario" },
   { value: "super_admin", label: "Super admin" },
   { value: "visualizador", label: "Visualizador" },
   { value: "comercial", label: "Comercial" },

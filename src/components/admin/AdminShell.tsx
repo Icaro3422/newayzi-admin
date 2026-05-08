@@ -361,6 +361,18 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // Rol "user": usuario del frontend, sin permisos en el admin.
+  if (role === "user") {
+    return (
+      <AccessDeniedView
+        error="Tu rol actual es Usuario (frontend). Este panel es solo para staff/admin."
+        isPermissionDenied={true}
+        onRetry={refetchMe}
+        onSignOut={() => signOut({ redirectUrl: "/sign-in" })}
+      />
+    );
+  }
+
   // Primer login: forzar cambio de contraseña antes de mostrar el dashboard
   if (mustChangePassword) {
     return (

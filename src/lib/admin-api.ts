@@ -2772,6 +2772,8 @@ export const ROLE_META: Record<AdminRole, { label: string; icon: string; color: 
 /** Permisos de acceso a módulos */
 export function canAccessModule(role: AdminRole | null, module: string): boolean {
   if (!role) return false;
+  // Rol "user" = usuario del frontend, sin acceso al admin.
+  if (role === "user") return false;
   // Super admin no ve "Mi Billetera" — es parte del equipo Almara, no usa rewards personales
   if (role === "super_admin" && module === "wallet") return false;
   if (role === "super_admin") return true;
