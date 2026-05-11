@@ -2746,6 +2746,36 @@ export const adminBookings = {
   ): Promise<{ ok: boolean; status: string; updated: string }> {
     return patchJson(`/api/admin/bookings/${id}/status/`, data);
   },
+
+  /** Editar campos de la reserva: notas, contacto, guests_count. Operador, comercial, super_admin. */
+  async patchBooking(
+    id: number,
+    data: {
+      notes?: string;
+      contact_name?: string;
+      contact_email?: string;
+      contact_phone?: string;
+      guests_count?: number;
+    }
+  ): Promise<{ ok: boolean; notes: string; contact_name: string; contact_email: string; contact_phone: string; guests_count: number; updated: string }> {
+    return patchJson(`/api/admin/bookings/${id}/edit/`, data);
+  },
+
+  /** Editar datos de un huésped individual (nombre, email, teléfono, is_primary, metadata). */
+  async patchGuest(
+    bookingId: number,
+    guestId: number,
+    data: {
+      first_name?: string;
+      last_name?: string;
+      email?: string;
+      phone?: string;
+      is_primary?: boolean;
+      metadata?: Record<string, unknown>;
+    }
+  ): Promise<{ id: number; first_name: string; last_name: string; email: string; phone: string; is_primary: boolean }> {
+    return patchJson(`/api/admin/bookings/${bookingId}/guests/${guestId}/`, data);
+  },
 };
 
 /** Roles que pueden cancelar reservas por API admin. */
@@ -2757,6 +2787,13 @@ export function canAdminCancelBooking(role: AdminRole | null): boolean {
 
 /** Operador, comercial o super_admin: cambiar estado sin flujo de cancelación. */
 export function canAdminPatchBookingStatus(role: AdminRole | null): boolean {
+  if (!role) return false;
+  if (role === "super_admin") return true;
+  return role === "operador" || role === "comercial";
+}
+
+/** Operador, comercial o super_admin: editar notas, contacto, datos de huésped. */
+export function canAdminEditBooking(role: AdminRole | null): boolean {
   if (!role) return false;
   if (role === "super_admin") return true;
   return role === "operador" || role === "comercial";

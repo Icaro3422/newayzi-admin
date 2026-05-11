@@ -158,6 +158,10 @@ export function ConnectionDetailClient() {
   const [configSmGraphqlQuery, setConfigSmGraphqlQuery] = useState("");
   const [configSmGraphqlVariables, setConfigSmGraphqlVariables] = useState("");
   const [configSmPropertiesListPath, setConfigSmPropertiesListPath] = useState("");
+  const [configHwClientId, setConfigHwClientId] = useState("");
+  const [configHwClientSecret, setConfigHwClientSecret] = useState("");
+  const [configHwListingIds, setConfigHwListingIds] = useState("");
+  const [configHwCurrency, setConfigHwCurrency] = useState("");
   const [configRgBaseUrl, setConfigRgBaseUrl] = useState("");
   const [configRgApiKey, setConfigRgApiKey] = useState("");
   const [configRgApiSecret, setConfigRgApiSecret] = useState("");
@@ -302,6 +306,18 @@ export function ConnectionDetailClient() {
       } else {
         setConfigSmGraphqlVariables("");
       }
+    }
+    if (connection.pms_type === "hostaway") {
+      const c = connection.config as Record<string, unknown>;
+      setConfigHwClientId(String(c.client_id ?? ""));
+      setConfigHwClientSecret("");
+      const rawIds = c.listing_ids;
+      if (Array.isArray(rawIds) && rawIds.length) {
+        setConfigHwListingIds(JSON.stringify(rawIds));
+      } else {
+        setConfigHwListingIds("");
+      }
+      setConfigHwCurrency(String(c.currency ?? ""));
     }
     if (connection.pms_type === "rategain") {
       const c = connection.config as Record<string, unknown>;
@@ -911,6 +927,42 @@ export function ConnectionDetailClient() {
       setConnection(updated);
       setEditingConfig(false);
       setConfigRgApiSecret("");
+    } finally {
+      setSavingConfig(false);
+    }
+  }
+
+  async function saveHostawayConfig() {
+    if (!connection || !canEditConnections || connection.pms_type !== "hostaway") return;
+    const newConfig: Record<string, unknown> = {
+      ...(connection.config as Record<string, unknown>),
+      client_id: configHwClientId.trim(),
+    };
+    const secret = configHwClientSecret.trim();
+    if (secret) newConfig.client_secret = secret;
+
+    const rawIds = configHwListingIds.trim();
+    if (rawIds) {
+      try {
+        const parsed = JSON.parse(rawIds) as unknown;
+        if (Array.isArray(parsed)) {
+          newConfig.listing_ids = parsed.map((x) => (typeof x === "number" ? x : parseInt(String(x), 10))).filter((n) => !Number.isNaN(n));
+        }
+      } catch {
+        newConfig.listing_ids = rawIds.split(/[\s,]+/).map((s) => parseInt(s.trim(), 10)).filter((n) => !Number.isNaN(n));
+      }
+    } else {
+      newConfig.listing_ids = [];
+    }
+    const cur = configHwCurrency.trim().toUpperCase();
+    if (cur) newConfig.currency = cur; else delete newConfig.currency;
+
+    setSavingConfig(true);
+    try {
+      const updated = await adminApi.patchConnection(id, { config: newConfig });
+      setConnection(updated);
+      setEditingConfig(false);
+      setConfigHwClientSecret("");
     } finally {
       setSavingConfig(false);
     }
@@ -2322,6 +2374,74 @@ export function ConnectionDetailClient() {
                 <p>GraphQL path: <span className="text-white/70">{configSmGraphqlPath || "—"}</span></p>
                 <p>Lista (path): <span className="text-white/70">{configSmPropertiesListPath || "—"}</span></p>
                 <p>Query GraphQL: <span className="text-white/70">{configSmGraphqlQuery ? `${configSmGraphqlQuery.slice(0, 80)}…` : "—"}</span></p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {connection.pms_type === "hostaway" && canEditConnections && (
+          <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:calendar-bold-duotone" width={17} className="text-[#f0e6d2]" />
+                <p className="text-sm font-semibold text-white/80">Hostaway</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {!editingConfig ? (
+                  <Button size="sm" variant="flat" onPress={() => setEditingConfig(true)}
+                    className="!text-white/70 bg-white/[0.07] border border-white/[0.12] hover:bg-white/[0.12]">
+                    Editar
+                  </Button>
+                ) : (
+                  <>
+                    <Button size="sm" variant="flat"
+                      className="!text-white/60 bg-white/[0.05] border border-white/[0.1]"
+                      onPress={() => {
+                        setEditingConfig(false);
+                        const c = (connection.config ?? {}) as Record<string, unknown>;
+                        setConfigHwClientId(String(c.client_id ?? ""));
+                        setConfigHwClientSecret("");
+                        const rawIds = c.listing_ids;
+                        setConfigHwListingIds(Array.isArray(rawIds) && rawIds.length ? JSON.stringify(rawIds) : "");
+                        setConfigHwCurrency(String(c.currency ?? ""));
+                      }}>
+                      Cancelar
+                    </Button>
+                    <Button size="sm" className="btn-newayzi-primary"
+                      onPress={saveHostawayConfig} isLoading={savingConfig}
+                      isDisabled={!configHwClientId.trim()}>
+                      Guardar
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {editingConfig ? (
+              <div className="space-y-3">
+                <Input label="Account ID" value={configHwClientId} onValueChange={setConfigHwClientId}
+                  placeholder="12345" size="sm"
+                  classNames={{ inputWrapper: "rounded-xl border", input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }} />
+                <Input label="API Key (dejar vacío para mantener)" type="password"
+                  value={configHwClientSecret} onValueChange={setConfigHwClientSecret}
+                  placeholder="Dejar vacío para no cambiar" size="sm"
+                  classNames={{ inputWrapper: "rounded-xl border", input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }} />
+                <Textarea label="Listing IDs (opcional; vacío = todos)" value={configHwListingIds}
+                  onValueChange={setConfigHwListingIds}
+                  placeholder="Vacío = sincronizar todos · Ejemplo: [111, 222]" minRows={2}
+                  classNames={{ inputWrapper: "rounded-xl border border-white/[0.12]", input: "!text-white/95 placeholder:!text-white/30 font-mono text-xs", label: "!text-white/60" }} />
+                <Input label="Moneda (opcional)" value={configHwCurrency} onValueChange={setConfigHwCurrency}
+                  placeholder="USD" size="sm"
+                  classNames={{ inputWrapper: "rounded-xl border", input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }} />
+              </div>
+            ) : (
+              <div className="text-sm text-white/40 space-y-1">
+                <p>Account ID: <span className="text-white/70">{configHwClientId || "—"}</span></p>
+                <p>API Key: <span className="text-white/50 tracking-widest">••••••••</span></p>
+                <p>Listing IDs: <span className="text-white/70 font-mono text-xs">
+                  {configHwListingIds.trim() ? configHwListingIds : "Todos (descubrimiento automático)"}
+                </span></p>
+                <p>Moneda: <span className="text-white/70">{configHwCurrency || "USD (predeterminado)"}</span></p>
               </div>
             )}
           </div>

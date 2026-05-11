@@ -6,6 +6,7 @@ import { Icon } from "@iconify/react";
 import {
   adminBookings,
   canAdminCancelBooking,
+  canAdminEditBooking,
   canAdminPatchBookingStatus,
   type AdminBookingDetail,
 } from "@/lib/admin-api";
@@ -71,7 +72,20 @@ export default function AdminBookingDetailPage() {
   } | null>(null);
   const [statusPatching, setStatusPatching] = useState(false);
 
+  // ── Editar contacto ───────────────────────────────────────────────────────
+  const [editingContact, setEditingContact] = useState(false);
+  const [contactForm, setContactForm] = useState({ contact_name: "", contact_email: "", contact_phone: "", notes: "", guests_count: "" });
+  const [savingContact, setSavingContact] = useState(false);
+  const [contactError, setContactError] = useState<string | null>(null);
+
+  // ── Editar huésped ────────────────────────────────────────────────────────
+  const [editingGuestId, setEditingGuestId] = useState<number | null>(null);
+  const [guestForm, setGuestForm] = useState({ first_name: "", last_name: "", email: "", phone: "", is_primary: false });
+  const [savingGuest, setSavingGuest] = useState(false);
+  const [guestError, setGuestError] = useState<string | null>(null);
+
   const showActions = canAdminCancelBooking(role) || canAdminPatchBookingStatus(role);
+  const canEdit = canAdminEditBooking(role);
 
   async function reloadBooking() {
     if (!id) return;
@@ -113,6 +127,62 @@ export default function AdminBookingDetailPage() {
       setCancelError(e instanceof Error ? e.message : "Error al cancelar");
     } finally {
       setCancelLoading(false);
+    }
+  }
+
+  function openEditContact() {
+    if (!booking) return;
+    setContactForm({
+      contact_name: booking.contact_name || "",
+      contact_email: booking.contact_email || "",
+      contact_phone: booking.contact_phone || "",
+      notes: booking.notes || "",
+      guests_count: String(booking.guests_count ?? ""),
+    });
+    setContactError(null);
+    setEditingContact(true);
+  }
+
+  async function saveContact() {
+    if (!booking) return;
+    setSavingContact(true);
+    setContactError(null);
+    try {
+      const gc = parseInt(contactForm.guests_count, 10);
+      await adminBookings.patchBooking(booking.id, {
+        contact_name: contactForm.contact_name,
+        contact_email: contactForm.contact_email,
+        contact_phone: contactForm.contact_phone,
+        notes: contactForm.notes,
+        guests_count: Number.isNaN(gc) ? undefined : gc,
+      });
+      await reloadBooking();
+      setEditingContact(false);
+    } catch (e) {
+      setContactError(e instanceof Error ? e.message : "Error al guardar");
+    } finally {
+      setSavingContact(false);
+    }
+  }
+
+  function openEditGuest(g: AdminBookingDetail["guests"][number]) {
+    setGuestForm({ first_name: g.first_name, last_name: g.last_name, email: g.email, phone: g.phone, is_primary: g.is_primary });
+    setGuestError(null);
+    setEditingGuestId(g.id);
+  }
+
+  async function saveGuest() {
+    if (!booking || editingGuestId === null) return;
+    setSavingGuest(true);
+    setGuestError(null);
+    try {
+      await adminBookings.patchGuest(booking.id, editingGuestId, guestForm);
+      await reloadBooking();
+      setEditingGuestId(null);
+    } catch (e) {
+      setGuestError(e instanceof Error ? e.message : "Error al guardar");
+    } finally {
+      setSavingGuest(false);
     }
   }
 
@@ -283,13 +353,68 @@ export default function AdminBookingDetailPage() {
 
         {/* ─ Contacto ───────────────────────────────────────────────── */}
         <section className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-violet-300 flex items-center gap-2">
-            <Icon icon="solar:user-bold-duotone" /> Contacto
-          </h2>
-          <Row label="Nombre" value={booking.contact_name || "—"} />
-          <Row label="Email" value={booking.contact_email || "—"} />
-          <Row label="Teléfono" value={booking.contact_phone || "—"} />
-          {booking.notes && <Row label="Notas" value={booking.notes} />}
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-violet-300 flex items-center gap-2">
+              <Icon icon="solar:user-bold-duotone" /> Contacto
+            </h2>
+            {canEdit && booking.status !== "cancelled" && !editingContact && (
+              <button
+                onClick={openEditContact}
+                className="text-xs text-violet-300 hover:text-violet-200 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-white/5 transition-colors"
+              >
+                <Icon icon="solar:pen-2-bold" width={13} /> Editar
+              </button>
+            )}
+          </div>
+          {editingContact ? (
+            <div className="space-y-3 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-white/50 mb-1 block">Nombre</label>
+                  <input value={contactForm.contact_name} onChange={e => setContactForm(f => ({ ...f, contact_name: e.target.value }))}
+                    className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-violet-500/50" placeholder="Nombre de contacto" />
+                </div>
+                <div>
+                  <label className="text-xs text-white/50 mb-1 block">Email</label>
+                  <input type="email" value={contactForm.contact_email} onChange={e => setContactForm(f => ({ ...f, contact_email: e.target.value }))}
+                    className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-violet-500/50" placeholder="email@ejemplo.com" />
+                </div>
+                <div>
+                  <label className="text-xs text-white/50 mb-1 block">Teléfono</label>
+                  <input value={contactForm.contact_phone} onChange={e => setContactForm(f => ({ ...f, contact_phone: e.target.value }))}
+                    className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-violet-500/50" placeholder="+57 300 000 0000" />
+                </div>
+                <div>
+                  <label className="text-xs text-white/50 mb-1 block">N.º huéspedes</label>
+                  <input type="number" min={1} value={contactForm.guests_count} onChange={e => setContactForm(f => ({ ...f, guests_count: e.target.value }))}
+                    className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-violet-500/50" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-white/50 mb-1 block">Notas</label>
+                <textarea value={contactForm.notes} onChange={e => setContactForm(f => ({ ...f, notes: e.target.value }))} rows={3}
+                  className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-violet-500/50 resize-none" placeholder="Notas internas…" />
+              </div>
+              {contactError && <p className="text-xs text-red-400">{contactError}</p>}
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setEditingContact(false)}
+                  className="px-3 py-1.5 text-xs text-white/60 border border-white/10 rounded-xl hover:bg-white/5 transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={saveContact} disabled={savingContact}
+                  className="px-4 py-1.5 text-xs font-semibold bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition-colors disabled:opacity-40">
+                  {savingContact ? "Guardando…" : "Guardar"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <Row label="Nombre" value={booking.contact_name || "—"} />
+              <Row label="Email" value={booking.contact_email || "—"} />
+              <Row label="Teléfono" value={booking.contact_phone || "—"} />
+              {booking.notes && <Row label="Notas" value={booking.notes} />}
+            </>
+          )}
         </section>
 
         {/* ─ Huéspedes registrados ──────────────────────────────────── */}
@@ -302,18 +427,69 @@ export default function AdminBookingDetailPage() {
           ) : (
             <div className="space-y-2">
               {booking.guests.map((g) => (
-                <div key={g.id} className="flex items-center justify-between bg-white/5 rounded-xl px-3 py-2">
-                  <div>
-                    <p className="text-sm font-semibold text-white">
-                      {g.first_name} {g.last_name}
-                      {g.is_primary && (
-                        <span className="ml-2 text-[10px] bg-violet-500/20 text-violet-300 border border-violet-500/20 px-2 py-0.5 rounded-full font-bold">
-                          Principal
-                        </span>
+                <div key={g.id} className="bg-white/5 rounded-xl px-3 py-2">
+                  {editingGuestId === g.id ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-white/50 mb-1 block">Nombre</label>
+                          <input value={guestForm.first_name} onChange={e => setGuestForm(f => ({ ...f, first_name: e.target.value }))}
+                            className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500/50" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-white/50 mb-1 block">Apellido</label>
+                          <input value={guestForm.last_name} onChange={e => setGuestForm(f => ({ ...f, last_name: e.target.value }))}
+                            className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500/50" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-white/50 mb-1 block">Email</label>
+                          <input type="email" value={guestForm.email} onChange={e => setGuestForm(f => ({ ...f, email: e.target.value }))}
+                            className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500/50" />
+                        </div>
+                        <div>
+                          <label className="text-xs text-white/50 mb-1 block">Teléfono</label>
+                          <input value={guestForm.phone} onChange={e => setGuestForm(f => ({ ...f, phone: e.target.value }))}
+                            className="w-full bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500/50" />
+                        </div>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-white/70">
+                        <input type="checkbox" checked={guestForm.is_primary} onChange={e => setGuestForm(f => ({ ...f, is_primary: e.target.checked }))}
+                          className="w-4 h-4 accent-violet-500 rounded" />
+                        Huésped principal
+                      </label>
+                      {guestError && <p className="text-xs text-red-400">{guestError}</p>}
+                      <div className="flex gap-2 justify-end">
+                        <button onClick={() => setEditingGuestId(null)}
+                          className="px-3 py-1.5 text-xs text-white/60 border border-white/10 rounded-xl hover:bg-white/5 transition-colors">
+                          Cancelar
+                        </button>
+                        <button onClick={saveGuest} disabled={savingGuest}
+                          className="px-4 py-1.5 text-xs font-semibold bg-violet-600 hover:bg-violet-700 text-white rounded-xl transition-colors disabled:opacity-40">
+                          {savingGuest ? "Guardando…" : "Guardar"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-white">
+                          {g.first_name} {g.last_name}
+                          {g.is_primary && (
+                            <span className="ml-2 text-[10px] bg-violet-500/20 text-violet-300 border border-violet-500/20 px-2 py-0.5 rounded-full font-bold">
+                              Principal
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-white/40">{g.email || "—"} {g.phone ? `· ${g.phone}` : ""}</p>
+                      </div>
+                      {canEdit && booking.status !== "cancelled" && (
+                        <button onClick={() => openEditGuest(g)}
+                          className="text-xs text-violet-300 hover:text-violet-200 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-white/5 transition-colors ml-2 flex-shrink-0">
+                          <Icon icon="solar:pen-2-bold" width={13} /> Editar
+                        </button>
                       )}
-                    </p>
-                    <p className="text-xs text-white/40">{g.email || "—"} {g.phone ? `· ${g.phone}` : ""}</p>
-                  </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

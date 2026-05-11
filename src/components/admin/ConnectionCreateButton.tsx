@@ -25,6 +25,7 @@ const PMS_ICONS: Record<string, string> = {
   cloudbeds: "solar:cloud-bold-duotone",
   stays: "solar:home-smile-bold-duotone",
   generic: "solar:link-circle-bold-duotone",
+  hostaway: "solar:calendar-bold-duotone",
   siteminder_dashboard: "solar:global-bold-duotone",
   rategain: "solar:graph-up-bold-duotone",
 };
@@ -34,6 +35,7 @@ const PMS_DESCRIPTIONS: Record<string, string> = {
   cloudbeds: "Plataforma de gestión hotelera CloudBeds",
   stays: "Sistema de reservas Stays",
   generic: "Cualquier PMS vía API genérica (Booking, OTAs propias, etc.)",
+  hostaway: "Hostaway — channel manager para alquileres vacacionales (OAuth2 API v1)",
   siteminder_dashboard:
     "SiteMinder (dashboard web): sesión con email/contraseña y endpoint JSON interno (XHR) configurable",
   rategain:
@@ -122,6 +124,38 @@ const PMS_CONFIG_FIELDS: Record<
       required: false,
       placeholder: "data.propiedades",
       description: "Navegación con puntos dentro del JSON (GET o GraphQL).",
+    },
+  ],
+  hostaway: [
+    {
+      key: "client_id",
+      label: "Account ID",
+      required: true,
+      placeholder: "12345",
+      description: "Hostaway → Settings → Integrations → Hostaway API → Account ID.",
+    },
+    {
+      key: "client_secret",
+      label: "API Key",
+      required: true,
+      placeholder: "API Key de Hostaway",
+      type: "password",
+      description: "API Key del mismo panel (se cifra al guardar).",
+    },
+    {
+      key: "listing_ids",
+      label: "Listing IDs (opcional, JSON array o comas)",
+      required: false,
+      placeholder: 'Vacío = sincronizar todos los listings',
+      description: "Limitar a listings específicos: p. ej. [111, 222] o 111, 222.",
+      inputType: "textarea",
+    },
+    {
+      key: "currency",
+      label: "Moneda (opcional)",
+      required: false,
+      placeholder: "USD",
+      description: "Moneda de respaldo si la API no retorna moneda por día (ej. USD, COP, EUR).",
     },
   ],
   rategain: [
