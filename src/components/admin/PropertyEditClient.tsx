@@ -264,12 +264,13 @@ export function PropertyEditClient() {
       const refreshed = await adminApi.getProperty(property.id);
       if (refreshed) {
         setProperty(refreshed);
-        const refreshedAiDescription =
+        // Priorizar la descripción persistida del backend (HTML listo para el editor).
+        const refreshedDescription =
+          refreshed.description ||
           refreshed.pms_ai?.ai_description_es ||
           refreshed.pms_ai?.ai_description_en ||
-          refreshed.description ||
           "";
-        setDescription(refreshedAiDescription);
+        setDescription(refreshedDescription);
       }
       addToast({
         title: "Descripción AI generada",
