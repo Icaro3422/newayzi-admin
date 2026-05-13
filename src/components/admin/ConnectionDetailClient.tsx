@@ -11,6 +11,7 @@ import {
   PmsDeleteBlockedError,
   type PMSConnectionDetail,
   type PMSConnectionDeleteBlockersInfo,
+  type UnitItem,
   type UnitsSummary,
   type ConnectionSyncNowResponse,
   type ConnectionSyncStreamEvent,
@@ -91,6 +92,20 @@ function mapRunStatusToApiStatus(runStatus: PMSSyncRunStatus["status"]): Connect
   if (runStatus === "partial") return "partial";
   if (runStatus === "error") return "error";
   return "queued";
+}
+
+function shouldAcceptEventBySeq(seenSeqs: Set<number>, seq?: number): boolean {
+  if (typeof seq !== "number" || !Number.isFinite(seq)) return true;
+  if (seenSeqs.has(seq)) return false;
+  seenSeqs.add(seq);
+  // Mantener memoria acotada para corridas largas.
+  if (seenSeqs.size > 4000) {
+    const keepFrom = Math.max(1, seq - 2000);
+    for (const value of seenSeqs) {
+      if (value < keepFrom) seenSeqs.delete(value);
+    }
+  }
+  return true;
 }
 
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -187,6 +202,9 @@ export function ConnectionDetailClient() {
   const [syncForceFullSync, setSyncForceFullSync] = useState(false);
   /** Tras mapear catálogo: solo tarifas (Stays: rates) + disponibilidad, sin re-descargar propiedades/alojamientos. */
   const [syncPricingOnly, setSyncPricingOnly] = useState(false);
+  const [aiGeneratingRowKey, setAiGeneratingRowKey] = useState<string | null>(null);
+  const syncSeenSeqsRef = useRef<Set<number>>(new Set());
+  const runDetailSeenSeqsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     if (Number.isNaN(id) || id <= 0) { setLoading(false); return; }
@@ -342,9 +360,11 @@ export function ConnectionDetailClient() {
     setSyncCurrentPhase("Preparando...");
     setSyncCounters(emptySyncCounters());
     setSyncFallbackUsed(false);
+    syncSeenSeqsRef.current.clear();
   }
 
   function applyRunDetailEvent(evt: ConnectionSyncStreamEvent & { seq?: number; synced?: number; failed?: number; discovered?: number }) {
+    if (!shouldAcceptEventBySeq(runDetailSeenSeqsRef.current, evt.seq)) return;
     setRunDetailEvents((prev) => [evt, ...prev].slice(0, 80));
     if (evt.event === "phase_started") {
       setRunDetailPhase(`Procesando ${phaseLabel(evt.phase)}...`);
@@ -397,6 +417,7 @@ export function ConnectionDetailClient() {
     setRunDetailCounters(emptySyncCounters());
     setRunDetailPhase(run.status === "queued" ? "En cola" : run.status === "running" ? "Ejecutando..." : "Finalizado");
     setRunDetailLastRefresh(null);
+    runDetailSeenSeqsRef.current.clear();
     runDetailLastSeqRef.current = 0;
     runDetailPollingRunIdRef.current = null;
     runDetailWsRef.current?.close();
@@ -505,7 +526,8 @@ export function ConnectionDetailClient() {
     };
   }, [runDetailModalOpen, selectedRun?.run_id, selectedRun?.ws_token]);
 
-  function registerSyncEvent(evt: ConnectionSyncStreamEvent) {
+  function registerSyncEvent(evt: ConnectionSyncStreamEvent & { seq?: number }) {
+    if (!shouldAcceptEventBySeq(syncSeenSeqsRef.current, evt.seq)) return;
     setSyncEvents((prev) => [evt, ...prev].slice(0, 80));
     if (evt.event === "phase_started") {
       setSyncCurrentPhase(`Procesando ${phaseLabel(evt.phase)}...`);
@@ -605,6 +627,8 @@ export function ConnectionDetailClient() {
       let wsRetryCount = 0;
       let wsNextRetryAt = 0;
       let lastRealtimeActivityTs = Date.now();
+      let wsPermanentlyDisabled = false;
+      const MAX_WS_RETRIES = 4;
 
       const applyIncomingEvent = (evt: ConnectionSyncStreamEvent & { seq?: number }) => {
         if (typeof evt.seq === "number") {
@@ -616,11 +640,16 @@ export function ConnectionDetailClient() {
 
       const scheduleSocketRetry = () => {
         wsRetryCount += 1;
+        if (wsRetryCount >= MAX_WS_RETRIES) {
+          wsPermanentlyDisabled = true;
+          return;
+        }
         const backoffMs = Math.min(8000, 500 * Math.pow(2, Math.max(0, wsRetryCount - 1)));
         wsNextRetryAt = Date.now() + backoffMs;
       };
 
       const openSocket = () => {
+        if (wsPermanentlyDisabled) return;
         if (!wsToken || socket) return;
         if (Date.now() < wsNextRetryAt) return;
         try {
@@ -686,6 +715,19 @@ export function ConnectionDetailClient() {
         pollAttempts += 1;
         if (!wsHealthy && wsToken) {
           openSocket();
+          if (wsPermanentlyDisabled) {
+            usedFallback = true;
+            setSyncFallbackUsed(true);
+            if (!warnedFallback) {
+              warnedFallback = true;
+              registerSyncEvent({
+                event: "message",
+                detail: "Canal websocket deshabilitado por inestabilidad. Continuamos con polling estable.",
+              });
+            }
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            continue;
+          }
           const wsGraceElapsed = Date.now() - wsStartTs >= wsFallbackGraceMs;
           const realtimeLooksStale = Date.now() - lastRealtimeActivityTs >= staleRealtimeThresholdMs;
           if (wsGraceElapsed && realtimeLooksStale) {
@@ -777,6 +819,41 @@ export function ConnectionDetailClient() {
       });
     } finally {
       setSyncing(false);
+    }
+  }
+
+  async function handleGenerateAiForUnit(unit: UnitItem, isRoom: boolean, rowKey: string) {
+    const mappingKind: "property" | "room_type" = isRoom ? "room_type" : "property";
+    const mappingId = isRoom ? unit.room_type_mapping_id : unit.property_mapping_id;
+    if (!mappingId) {
+      addToast({
+        title: "No disponible",
+        description: "Esta unidad aún no tiene mapping válido para regenerar descripción AI.",
+        color: "warning",
+      });
+      return;
+    }
+    try {
+      setAiGeneratingRowKey(rowKey);
+      await adminApi.generateAIDescriptionForUnit(id, {
+        mapping_kind: mappingKind,
+        mapping_id: mappingId,
+      });
+      const updatedSummary = await adminApi.getUnitsSummary(id);
+      setUnitsSummary(updatedSummary ?? null);
+      addToast({
+        title: "Descripción AI regenerada",
+        description: "Se procesó desde la descripción original del PMS.",
+        color: "success",
+      });
+    } catch (err) {
+      addToast({
+        title: "Error al regenerar AI",
+        description: err instanceof Error ? err.message : "No se pudo regenerar la descripción.",
+        color: "danger",
+      });
+    } finally {
+      setAiGeneratingRowKey(null);
     }
   }
 
@@ -2712,6 +2789,9 @@ export function ConnectionDetailClient() {
                     pmsPropertyId: u.pms_property_id ?? null,
                     pmsRoomTypeId: isRoom ? (u.pms_room_id ?? null) : undefined,
                   };
+                  const aiGenerated = u.ai_generated === true;
+                  const aiLangs = Array.isArray(u.ai_languages) ? u.ai_languages.join("/") : "";
+                  const isGeneratingAI = aiGeneratingRowKey === rowKey;
                   return (
                     <tr
                       key={rowKey}
@@ -2732,24 +2812,50 @@ export function ConnectionDetailClient() {
                         {pmsIdLabel}
                       </td>
                       <td className="px-6 py-3">
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${st.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
-                          {st.label}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${st.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
+                            {st.label}
+                          </span>
+                          <span
+                            className={`inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full border ${
+                              aiGenerated
+                                ? "text-emerald-300 border-emerald-400/40 bg-emerald-500/10"
+                                : "text-white/55 border-white/20 bg-white/[0.04]"
+                            }`}
+                            title={aiLangs ? `Idiomas: ${aiLangs}` : "Sin idiomas AI detectados"}
+                          >
+                            <Icon icon="solar:stars-bold" width={12} />
+                            {aiGenerated ? "Generado por AI" : "AI pendiente"}
+                          </span>
+                        </div>
                       </td>
                       {canSyncConnection && (
                         <td className="px-6 py-3 sticky right-0 z-10 bg-[#0f1220] border-l border-white/[0.07] shadow-[-4px_0_8px_rgba(0,0,0,0.2)]">
-                          <Button
-                            size="sm"
-                            variant="flat"
-                            isIconOnly
-                            aria-label="Sincronizar esta unidad"
-                            onPress={() => doStartSync(false, syncScope)}
-                            isDisabled={syncing}
-                            className="!text-white/70 bg-white/[0.07] hover:bg-white/[0.12] min-w-8 w-8"
-                          >
-                            <Icon icon="solar:refresh-bold" width={16} />
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              isIconOnly
+                              aria-label="Sincronizar esta unidad"
+                              onPress={() => doStartSync(false, syncScope)}
+                              isDisabled={syncing || isGeneratingAI}
+                              className="!text-white/70 bg-white/[0.07] hover:bg-white/[0.12] min-w-8 w-8"
+                            >
+                              <Icon icon="solar:refresh-bold" width={16} />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              aria-label="Generar descripción con IA"
+                              onPress={() => handleGenerateAiForUnit(u, isRoom, rowKey)}
+                              isDisabled={syncing || isGeneratingAI}
+                              className="!text-[#e8d6ac] bg-[#b89a5e]/15 hover:bg-[#b89a5e]/25 border border-[#b89a5e]/30"
+                              startContent={<Icon icon="solar:stars-bold" width={14} />}
+                            >
+                              {isGeneratingAI ? "Generando..." : "Generar AI"}
+                            </Button>
+                          </div>
                         </td>
                       )}
                     </tr>

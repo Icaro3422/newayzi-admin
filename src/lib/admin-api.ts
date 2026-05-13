@@ -419,6 +419,12 @@ export interface UnitItem {
   local_room_name?: string | null;
   status: string;
   pms_name?: string | null;
+  property_mapping_id?: number;
+  room_type_mapping_id?: number;
+  ai_status?: string;
+  ai_generated?: boolean;
+  ai_languages?: string[];
+  ai_generated_at?: string;
 }
 
 export interface PMSConnectionDetail extends PMSConnectionListItem {
@@ -610,12 +616,36 @@ export interface SyncedUnit {
   local_property_name?: string;
   local_room_name?: string;
   status: string;
+  property_mapping_id?: number;
+  room_type_mapping_id?: number;
+  ai_status?: string;
+  ai_generated?: boolean;
+  ai_languages?: string[];
+  ai_generated_at?: string;
 }
 
 export interface PendingUnit {
   pms_property_id: string;
   pms_room_id?: string;
   pms_name?: string;
+  property_mapping_id?: number;
+  room_type_mapping_id?: number;
+  ai_status?: string;
+  ai_generated?: boolean;
+  ai_languages?: string[];
+  ai_generated_at?: string;
+}
+
+export interface GenerateAIDescriptionResponse {
+  ok: boolean;
+  mapping_kind: "property" | "room_type";
+  mapping_id: number;
+  ai_meta?: {
+    input_hash?: string;
+    languages?: string[];
+    status?: string;
+    generated_at?: string;
+  };
 }
 
 export interface Operator {
@@ -1894,35 +1924,23 @@ export const adminApi = {
     const wsBases = getWsBaseCandidates();
     if (wsBases.length === 0) throw new Error("No fue posible resolver la URL websocket.");
     const lastSeq = Math.max(0, opts.lastSeq ?? 0);
-    const wsPaths = [
-      `/ws/admin/pms/sync-runs/${runId}/`,
-      `/api/ws/admin/pms/sync-runs/${runId}/`,
-    ];
+    const wsPath = `/ws/admin/pms/sync-runs/${runId}/`;
 
     let socket: WebSocket | null = null;
     let userClosed = false;
     let openedOnce = false;
-    let targetIdx = 0;
-    const targets = wsBases.flatMap((base) => wsPaths.map((path) => ({ base, path })));
+    const wsBase = wsBases[0];
 
-    const bindListeners = (current: WebSocket, idx: number) => {
+    const bindListeners = (current: WebSocket) => {
       current.onopen = () => {
         openedOnce = true;
         opts.onOpen?.();
       };
       current.onerror = () => {
-        if (!openedOnce && !userClosed && idx + 1 < targets.length) {
-          return;
-        }
         opts.onError?.();
       };
       current.onclose = (ev) => {
         if (socket === current) socket = null;
-        if (!openedOnce && !userClosed && idx + 1 < targets.length) {
-          targetIdx = idx + 1;
-          openSocket(targetIdx);
-          return;
-        }
         opts.onClose?.(ev);
       };
       current.onmessage = (raw) => {
@@ -1939,15 +1957,14 @@ export const adminApi = {
       };
     };
 
-    const openSocket = (idx: number) => {
-      const target = targets[idx];
-      const url = `${target.base}${target.path}?token=${encodeURIComponent(wsToken)}&last_seq=${lastSeq}`;
+    const openSocket = () => {
+      const url = `${wsBase}${wsPath}?token=${encodeURIComponent(wsToken)}&last_seq=${lastSeq}`;
       const nextSocket = new WebSocket(url);
       socket = nextSocket;
-      bindListeners(nextSocket, idx);
+      bindListeners(nextSocket);
     };
 
-    openSocket(targetIdx);
+    openSocket();
     return {
       close: () => {
         userClosed = true;
@@ -2004,6 +2021,16 @@ export const adminApi = {
   async getPendingUnits(connectionId: number): Promise<PendingUnit[] | null> {
     return getJson<PendingUnit[]>(
       `/api/admin/pms/connections/${connectionId}/pending-units/`
+    );
+  },
+
+  async generateAIDescriptionForUnit(
+    connectionId: number,
+    payload: { mapping_kind: "property" | "room_type"; mapping_id: number }
+  ): Promise<GenerateAIDescriptionResponse> {
+    return postJson<GenerateAIDescriptionResponse>(
+      `/api/admin/pms/connections/${connectionId}/generate-ai-description/`,
+      payload
     );
   },
 
