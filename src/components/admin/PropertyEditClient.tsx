@@ -258,15 +258,6 @@ export function PropertyEditClient() {
       });
       return;
     }
-    if (!property.pms_ai?.can_generate_once) {
-      addToast({
-        title: "AI ya generada",
-        description: "La generación desde fuente original ya se ejecutó una vez.",
-        color: "warning",
-      });
-      return;
-    }
-
     setGeneratingOriginalAi(true);
     try {
       await adminApi.generatePropertyAIDescriptionOnce(property.id);
@@ -277,7 +268,7 @@ export function PropertyEditClient() {
       }
       addToast({
         title: "Descripción AI generada",
-        description: "Se generó desde la fuente original PMS y quedó bloqueada para una segunda ejecución.",
+        description: "Se generó desde la fuente original PMS y ya está aplicada al contenido público.",
         color: "success",
       });
     } catch (e: unknown) {
@@ -798,21 +789,19 @@ export function PropertyEditClient() {
                       size="sm"
                       className="rounded-xl border border-[#b89a5e]/40 bg-[#b89a5e]/20 text-[#f0e6d2] font-medium"
                       isLoading={generatingOriginalAi}
-                      isDisabled={generatingOriginalAi || !property.pms_ai.can_generate_once}
+                      isDisabled={generatingOriginalAi}
                       startContent={!generatingOriginalAi ? <Icon icon="solar:magic-stick-3-bold-duotone" width={17} /> : undefined}
                       onPress={generateDescriptionFromOriginalPmsOnce}
                     >
-                      {property.pms_ai.can_generate_once
-                        ? "Generar descripción con AI desde original"
-                        : "AI desde original ya generada"}
+                      Generar descripción con AI desde original
                     </Button>
                     {property.pms_ai.manual_original_generated_at ? (
                       <span className="text-[11px] text-emerald-300">
-                        Generada una vez: {new Date(property.pms_ai.manual_original_generated_at).toLocaleString("es-CO")}
+                        Última generación: {new Date(property.pms_ai.manual_original_generated_at).toLocaleString("es-CO")}
                       </span>
                     ) : (
                       <span className="text-[11px] text-white/45">
-                        Acción disponible una sola vez por propiedad.
+                        Disponible para regenerar cuando lo necesites.
                       </span>
                     )}
                   </div>
