@@ -1064,6 +1064,18 @@ async function getJson<T>(path: string): Promise<T | null> {
   }
 }
 
+async function getJsonNoStore<T>(path: string): Promise<T | null> {
+  try {
+    const res = await authFetch(path, { cache: "no-store" });
+    return (await res.json()) as T;
+  } catch (e) {
+    if (e instanceof AdminApiNotFoundError) {
+      return null;
+    }
+    throw e;
+  }
+}
+
 /**
  * URL para POST multipart: usa el mismo base que el resto del API (CORS configurado en Django).
  * El Excel de inventario manual es pequeño y pasa bien por la API directa.
@@ -1412,7 +1424,7 @@ export const adminApi = {
   },
 
   async getProperty(id: number): Promise<PropertyDetail | null> {
-    return getJson<PropertyDetail>(`/api/admin/properties/${id}/`);
+    return getJsonNoStore<PropertyDetail>(`/api/admin/properties/${id}/`);
   },
 
   async getPropertyLoyaltyDeals(level: LoyaltyLevelValue): Promise<LoyaltyDealsResponse | null> {
