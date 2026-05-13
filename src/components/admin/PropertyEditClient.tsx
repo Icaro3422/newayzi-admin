@@ -264,7 +264,12 @@ export function PropertyEditClient() {
       const refreshed = await adminApi.getProperty(property.id);
       if (refreshed) {
         setProperty(refreshed);
-        setDescription(refreshed.description ?? "");
+        const refreshedAiDescription =
+          refreshed.pms_ai?.ai_description_es ||
+          refreshed.pms_ai?.ai_description_en ||
+          refreshed.description ||
+          "";
+        setDescription(refreshedAiDescription);
       }
       addToast({
         title: "Descripción AI generada",
