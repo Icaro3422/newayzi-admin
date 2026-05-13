@@ -128,7 +128,7 @@ export function PropertyEditClient() {
   const router = useRouter();
   const params = useParams();
   const propertyId = parseInt(String(params?.id ?? "0"), 10);
-  const { canEditProperty } = useAdmin();
+  const { canEditProperty, role } = useAdmin();
 
   // ── Datos base
   const [property, setProperty] = useState<PropertyDetail | null>(null);
@@ -193,6 +193,7 @@ export function PropertyEditClient() {
   // ── Galería
   const [pictures, setPictures] = useState<PropertyPicture[]>([]);
   const [aiSuggesting, setAiSuggesting] = useState(false);
+  const [generatingOriginalAi, setGeneratingOriginalAi] = useState(false);
   const [allProperties, setAllProperties] = useState<Array<{ id: number; name: string }>>([]);
   const [selectedDealLevel, setSelectedDealLevel] = useState<LoyaltyLevelValue>("member");
   const [levelDeals, setLevelDeals] = useState<LoyaltyDealItem[]>([]);
@@ -244,6 +245,49 @@ export function PropertyEditClient() {
       addToast({ title: "Error de red", color: "danger" });
     } finally {
       setAiSuggesting(false);
+    }
+  }
+
+  async function generateDescriptionFromOriginalPmsOnce() {
+    if (!property || readOnly || generatingOriginalAi) return;
+    if (!property.pms_ai?.available) {
+      addToast({
+        title: "Sin fuente PMS",
+        description: "Esta propiedad no tiene un mapeo PMS activo para generar AI.",
+        color: "warning",
+      });
+      return;
+    }
+    if (!property.pms_ai?.can_generate_once) {
+      addToast({
+        title: "AI ya generada",
+        description: "La generación desde fuente original ya se ejecutó una vez.",
+        color: "warning",
+      });
+      return;
+    }
+
+    setGeneratingOriginalAi(true);
+    try {
+      await adminApi.generatePropertyAIDescriptionOnce(property.id);
+      const refreshed = await adminApi.getProperty(property.id);
+      if (refreshed) {
+        setProperty(refreshed);
+        setDescription(refreshed.description ?? "");
+      }
+      addToast({
+        title: "Descripción AI generada",
+        description: "Se generó desde la fuente original PMS y quedó bloqueada para una segunda ejecución.",
+        color: "success",
+      });
+    } catch (e: unknown) {
+      addToast({
+        title: "No se pudo generar AI",
+        description: formatAdminApiError(e),
+        color: "danger",
+      });
+    } finally {
+      setGeneratingOriginalAi(false);
     }
   }
 
@@ -582,6 +626,7 @@ export function PropertyEditClient() {
   }
 
   const readOnly = !canEditProperty;
+  const canUseGenerateOriginalAiCta = role === "super_admin";
 
   const SaveButton = () => (
     <div className="flex gap-2 pt-2">
@@ -709,6 +754,71 @@ export function PropertyEditClient() {
                 </Button>
               )}
             </div>
+            {property.pms_ai?.available && (
+              <div className="mb-4 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
+                <p className="text-xs uppercase tracking-widest text-white/45 font-semibold">
+                  PMS + AI
+                </p>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-white/55 font-medium">Descripción sincronizada (original PMS)</p>
+                    <Textarea
+                      value={property.pms_ai.source_original_description || "Sin descripción original detectada"}
+                      isReadOnly
+                      minRows={5}
+                      classNames={{
+                        inputWrapper: "rounded-xl border border-white/[0.1] bg-white/[0.02]",
+                        input: "!text-white/85 text-xs",
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-white/55 font-medium">Descripción generada por AI</p>
+                    <Textarea
+                      value={
+                        property.pms_ai.ai_description_es ||
+                        property.pms_ai.ai_description_en ||
+                        "Aún no hay descripción AI en este mapeo"
+                      }
+                      isReadOnly
+                      minRows={5}
+                      classNames={{
+                        inputWrapper: "rounded-xl border border-white/[0.1] bg-white/[0.02]",
+                        input: "!text-white/85 text-xs",
+                      }}
+                    />
+                    <p className="text-[11px] text-white/45">
+                      Idiomas AI: {(property.pms_ai.ai_languages || []).join(", ") || "sin idiomas"} · estado: {property.pms_ai.ai_status || "n/a"}
+                    </p>
+                  </div>
+                </div>
+                {!readOnly && canUseGenerateOriginalAiCta && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      className="rounded-xl border border-[#b89a5e]/40 bg-[#b89a5e]/20 text-[#f0e6d2] font-medium"
+                      isLoading={generatingOriginalAi}
+                      isDisabled={generatingOriginalAi || !property.pms_ai.can_generate_once}
+                      startContent={!generatingOriginalAi ? <Icon icon="solar:magic-stick-3-bold-duotone" width={17} /> : undefined}
+                      onPress={generateDescriptionFromOriginalPmsOnce}
+                    >
+                      {property.pms_ai.can_generate_once
+                        ? "Generar descripción con AI desde original"
+                        : "AI desde original ya generada"}
+                    </Button>
+                    {property.pms_ai.manual_original_generated_at ? (
+                      <span className="text-[11px] text-emerald-300">
+                        Generada una vez: {new Date(property.pms_ai.manual_original_generated_at).toLocaleString("es-CO")}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-white/45">
+                        Acción disponible una sola vez por propiedad.
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             {isDescriptionEmpty(description) && (
               <p className="text-xs text-white/45 mb-2 font-sora">
                 Si la propiedad viene sin texto del PMS, puedes generar un borrador según nombre, ciudad, tipo y amenidades (requiere{" "}

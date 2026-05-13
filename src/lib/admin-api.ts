@@ -236,6 +236,19 @@ export interface AdminCitySearchRow {
 
 export interface PropertyDetail extends PropertyListItem {
   description?: string;
+  pms_ai?: {
+    available: boolean;
+    connection_id?: number | null;
+    connection_name?: string | null;
+    property_mapping_id?: number | null;
+    source_original_description?: string;
+    ai_description_es?: string;
+    ai_description_en?: string;
+    ai_status?: string;
+    ai_languages?: string[];
+    manual_original_generated_at?: string | null;
+    can_generate_once?: boolean;
+  };
   /** Solo cotizar noches cubiertas por el Excel de inventario manual. */
   restrict_pricing_to_manual_weeks?: boolean;
   /** Solo mostrar la propiedad cuando las fechas coincidan exactamente con un PropertyFixedWeekSlot. */
@@ -1441,6 +1454,15 @@ export const adminApi = {
     }>
   ): Promise<PropertyDetail> {
     return patchJson<PropertyDetail>(`/api/admin/properties/${id}/`, data);
+  },
+
+  async generatePropertyAIDescriptionOnce(id: number): Promise<{
+    ok: boolean;
+    property_id: number;
+    property_mapping_id: number;
+    ai_meta?: Record<string, unknown>;
+  }> {
+    return postJson(`/api/admin/properties/${id}/generate-ai-description-once/`, {});
   },
 
   async deleteProperty(id: number): Promise<void> {
