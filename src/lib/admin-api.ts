@@ -337,9 +337,11 @@ export interface RoomTypePicture {
 }
 
 export interface RoomTypePmsMappingRow {
+  room_type_mapping_id?: number;
   connection_id: number;
   connection_name: string;
   pms_room_type_id: string;
+  pms_room_type_data?: Record<string, unknown>;
 }
 
 export interface RoomTypePhysicalRoomRow {
@@ -367,6 +369,18 @@ export interface RoomTypeAdminDetail extends Omit<RoomTypeAdminSummary, "descrip
   pictures: RoomTypePicture[];
   physical_rooms: RoomTypePhysicalRoomRow[];
   pms_mappings: RoomTypePmsMappingRow[];
+  pms_ai?: {
+    available: boolean;
+    connection_id?: number | null;
+    connection_name?: string | null;
+    room_type_mapping_id?: number | null;
+    source_original_description?: string;
+    ai_description_es?: string;
+    ai_description_en?: string;
+    ai_status?: string;
+    ai_languages?: string[];
+    manual_original_generated_at?: string | null;
+  };
   created: string;
   updated: string;
 }
@@ -1706,6 +1720,22 @@ export const adminApi = {
     return patchJson<RoomTypeAdminDetail>(
       `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/`,
       data
+    );
+  },
+
+  async generateRoomTypeAIDescription(
+    propertyId: number,
+    roomTypeId: number
+  ): Promise<{
+    ok: boolean;
+    property_id: number;
+    room_type_id: number;
+    room_type_mapping_id: number;
+    ai_meta?: Record<string, unknown>;
+  }> {
+    return postJson(
+      `/api/admin/properties/${propertyId}/room-types/${roomTypeId}/generate-ai-description/`,
+      {}
     );
   },
 

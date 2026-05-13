@@ -45,11 +45,13 @@ export function RoomTypeEditClient() {
   const router = useRouter();
   const propertyId = parseInt(String(params?.id ?? "0"), 10);
   const roomTypeId = parseInt(String(params?.roomTypeId ?? "0"), 10);
-  const { canEditProperty } = useAdmin();
+  const { canEditProperty, role } = useAdmin();
   const readOnly = !canEditProperty;
+  const canUseRoomTypeAiCta = role === "super_admin";
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [generatingOriginalAi, setGeneratingOriginalAi] = useState(false);
   const [detail, setDetail] = useState<RoomTypeAdminDetail | null>(null);
   const [pictures, setPictures] = useState<RoomTypePicture[]>([]);
 
@@ -125,6 +127,47 @@ export function RoomTypeEditClient() {
     }
   }
 
+  async function handleGenerateRoomTypeAi() {
+    if (!detail || readOnly || generatingOriginalAi || !canUseRoomTypeAiCta) return;
+    if (!detail.pms_ai?.available) {
+      addToast({
+        title: "Sin fuente PMS",
+        description: "Este tipo de habitación no tiene mapeo PMS activo.",
+        color: "warning",
+      });
+      return;
+    }
+    setGeneratingOriginalAi(true);
+    try {
+      await adminApi.generateRoomTypeAIDescription(propertyId, roomTypeId);
+      const refreshed = await adminApi.getRoomTypeAdmin(propertyId, roomTypeId);
+      if (refreshed) {
+        setDetail(refreshed);
+        setPictures(refreshed.pictures ?? []);
+        setName(refreshed.name);
+        setDescription(refreshed.description ?? "");
+        setCode(refreshed.code);
+        setMaxOccupancy(String(refreshed.max_occupancy));
+        setNumRooms(refreshed.num_rooms != null ? String(refreshed.num_rooms) : "");
+        setNumBathrooms(refreshed.num_bathrooms != null ? String(refreshed.num_bathrooms) : "");
+        setAreaSqm(refreshed.area_sqm != null ? String(refreshed.area_sqm) : "");
+      }
+      addToast({
+        title: "Descripción AI generada",
+        description: "La descripción del tipo de habitación se actualizó desde la fuente original PMS.",
+        color: "success",
+      });
+    } catch (e) {
+      addToast({
+        title: "No se pudo generar AI",
+        description: e instanceof Error ? e.message : "Intenta de nuevo.",
+        color: "danger",
+      });
+    } finally {
+      setGeneratingOriginalAi(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center py-24">
@@ -195,6 +238,66 @@ export function RoomTypeEditClient() {
             <p className="text-xs text-white/45">Nombre, descripción y características físicas.</p>
           </div>
         </div>
+
+        {detail.pms_ai?.available && (
+          <div className="mb-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
+            <p className="text-xs uppercase tracking-widest text-white/45 font-semibold">PMS + AI (Habitación)</p>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <p className="text-xs text-white/55 font-medium">Descripción sincronizada (original PMS)</p>
+                <Textarea
+                  value={detail.pms_ai.source_original_description || "Sin descripción original detectada"}
+                  isReadOnly
+                  minRows={4}
+                  classNames={{
+                    inputWrapper: "rounded-xl border border-white/[0.1] bg-white/[0.02]",
+                    input: "!text-white/85 text-xs",
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-xs text-white/55 font-medium">Descripción generada por AI</p>
+                <Textarea
+                  value={
+                    detail.pms_ai.ai_description_es ||
+                    detail.pms_ai.ai_description_en ||
+                    "Aún no hay descripción AI"
+                  }
+                  isReadOnly
+                  minRows={4}
+                  classNames={{
+                    inputWrapper: "rounded-xl border border-white/[0.1] bg-white/[0.02]",
+                    input: "!text-white/85 text-xs",
+                  }}
+                />
+                <p className="text-[11px] text-white/45">
+                  Idiomas AI: {(detail.pms_ai.ai_languages || []).join(", ") || "sin idiomas"} · estado: {detail.pms_ai.ai_status || "n/a"}
+                </p>
+              </div>
+            </div>
+            {!readOnly && canUseRoomTypeAiCta && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  className="rounded-xl border border-[#b89a5e]/40 bg-[#b89a5e]/20 text-[#f0e6d2] font-medium"
+                  isLoading={generatingOriginalAi}
+                  isDisabled={generatingOriginalAi}
+                  startContent={!generatingOriginalAi ? <Icon icon="solar:magic-stick-3-bold-duotone" width={17} /> : undefined}
+                  onPress={handleGenerateRoomTypeAi}
+                >
+                  Generar descripción con AI desde original
+                </Button>
+                {detail.pms_ai.manual_original_generated_at ? (
+                  <span className="text-[11px] text-emerald-300">
+                    Última generación: {new Date(detail.pms_ai.manual_original_generated_at).toLocaleString("es-CO")}
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-white/45">Disponible para regenerar cuando lo necesites.</span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input
