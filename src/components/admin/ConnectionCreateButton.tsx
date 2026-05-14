@@ -39,7 +39,7 @@ const PMS_DESCRIPTIONS: Record<string, string> = {
   siteminder_dashboard:
     "SiteMinder (dashboard web): sesión con email/contraseña y endpoint JSON interno (XHR) configurable",
   rategain:
-    "RateGain Smart Distribution — API REST (ApiKey/ApiSecret) para catálogo, disponibilidad y tarifas",
+    "RateGain Smart Distribution — API REST (ApiKey/ApiSecret). Sincroniza catálogo, disponibilidad, tarifas y restricciones (min stay, CTA/CTD). Credenciales vía onboarding RateGain.",
 };
 
 /** Campos de credenciales requeridos por cada tipo de PMS */
@@ -163,19 +163,33 @@ const PMS_CONFIG_FIELDS: Record<
       key: "base_url",
       label: "SD-Domain (base URL)",
       required: true,
-      placeholder: "https://partner.ejemplo.com",
+      placeholder: "https://partner.xxxxx.com",
       type: "url",
-      description: "Origen HTTPS sin barra final (ver documentación RateGain Smart Distribution).",
+      description: "URL base que RateGain entrega en el onboarding de Smart Distribution (sin barra final). Si no la tienes, escríbeles a pmg@rategain.com solicitando SD-Domain, ApiKey y ApiSecret.",
     },
-    { key: "api_key", label: "Api Key", required: true, placeholder: "ApiKey de onboarding", type: "password" },
-    { key: "api_secret", label: "Api Secret", required: true, placeholder: "ApiSecret", type: "password" },
+    {
+      key: "api_key",
+      label: "Api Key",
+      required: true,
+      placeholder: "ApiKey del onboarding RateGain",
+      type: "password",
+      description: "Credencial ApiKey que RateGain entrega en el proceso de onboarding de Smart Distribution.",
+    },
+    {
+      key: "api_secret",
+      label: "Api Secret",
+      required: true,
+      placeholder: "ApiSecret del onboarding RateGain",
+      type: "password",
+      description: "Credencial ApiSecret correspondiente. Ambas se almacenan cifradas y nunca se muestran completas.",
+    },
     {
       key: "property_ids",
-      label: "Property IDs (opcional, JSON o comas)",
+      label: "Property IDs (opcional — JSON array o separados por comas)",
       required: false,
-      placeholder: "Vacío = descubrir todas vía API (destinos + bestproperties)",
+      placeholder: 'Vacío = descubrir automáticamente todas las propiedades',
       description:
-        "Si lo dejas vacío, el sync consulta getDestinations y bestproperties para listar todos los propertyId. Rellena solo si quieres limitar a hoteles concretos.",
+        "Deja vacío para que Almara descubra todas tus propiedades vía getDestinations + bestproperties. Solo rellena si quieres limitar la sincronización a hoteles concretos (p. ej. [\"P001\",\"P002\"] o P001, P002).",
       inputType: "textarea",
     },
   ],
