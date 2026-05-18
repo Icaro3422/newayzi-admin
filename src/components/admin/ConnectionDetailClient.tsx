@@ -173,6 +173,14 @@ export function ConnectionDetailClient() {
   const [configSmGraphqlQuery, setConfigSmGraphqlQuery] = useState("");
   const [configSmGraphqlVariables, setConfigSmGraphqlVariables] = useState("");
   const [configSmPropertiesListPath, setConfigSmPropertiesListPath] = useState("");
+  const [configScHotelCode, setConfigScHotelCode] = useState("");
+  const [configScRequestorId, setConfigScRequestorId] = useState("");
+  const [configScReservationEndpoint, setConfigScReservationEndpoint] = useState("");
+  const [configScEnvironment, setConfigScEnvironment] = useState("");
+  const [configScOutboundUser, setConfigScOutboundUser] = useState("");
+  const [configScOutboundPwd, setConfigScOutboundPwd] = useState("");
+  const [configScInboundUser, setConfigScInboundUser] = useState("");
+  const [configScInboundPwd, setConfigScInboundPwd] = useState("");
   const [configHwClientId, setConfigHwClientId] = useState("");
   const [configHwClientSecret, setConfigHwClientSecret] = useState("");
   const [configHwListingIds, setConfigHwListingIds] = useState("");
@@ -324,6 +332,17 @@ export function ConnectionDetailClient() {
       } else {
         setConfigSmGraphqlVariables("");
       }
+    }
+    if (connection.pms_type === "siteminder_siteconnect") {
+      const c = connection.config as Record<string, unknown>;
+      setConfigScHotelCode(String(c.siteconnect_hotel_code ?? ""));
+      setConfigScRequestorId(String(c.siteconnect_requestor_id ?? ""));
+      setConfigScReservationEndpoint(String(c.siteconnect_reservation_endpoint ?? ""));
+      setConfigScEnvironment(String(c.siteconnect_environment ?? "test"));
+      setConfigScOutboundUser(String(c.siteconnect_outbound_username ?? ""));
+      setConfigScOutboundPwd("");
+      setConfigScInboundUser(String(c.siteconnect_inbound_username ?? ""));
+      setConfigScInboundPwd("");
     }
     if (connection.pms_type === "hostaway") {
       const c = connection.config as Record<string, unknown>;
@@ -947,6 +966,36 @@ export function ConnectionDetailClient() {
       setConnection(updated);
       setEditingConfig(false);
       setConfigSmPwd("");
+    } finally { setSavingConfig(false); }
+  }
+
+  async function saveSiteConnectConfig() {
+    if (!connection || !canEditConnections || connection.pms_type !== "siteminder_siteconnect") return;
+    const prev = { ...(connection.config as Record<string, unknown>) };
+    delete prev.siteconnect_outbound_password;
+    delete prev.siteconnect_inbound_password;
+    const newConfig: Record<string, unknown> = {
+      ...prev,
+      siteconnect_hotel_code: configScHotelCode.trim(),
+      siteconnect_requestor_id: configScRequestorId.trim(),
+      siteconnect_reservation_endpoint: configScReservationEndpoint.trim().replace(/\/+$/, ""),
+      siteconnect_environment: (configScEnvironment.trim() || "test").toLowerCase(),
+      siteconnect_outbound_username: configScOutboundUser.trim(),
+      siteconnect_inbound_username: configScInboundUser.trim(),
+    };
+    if (configScOutboundPwd.trim()) {
+      newConfig.siteconnect_outbound_password = configScOutboundPwd.trim();
+    }
+    if (configScInboundPwd.trim()) {
+      newConfig.siteconnect_inbound_password = configScInboundPwd.trim();
+    }
+    setSavingConfig(true);
+    try {
+      const updated = await adminApi.patchConnection(id, { config: newConfig });
+      setConnection(updated);
+      setEditingConfig(false);
+      setConfigScOutboundPwd("");
+      setConfigScInboundPwd("");
     } finally { setSavingConfig(false); }
   }
 
@@ -2451,6 +2500,145 @@ export function ConnectionDetailClient() {
                 <p>GraphQL path: <span className="text-white/70">{configSmGraphqlPath || "—"}</span></p>
                 <p>Lista (path): <span className="text-white/70">{configSmPropertiesListPath || "—"}</span></p>
                 <p>Query GraphQL: <span className="text-white/70">{configSmGraphqlQuery ? `${configSmGraphqlQuery.slice(0, 80)}…` : "—"}</span></p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {connection.pms_type === "siteminder_siteconnect" && canEditConnections && (
+          <div className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.03] p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Icon icon="solar:server-bold-duotone" width={17} className="text-[#f0e6d2]" />
+                <p className="text-sm font-semibold text-white/80">SiteMinder SiteConnect (Partner)</p>
+              </div>
+              {!editingConfig ? (
+                <Button
+                  size="sm"
+                  variant="flat"
+                  onPress={() => setEditingConfig(true)}
+                  className="!text-white/70 bg-white/[0.07] border border-white/[0.12] hover:bg-white/[0.12]"
+                >
+                  Editar
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    className="!text-white/60 bg-white/[0.05] border border-white/[0.1]"
+                    onPress={() => {
+                      setEditingConfig(false);
+                      const c = (connection.config ?? {}) as Record<string, unknown>;
+                      setConfigScHotelCode(String(c.siteconnect_hotel_code ?? ""));
+                      setConfigScRequestorId(String(c.siteconnect_requestor_id ?? ""));
+                      setConfigScReservationEndpoint(String(c.siteconnect_reservation_endpoint ?? ""));
+                      setConfigScEnvironment(String(c.siteconnect_environment ?? "test"));
+                      setConfigScOutboundUser(String(c.siteconnect_outbound_username ?? ""));
+                      setConfigScInboundUser(String(c.siteconnect_inbound_username ?? ""));
+                      setConfigScOutboundPwd("");
+                      setConfigScInboundPwd("");
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="btn-newayzi-primary"
+                    onPress={saveSiteConnectConfig}
+                    isLoading={savingConfig}
+                    isDisabled={
+                      !configScHotelCode.trim() ||
+                      !configScRequestorId.trim() ||
+                      !configScReservationEndpoint.trim() ||
+                      !configScOutboundUser.trim()
+                    }
+                  >
+                    Guardar
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {editingConfig ? (
+              <div className="space-y-3">
+                <Input
+                  label="HotelCode"
+                  value={configScHotelCode}
+                  onValueChange={setConfigScHotelCode}
+                  placeholder="HOTELCODE"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="RequestorID"
+                  value={configScRequestorId}
+                  onValueChange={setConfigScRequestorId}
+                  placeholder="ABC"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Reservation endpoint"
+                  value={configScReservationEndpoint}
+                  onValueChange={setConfigScReservationEndpoint}
+                  placeholder="https://.../reservation-gateway/services"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Entorno"
+                  value={configScEnvironment}
+                  onValueChange={setConfigScEnvironment}
+                  placeholder="test o production"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Usuario outbound (Newayzi -> SiteMinder)"
+                  value={configScOutboundUser}
+                  onValueChange={setConfigScOutboundUser}
+                  placeholder="partner_out_user"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Password outbound (dejar vacío para mantener)"
+                  type="password"
+                  value={configScOutboundPwd}
+                  onValueChange={setConfigScOutboundPwd}
+                  placeholder="********"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Usuario inbound (SiteMinder -> Newayzi)"
+                  value={configScInboundUser}
+                  onValueChange={setConfigScInboundUser}
+                  placeholder="partner_in_user"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Password inbound (dejar vacío para mantener)"
+                  type="password"
+                  value={configScInboundPwd}
+                  onValueChange={setConfigScInboundPwd}
+                  placeholder="********"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+              </div>
+            ) : (
+              <div className="text-sm text-white/40 space-y-1">
+                <p>HotelCode: <span className="text-white/70">{configScHotelCode || "—"}</span></p>
+                <p>RequestorID: <span className="text-white/70">{configScRequestorId || "—"}</span></p>
+                <p>Reservation endpoint: <span className="text-white/70">{configScReservationEndpoint || "—"}</span></p>
+                <p>Entorno: <span className="text-white/70">{configScEnvironment || "—"}</span></p>
+                <p>Outbound user: <span className="text-white/70">{configScOutboundUser || "—"}</span></p>
+                <p>Outbound password: <span className="text-white/50 tracking-widest">••••••••</span></p>
+                <p>Inbound user: <span className="text-white/70">{configScInboundUser || "—"}</span></p>
+                <p>Inbound password: <span className="text-white/50 tracking-widest">••••••••</span></p>
               </div>
             )}
           </div>

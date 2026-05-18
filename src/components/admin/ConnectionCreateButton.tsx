@@ -27,6 +27,7 @@ const PMS_ICONS: Record<string, string> = {
   generic: "solar:link-circle-bold-duotone",
   hostaway: "solar:calendar-bold-duotone",
   siteminder_dashboard: "solar:global-bold-duotone",
+  siteminder_siteconnect: "solar:server-bold-duotone",
   rategain: "solar:graph-up-bold-duotone",
 };
 
@@ -38,6 +39,8 @@ const PMS_DESCRIPTIONS: Record<string, string> = {
   hostaway: "Hostaway — channel manager para alquileres vacacionales (OAuth2 API v1)",
   siteminder_dashboard:
     "SiteMinder (dashboard web): sesión con email/contraseña y endpoint JSON interno (XHR) configurable",
+  siteminder_siteconnect:
+    "SiteMinder SiteConnect (Partner API): SOAP OTA + WS-Security para reservas y callbacks ARI certificados.",
   rategain:
     "RateGain Smart Distribution — API REST (ApiKey/ApiSecret). Sincroniza catálogo, disponibilidad, tarifas y restricciones (min stay, CTA/CTD). Credenciales vía onboarding RateGain.",
 };
@@ -124,6 +127,67 @@ const PMS_CONFIG_FIELDS: Record<
       required: false,
       placeholder: "data.propiedades",
       description: "Navegación con puntos dentro del JSON (GET o GraphQL).",
+    },
+  ],
+  siteminder_siteconnect: [
+    {
+      key: "siteconnect_hotel_code",
+      label: "HotelCode",
+      required: true,
+      placeholder: "HOTELCODE",
+      description: "Código único de hotel en SiteConnect (entregado durante onboarding partner).",
+    },
+    {
+      key: "siteconnect_requestor_id",
+      label: "RequestorID (Channel Code)",
+      required: true,
+      placeholder: "ABC",
+      description: "Identificador del partner/canal provisto por SiteMinder.",
+    },
+    {
+      key: "siteconnect_reservation_endpoint",
+      label: "Reservation endpoint",
+      required: true,
+      placeholder: "https://tpi-cm-siteconn.preprod.siteminderlabs.com/reservation-gateway/services",
+      type: "url",
+      description: "Endpoint SOAP de reservas que SiteMinder te entrega (test o producción).",
+    },
+    {
+      key: "siteconnect_outbound_username",
+      label: "Usuario outbound (Newayzi -> SiteMinder)",
+      required: true,
+      placeholder: "partner_out_user",
+      description: "Username WS-Security para enviar OTA_HotelResNotifRQ a SiteMinder.",
+    },
+    {
+      key: "siteconnect_outbound_password",
+      label: "Password outbound",
+      required: true,
+      placeholder: "********",
+      type: "password",
+      description: "Password WS-Security outbound (se guarda cifrado).",
+    },
+    {
+      key: "siteconnect_inbound_username",
+      label: "Usuario inbound (SiteMinder -> Newayzi)",
+      required: false,
+      placeholder: "partner_in_user",
+      description: "Username que SiteMinder usará para autenticarse contra los endpoints SOAP de Newayzi.",
+    },
+    {
+      key: "siteconnect_inbound_password",
+      label: "Password inbound (opcional)",
+      required: false,
+      placeholder: "********",
+      type: "password",
+      description: "Password WS-Security inbound (se guarda cifrado).",
+    },
+    {
+      key: "siteconnect_environment",
+      label: "Entorno",
+      required: false,
+      placeholder: "test",
+      description: "test o production.",
     },
   ],
   hostaway: [
