@@ -173,6 +173,9 @@ export function ConnectionDetailClient() {
   const [configSmGraphqlQuery, setConfigSmGraphqlQuery] = useState("");
   const [configSmGraphqlVariables, setConfigSmGraphqlVariables] = useState("");
   const [configSmPropertiesListPath, setConfigSmPropertiesListPath] = useState("");
+  const [configSmGraphqlBlueprint, setConfigSmGraphqlBlueprint] = useState("");
+  const [configSmPropertyId, setConfigSmPropertyId] = useState("");
+  const [configSmAutoDiscover, setConfigSmAutoDiscover] = useState("");
   const [configScHotelCode, setConfigScHotelCode] = useState("");
   const [configScRequestorId, setConfigScRequestorId] = useState("");
   const [configScReservationEndpoint, setConfigScReservationEndpoint] = useState("");
@@ -324,6 +327,16 @@ export function ConnectionDetailClient() {
       setConfigSmGraphqlPath(cfg.graphql_path ?? "");
       setConfigSmGraphqlQuery(cfg.graphql_query ?? "");
       setConfigSmPropertiesListPath(cfg.properties_list_path ?? "");
+      setConfigSmPropertyId(cfg.siteminder_property_id ?? cfg.property_id ?? "");
+      setConfigSmAutoDiscover(String(cfg.auto_discover_blueprint ?? ""));
+      const gb = cfg.graphql_sync_blueprint as unknown;
+      if (gb && typeof gb === "object") {
+        setConfigSmGraphqlBlueprint(JSON.stringify(gb, null, 2));
+      } else if (typeof gb === "string") {
+        setConfigSmGraphqlBlueprint(gb);
+      } else {
+        setConfigSmGraphqlBlueprint("");
+      }
       const gv = cfg.graphql_variables as unknown;
       if (gv && typeof gv === "object") {
         setConfigSmGraphqlVariables(JSON.stringify(gv, null, 2));
@@ -944,6 +957,17 @@ export function ConnectionDetailClient() {
     } else {
       delete newConfig.properties_list_path;
     }
+    if (configSmPropertyId.trim()) {
+      newConfig.siteminder_property_id = configSmPropertyId.trim();
+    } else {
+      delete newConfig.siteminder_property_id;
+    }
+    const autoRaw = configSmAutoDiscover.trim().toLowerCase();
+    if (autoRaw) {
+      newConfig.auto_discover_blueprint = autoRaw === "true" || autoRaw === "1" || autoRaw === "yes";
+    } else {
+      delete newConfig.auto_discover_blueprint;
+    }
     const gvRaw = configSmGraphqlVariables.trim();
     if (gvRaw) {
       try {
@@ -958,6 +982,21 @@ export function ConnectionDetailClient() {
       }
     } else {
       delete newConfig.graphql_variables;
+    }
+    const gbRaw = configSmGraphqlBlueprint.trim();
+    if (gbRaw) {
+      try {
+        newConfig.graphql_sync_blueprint = JSON.parse(gbRaw) as Record<string, unknown>;
+      } catch {
+        addToast({
+          title: "Blueprint inválido",
+          description: "graphql_sync_blueprint debe ser JSON válido u estar vacío.",
+          color: "danger",
+        });
+        return;
+      }
+    } else {
+      delete newConfig.graphql_sync_blueprint;
     }
     if (configSmPwd) newConfig.password = configSmPwd;
     setSavingConfig(true);
@@ -2389,6 +2428,16 @@ export function ConnectionDetailClient() {
                       setConfigSmGraphqlPath(cfg.graphql_path ?? "");
                       setConfigSmGraphqlQuery(cfg.graphql_query ?? "");
                       setConfigSmPropertiesListPath(cfg.properties_list_path ?? "");
+                      setConfigSmPropertyId(cfg.siteminder_property_id ?? cfg.property_id ?? "");
+                      setConfigSmAutoDiscover(String(cfg.auto_discover_blueprint ?? ""));
+                      const gb = cfg.graphql_sync_blueprint as unknown;
+                      if (gb && typeof gb === "object") {
+                        setConfigSmGraphqlBlueprint(JSON.stringify(gb, null, 2));
+                      } else if (typeof gb === "string") {
+                        setConfigSmGraphqlBlueprint(gb);
+                      } else {
+                        setConfigSmGraphqlBlueprint("");
+                      }
                       const gv = cfg.graphql_variables as unknown;
                       if (gv && typeof gv === "object") {
                         setConfigSmGraphqlVariables(JSON.stringify(gv, null, 2));
@@ -2407,7 +2456,7 @@ export function ConnectionDetailClient() {
                     className="btn-newayzi-primary"
                     onPress={saveSiteMinderConfig}
                     isLoading={savingConfig}
-                    isDisabled={!configSmBaseUrl.trim() || !configSmEmail.trim()}
+                    isDisabled={!configSmEmail.trim()}
                   >
                     Guardar
                   </Button>
@@ -2490,6 +2539,34 @@ export function ConnectionDetailClient() {
                   size="sm"
                   classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
                 />
+                <Input
+                  label="Property ID SiteMinder (autodiscovery)"
+                  value={configSmPropertyId}
+                  onValueChange={setConfigSmPropertyId}
+                  placeholder="fae94e45-584d-415c-97cc-d97cbb68d11c"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Input
+                  label="Auto descubrir blueprint (true/false)"
+                  value={configSmAutoDiscover}
+                  onValueChange={setConfigSmAutoDiscover}
+                  placeholder="true"
+                  size="sm"
+                  classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
+                />
+                <Textarea
+                  label="Blueprint multi-endpoint (graphql_sync_blueprint)"
+                  value={configSmGraphqlBlueprint}
+                  onValueChange={setConfigSmGraphqlBlueprint}
+                  placeholder='{"availability":{"path":"/api/cm-beef/graphql","query":"query ...","variables":{"propertyId":"{property_id}","startDate":"{start_date}","endDate":"{end_date}"}}}'
+                  minRows={5}
+                  classNames={{
+                    inputWrapper: `${inputDark} border-white/[0.12]`,
+                    input: "!text-white/95 placeholder:!text-white/30 font-mono text-xs",
+                    label: "!text-white/60",
+                  }}
+                />
               </div>
             ) : (
               <div className="text-sm text-white/40 space-y-1">
@@ -2499,7 +2576,10 @@ export function ConnectionDetailClient() {
                 <p>Inventario GET: <span className="text-white/70">{configSmInventoryUrl || "—"}</span></p>
                 <p>GraphQL path: <span className="text-white/70">{configSmGraphqlPath || "—"}</span></p>
                 <p>Lista (path): <span className="text-white/70">{configSmPropertiesListPath || "—"}</span></p>
+                <p>Property ID: <span className="text-white/70">{configSmPropertyId || "—"}</span></p>
+                <p>Auto discovery: <span className="text-white/70">{configSmAutoDiscover || "—"}</span></p>
                 <p>Query GraphQL: <span className="text-white/70">{configSmGraphqlQuery ? `${configSmGraphqlQuery.slice(0, 80)}…` : "—"}</span></p>
+                <p>Blueprint: <span className="text-white/70">{configSmGraphqlBlueprint ? "Configurado" : "—"}</span></p>
               </div>
             )}
           </div>
