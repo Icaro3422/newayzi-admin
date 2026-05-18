@@ -92,7 +92,7 @@ const PMS_CONFIG_FIELDS: Record<
       label: "Usuario o email del operador",
       required: true,
       placeholder: "usuario@hotel.com",
-      description: "Solo necesitas usuario y contraseña. El sistema detecta propiedades y endpoints automáticamente.",
+      description: "Usuario del dashboard SiteMinder.",
     },
     {
       key: "password",
@@ -100,6 +100,13 @@ const PMS_CONFIG_FIELDS: Record<
       required: true,
       placeholder: "Contraseña del dashboard",
       type: "password",
+    },
+    {
+      key: "siteminder_property_id",
+      label: "Property ID de SiteMinder",
+      required: true,
+      placeholder: "fae94e45-584d-415c-97cc-d97cbb68d11c",
+      description: "ID UUID de la propiedad que se sincronizará.",
     },
   ],
   siteminder_siteconnect: [

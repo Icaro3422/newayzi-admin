@@ -934,6 +934,14 @@ export function ConnectionDetailClient() {
 
   async function saveSiteMinderConfig() {
     if (!connection || !canEditConnections || connection.pms_type !== "siteminder_dashboard") return;
+    if (!configSmPropertyId.trim()) {
+      addToast({
+        title: "Falta Property ID",
+        description: "Debes indicar el siteminder_property_id para sincronizar SiteMinder.",
+        color: "danger",
+      });
+      return;
+    }
     const prev = { ...(connection.config as Record<string, unknown>) };
     delete prev.password;
     const newConfig: Record<string, unknown> = {
@@ -2456,7 +2464,7 @@ export function ConnectionDetailClient() {
                     className="btn-newayzi-primary"
                     onPress={saveSiteMinderConfig}
                     isLoading={savingConfig}
-                    isDisabled={!configSmEmail.trim()}
+                    isDisabled={!configSmEmail.trim() || !configSmPropertyId.trim()}
                   >
                     Guardar
                   </Button>
@@ -2540,7 +2548,7 @@ export function ConnectionDetailClient() {
                   classNames={{ inputWrapper: inputDark, input: "!text-white/95 placeholder:!text-white/30", label: "!text-white/60" }}
                 />
                 <Input
-                  label="Property ID SiteMinder (autodiscovery)"
+                  label="Property ID SiteMinder (obligatorio)"
                   value={configSmPropertyId}
                   onValueChange={setConfigSmPropertyId}
                   placeholder="fae94e45-584d-415c-97cc-d97cbb68d11c"
