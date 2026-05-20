@@ -163,11 +163,17 @@ export default function AdminSeoArticlesPage() {
         property_ids,
         city_ids,
       });
-      setGenMessage(
-        `Creadas: ${res.created}, omitidas: ${res.skipped}, fallidas: ${res.failed} (${res.execution_time_ms} ms).`
-      );
+      if (res.queued && res.task_id) {
+        setGenMessage(
+          `Generación encolada (task ${res.task_id}). El proceso corre en background sin bloquear la página.`
+        );
+      } else {
+        setGenMessage(
+          `Creadas: ${res.created ?? 0}, omitidas: ${res.skipped ?? 0}, fallidas: ${res.failed ?? 0} (${res.execution_time_ms ?? 0} ms).`
+        );
+      }
       if (res.errors?.length) {
-        setGenMessage((m) => `${m} Errores: ${res.errors.slice(0, 3).join(" · ")}`);
+        setGenMessage((m) => `${m} Errores: ${res.errors!.slice(0, 3).join(" · ")}`);
       }
       setGenOpen(false);
       await load();

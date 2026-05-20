@@ -2558,12 +2558,14 @@ export interface AdminSeoArticlesListResponse {
 }
 
 export interface AdminSeoGenerateResponse {
-  created: number;
-  skipped: number;
-  failed: number;
-  execution_time_ms: number;
-  log_id: number;
-  errors: string[];
+  queued?: boolean;
+  task_id?: string;
+  created?: number;
+  skipped?: number;
+  failed?: number;
+  execution_time_ms?: number;
+  log_id?: number;
+  errors?: string[];
 }
 
 export const seoArticlesApi = {
