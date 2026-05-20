@@ -20,6 +20,7 @@ const STATUS_LABEL: Record<string, string> = {
 const TYPE_LABEL: Record<string, string> = {
   property_guide: "Guía propiedad",
   city_guide: "Guía ciudad",
+  segment_landing: "Landing segmento",
   editorial: "Editorial",
   industry_news: "Noticia sector",
   platform_event: "Evento / temporada",
@@ -38,9 +39,26 @@ function parseIds(raw: string): number[] | undefined {
 
 export default function AdminSeoArticlesPage() {
   const [articles, setArticles] = useState<AdminSeoArticle[]>([]);
+  const [total, setTotal] = useState(0);
+  const [summary, setSummary] = useState<{
+    total_all: number;
+    by_status: Record<string, number>;
+    by_type: Record<string, number>;
+    by_locale: Record<string, number>;
+  } | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
+  const pageSize = 50;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [localeFilter, setLocaleFilter] = useState("");
+  const [search, setSearch] = useState("");
+  const [generatedFrom, setGeneratedFrom] = useState("");
+  const [generatedTo, setGeneratedTo] = useState("");
+  const [publishedFrom, setPublishedFrom] = useState("");
+  const [publishedTo, setPublishedTo] = useState("");
 
   const [genOpen, setGenOpen] = useState(false);
   const [genLimit, setGenLimit] = useState("5");
@@ -60,19 +78,58 @@ export default function AdminSeoArticlesPage() {
     try {
       const data = await seoArticlesApi.list({
         status: statusFilter || undefined,
-        limit: 200,
+        article_type: typeFilter || undefined,
+        locale: localeFilter || undefined,
+        search: search || undefined,
+        generated_from: generatedFrom || undefined,
+        generated_to: generatedTo || undefined,
+        published_from: publishedFrom || undefined,
+        published_to: publishedTo || undefined,
+        page,
+        page_size: pageSize,
+        order: "-updated_at",
       });
       setArticles(data.results);
+      setTotal(data.total ?? data.count ?? data.results.length);
+      setHasNext(Boolean(data.has_next));
+      setSummary(data.summary ?? null);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Error al cargar guías");
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [
+    statusFilter,
+    typeFilter,
+    localeFilter,
+    search,
+    generatedFrom,
+    generatedTo,
+    publishedFrom,
+    publishedTo,
+    page,
+  ]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const statusCount = summary?.by_status || {};
+  const byType = summary?.by_type || {};
+  const byLocale = summary?.by_locale || {};
+
+  function fmtDate(value: string | null): string {
+    if (!value) return "—";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleString("es-CO", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
 
   async function patchStatus(id: number, status: string) {
     setPatchingId(id);
@@ -158,7 +215,10 @@ export default function AdminSeoArticlesPage() {
         <label className="text-white/50 text-sm font-sora">Estado</label>
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => {
+            setPage(1);
+            setStatusFilter(e.target.value);
+          }}
           className="bg-white/[0.08] border border-white/[0.15] rounded-xl px-3 py-2 text-sm text-white font-sora outline-none focus:border-[#b89a5e]"
         >
           <option value="">Todos</option>
@@ -166,14 +226,158 @@ export default function AdminSeoArticlesPage() {
           <option value="draft">Borradores</option>
           <option value="archived">Archivadas</option>
         </select>
+        <label className="text-white/50 text-sm font-sora">Tipo</label>
+        <select
+          value={typeFilter}
+          onChange={(e) => {
+            setPage(1);
+            setTypeFilter(e.target.value);
+          }}
+          className="bg-white/[0.08] border border-white/[0.15] rounded-xl px-3 py-2 text-sm text-white font-sora outline-none focus:border-[#b89a5e]"
+        >
+          <option value="">Todos</option>
+          {Object.keys(TYPE_LABEL).map((type) => (
+            <option key={type} value={type}>
+              {TYPE_LABEL[type]}
+            </option>
+          ))}
+        </select>
+        <label className="text-white/50 text-sm font-sora">Locale</label>
+        <select
+          value={localeFilter}
+          onChange={(e) => {
+            setPage(1);
+            setLocaleFilter(e.target.value);
+          }}
+          className="bg-white/[0.08] border border-white/[0.15] rounded-xl px-3 py-2 text-sm text-white font-sora outline-none focus:border-[#b89a5e]"
+        >
+          <option value="">Todos</option>
+          <option value="es">es</option>
+          <option value="en">en</option>
+        </select>
+        <input
+          value={search}
+          onChange={(e) => {
+            setPage(1);
+            setSearch(e.target.value);
+          }}
+          placeholder="Buscar por título, slug o descripción"
+          className="min-w-[280px] bg-white/[0.08] border border-white/[0.15] rounded-xl px-3 py-2 text-sm text-white font-sora placeholder:text-white/30 outline-none focus:border-[#b89a5e]"
+        />
+        <div className="flex items-center gap-2">
+          <label className="text-white/45 text-xs font-sora">Gen. desde</label>
+          <input
+            type="date"
+            value={generatedFrom}
+            onChange={(e) => {
+              setPage(1);
+              setGeneratedFrom(e.target.value);
+            }}
+            className="bg-white/[0.08] border border-white/[0.15] rounded-xl px-2 py-1.5 text-xs text-white font-sora"
+          />
+          <label className="text-white/45 text-xs font-sora">a</label>
+          <input
+            type="date"
+            value={generatedTo}
+            onChange={(e) => {
+              setPage(1);
+              setGeneratedTo(e.target.value);
+            }}
+            className="bg-white/[0.08] border border-white/[0.15] rounded-xl px-2 py-1.5 text-xs text-white font-sora"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-white/45 text-xs font-sora">Pub. desde</label>
+          <input
+            type="date"
+            value={publishedFrom}
+            onChange={(e) => {
+              setPage(1);
+              setPublishedFrom(e.target.value);
+            }}
+            className="bg-white/[0.08] border border-white/[0.15] rounded-xl px-2 py-1.5 text-xs text-white font-sora"
+          />
+          <label className="text-white/45 text-xs font-sora">a</label>
+          <input
+            type="date"
+            value={publishedTo}
+            onChange={(e) => {
+              setPage(1);
+              setPublishedTo(e.target.value);
+            }}
+            className="bg-white/[0.08] border border-white/[0.15] rounded-xl px-2 py-1.5 text-xs text-white font-sora"
+          />
+        </div>
         <button
           type="button"
-          onClick={() => load()}
+          onClick={() => {
+            setPage(1);
+            load();
+          }}
           className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white font-sora"
         >
           <Icon icon="solar:refresh-bold-duotone" />
           Actualizar
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            setStatusFilter("");
+            setTypeFilter("");
+            setLocaleFilter("");
+            setSearch("");
+            setGeneratedFrom("");
+            setGeneratedTo("");
+            setPublishedFrom("");
+            setPublishedTo("");
+            setPage(1);
+          }}
+          className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-white/80 font-sora"
+        >
+          <Icon icon="solar:eraser-bold-duotone" />
+          Limpiar filtros
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+        <div className="rounded-xl border border-white/[0.1] bg-white/[0.03] px-4 py-3">
+          <p className="text-white/45 text-xs font-sora uppercase tracking-wider">Total (global)</p>
+          <p className="text-white font-sora text-xl font-semibold">{summary?.total_all ?? "—"}</p>
+        </div>
+        <div className="rounded-xl border border-white/[0.1] bg-white/[0.03] px-4 py-3">
+          <p className="text-white/45 text-xs font-sora uppercase tracking-wider">Publicadas</p>
+          <p className="text-emerald-300 font-sora text-xl font-semibold">{statusCount.published ?? 0}</p>
+        </div>
+        <div className="rounded-xl border border-white/[0.1] bg-white/[0.03] px-4 py-3">
+          <p className="text-white/45 text-xs font-sora uppercase tracking-wider">Borradores</p>
+          <p className="text-amber-300 font-sora text-xl font-semibold">{statusCount.draft ?? 0}</p>
+        </div>
+        <div className="rounded-xl border border-white/[0.1] bg-white/[0.03] px-4 py-3">
+          <p className="text-white/45 text-xs font-sora uppercase tracking-wider">Resultado actual</p>
+          <p className="text-white font-sora text-xl font-semibold">{total}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+        <div className="rounded-xl border border-white/[0.1] bg-white/[0.03] px-4 py-3">
+          <p className="text-white/45 text-xs font-sora uppercase tracking-wider mb-2">Recuento por tipo</p>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(byType).map(([key, value]) => (
+              <span key={key} className="inline-flex rounded-lg border border-white/[0.15] px-2 py-1 text-xs text-white/80">
+                {TYPE_LABEL[key] || key}: {value}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-xl border border-white/[0.1] bg-white/[0.03] px-4 py-3">
+          <p className="text-white/45 text-xs font-sora uppercase tracking-wider mb-2">Recuento por locale</p>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(byLocale).map(([key, value]) => (
+              <span key={key} className="inline-flex rounded-lg border border-white/[0.15] px-2 py-1 text-xs text-white/80">
+                {key}: {value}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
 
       {genOpen ? (
@@ -277,6 +481,9 @@ export default function AdminSeoArticlesPage() {
                   <th className="px-4 py-3">Tipo</th>
                   <th className="px-4 py-3">Slug / locale</th>
                   <th className="px-4 py-3">Estado</th>
+                  <th className="px-4 py-3">Generada</th>
+                  <th className="px-4 py-3">Publicada</th>
+                  <th className="px-4 py-3">Actualizada</th>
                   <th className="px-4 py-3 text-right">Acciones</th>
                 </tr>
               </thead>
@@ -301,6 +508,9 @@ export default function AdminSeoArticlesPage() {
                         {STATUS_LABEL[a.status] || a.status}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-white/55 text-xs whitespace-nowrap">{fmtDate(a.created_at)}</td>
+                    <td className="px-4 py-3 text-white/55 text-xs whitespace-nowrap">{fmtDate(a.published_at)}</td>
+                    <td className="px-4 py-3 text-white/55 text-xs whitespace-nowrap">{fmtDate(a.updated_at)}</td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {a.status !== "published" ? (
                         <button
@@ -337,6 +547,29 @@ export default function AdminSeoArticlesPage() {
             </table>
           </div>
         )}
+      </div>
+      <div className="mt-4 flex items-center justify-between">
+        <p className="text-white/45 text-xs font-sora">
+          Página {page} · Mostrando {articles.length} de {total}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={page <= 1 || loading}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="px-3 py-1.5 rounded-lg text-xs font-sora text-white/70 border border-white/[0.15] disabled:opacity-40"
+          >
+            Anterior
+          </button>
+          <button
+            type="button"
+            disabled={!hasNext || loading}
+            onClick={() => setPage((p) => p + 1)}
+            className="px-3 py-1.5 rounded-lg text-xs font-sora text-white/70 border border-white/[0.15] disabled:opacity-40"
+          >
+            Siguiente
+          </button>
+        </div>
       </div>
     </div>
   );

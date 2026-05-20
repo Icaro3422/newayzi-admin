@@ -2545,6 +2545,16 @@ export interface AdminSeoArticle {
 export interface AdminSeoArticlesListResponse {
   results: AdminSeoArticle[];
   count: number;
+  total: number;
+  page: number;
+  page_size: number;
+  has_next: boolean;
+  summary?: {
+    total_all: number;
+    by_status: Record<string, number>;
+    by_type: Record<string, number>;
+    by_locale: Record<string, number>;
+  };
 }
 
 export interface AdminSeoGenerateResponse {
@@ -2557,10 +2567,33 @@ export interface AdminSeoGenerateResponse {
 }
 
 export const seoArticlesApi = {
-  async list(params?: { status?: string; limit?: number }): Promise<AdminSeoArticlesListResponse> {
+  async list(params?: {
+    status?: string;
+    article_type?: string;
+    locale?: string;
+    search?: string;
+    generated_from?: string;
+    generated_to?: string;
+    published_from?: string;
+    published_to?: string;
+    page?: number;
+    page_size?: number;
+    order?: string;
+    limit?: number;
+  }): Promise<AdminSeoArticlesListResponse> {
     const q = new URLSearchParams();
     if (params?.status) q.set("status", params.status);
-    if (params?.limit != null) q.set("limit", String(params.limit));
+    if (params?.article_type) q.set("article_type", params.article_type);
+    if (params?.locale) q.set("locale", params.locale);
+    if (params?.search) q.set("search", params.search);
+    if (params?.generated_from) q.set("generated_from", params.generated_from);
+    if (params?.generated_to) q.set("generated_to", params.generated_to);
+    if (params?.published_from) q.set("published_from", params.published_from);
+    if (params?.published_to) q.set("published_to", params.published_to);
+    if (params?.order) q.set("order", params.order);
+    if (params?.page != null) q.set("page", String(params.page));
+    if (params?.page_size != null) q.set("page_size", String(params.page_size));
+    if (params?.limit != null) q.set("limit", String(params.limit)); // compat
     const qs = q.toString();
     const res = await authFetch(`/api/admin/seo-articles/${qs ? `?${qs}` : ""}`);
     if (!res.ok) {
