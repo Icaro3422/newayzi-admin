@@ -212,7 +212,7 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
                 <div className="flex items-start gap-2">
                   <Icon icon="solar:magic-stick-3-bold-duotone" className="text-emerald-300 text-lg shrink-0 mt-0.5" />
                   <p className="text-xs text-emerald-200/80">
-                    Se enviará un <strong className="text-emerald-100">enlace de acceso directo</strong> al correo del usuario. Solo debe hacer clic para ingresar — <strong className="text-emerald-100">sin contraseña</strong>. El enlace expira en 48 horas.
+                    Se enviará un <strong className="text-emerald-100">enlace de acceso directo</strong> al correo del usuario. Solo debe hacer clic para ingresar — <strong className="text-emerald-100">sin contraseña</strong>.
                   </p>
                 </div>
                 <Select
@@ -268,7 +268,8 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
                 )}
               </Select>
             )}
-            {/* Billetera Rewards inicial */}
+            {/* Billetera Rewards inicial — solo roles admin; huéspedes corporativos → Créditos corporativos */}
+            {!isUserRole && (
             <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <Icon icon="solar:wallet-bold-duotone" className="text-violet-300 text-lg" />
@@ -300,7 +301,7 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
                 value={initial_points}
                 onValueChange={setInitialPoints}
                 placeholder="Ej: 500"
-                description="Se acreditan como ajuste en el historial de la billetera."
+                description="Ajuste manual en billetera — no registra prepago corporativo ni aporte al pool."
                 classNames={{
                   inputWrapper: inputDark,
                   input: "!text-white/95 placeholder:!text-white/38",
@@ -309,6 +310,16 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
                 }}
               />
             </div>
+            )}
+            {isUserRole && (
+              <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/5 p-4 text-sm text-white/65">
+                Para acreditar prepago corporativo (transferencia bancaria + magic link), usa{" "}
+                <a href="/admin/corporate-credits" className="text-cyan-300 underline">
+                  Créditos corporativos
+                </a>
+                . Este formulario solo crea la cuenta de huésped y envía el primer enlace.
+              </div>
+            )}
 
             {error && (
               <p className="text-sm text-red-400">{error}</p>
@@ -373,7 +384,7 @@ export function UserCreateButton({ onCreated }: { onCreated?: () => void }) {
                 <div className="flex items-center gap-2 rounded-xl bg-amber-500/15 border border-amber-400/20 px-3 py-2 text-xs text-amber-300">
                   <Icon icon="solar:letter-unread-bold-duotone" width={16} />
                   {isUserRole
-                    ? "No se pudo enviar el email. Puedes reenviar la invitación desde el panel de usuarios."
+                    ? "No se pudo enviar el email. Reenvía el magic link con el botón ✉️ en Usuarios o en Créditos corporativos."
                     : "No se pudo enviar el email. Comparte las credenciales manualmente."}
                 </div>
               )}

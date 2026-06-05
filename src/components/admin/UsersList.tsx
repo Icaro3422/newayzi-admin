@@ -16,8 +16,9 @@ import {
   Input,
 } from "@heroui/react";
 import { Icon } from "@iconify/react";
-import { adminApi, ROLE_META, type AdminUserListItem, type AdminRole } from "@/lib/admin-api";
+import { adminApi, ROLE_META, type AdminUserListItem, type AdminRole, corporateCreditsApi } from "@/lib/admin-api";
 import { useAdmin } from "@/contexts/AdminContext";
+import { useAuth } from "@clerk/nextjs";
 
 const ROLES: { value: AdminRole; label: string }[] = [
   { value: "user", label: "Usuario" },
@@ -52,6 +53,7 @@ function roleLabel(role: AdminRole | null): string {
 }
 
 export function UsersList() {
+  const { getToken } = useAuth();
   const { canAccess } = useAdmin();
   const canEdit = canAccess("users");
   const canCorporateCredit = canAccess("corporate-credits");
@@ -59,6 +61,7 @@ export function UsersList() {
   const [operators, setOperators] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [patching, setPatching] = useState<number | null>(null);
+  const [resendingId, setResendingId] = useState<number | null>(null);
   const [deleteModal, setDeleteModal] = useState<AdminUserListItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [editModal, setEditModal] = useState<AdminUserListItem | null>(null);
@@ -151,6 +154,35 @@ export function UsersList() {
       });
     } finally {
       setDeleting(false);
+    }
+  }
+
+  function isFrontendGuest(u: AdminUserListItem) {
+    return u.role == null || u.role === "user";
+  }
+
+  async function handleResendAccess(user: AdminUserListItem) {
+    if (!canCorporateCredit) return;
+    setResendingId(user.id);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Sin autenticación.");
+      const r = await corporateCreditsApi.resendAccess(token, { profile_id: user.id, invite_locale: "es" });
+      addToast({
+        title: r.email_sent ? "Enlace reenviado" : "No se pudo enviar",
+        description: r.email_sent
+          ? `Magic link enviado a ${r.profile_email}.`
+          : `No se envió correo a ${r.profile_email}.`,
+        color: r.email_sent ? "success" : "warning",
+      });
+    } catch (e) {
+      addToast({
+        title: "Error",
+        description: e instanceof Error ? e.message : "No se pudo reenviar el enlace.",
+        color: "danger",
+      });
+    } finally {
+      setResendingId(null);
     }
   }
 
@@ -324,11 +356,25 @@ export function UsersList() {
                         <Link
                           href={`/admin/corporate-credits?profile_id=${u.id}`}
                           className="inline-flex items-center justify-center min-w-8 w-8 h-8 rounded-lg text-cyan-400/80 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors"
-                          title="Cargar crédito corporativo"
-                          aria-label="Cargar crédito corporativo"
+                          title="Acreditar crédito corporativo"
+                          aria-label="Acreditar crédito corporativo"
                         >
                           <Icon icon="solar:buildings-2-bold-duotone" className="text-lg" />
                         </Link>
+                      )}
+                      {canCorporateCredit && isFrontendGuest(u) && (
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          variant="light"
+                          className="text-emerald-400/70 hover:text-emerald-300 hover:bg-emerald-500/10 min-w-8 w-8 h-8"
+                          onPress={() => handleResendAccess(u)}
+                          isLoading={resendingId === u.id}
+                          aria-label="Reenviar magic link"
+                          title="Reenviar magic link de acceso"
+                        >
+                          <Icon icon="solar:letter-bold-duotone" className="text-lg" />
+                        </Button>
                       )}
                       <Button
                         isIconOnly

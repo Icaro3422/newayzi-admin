@@ -3166,6 +3166,10 @@ export interface CorporateCreditPostResponse {
   points: number;
   test_points: number;
   pool_total_contributed: number;
+  profile_created?: boolean;
+  clerk_created?: boolean;
+  email_sent?: boolean;
+  profile_email?: string;
 }
 
 /** Créditos corporativos prepago (super_admin): puntos + aporte Reward Pool */
@@ -3190,24 +3194,60 @@ export const corporateCreditsApi = {
   async credit(
     token: string,
     payload: {
-      profile_id: number;
+      profile_id?: number;
+      email?: string;
+      first_name?: string;
+      last_name?: string;
       amount: number;
       transfer_reference: string;
       note?: string;
+      send_invite?: boolean;
+      invite_locale?: "es" | "en";
     }
   ): Promise<CorporateCreditPostResponse> {
+    const body: Record<string, unknown> = {
+      amount: payload.amount,
+      transfer_reference: payload.transfer_reference,
+      note: payload.note ?? "",
+    };
+    if (payload.profile_id != null) body.profile_id = payload.profile_id;
+    if (payload.email) body.email = payload.email;
+    if (payload.first_name) body.first_name = payload.first_name;
+    if (payload.last_name) body.last_name = payload.last_name;
+    if (payload.send_invite != null) body.send_invite = payload.send_invite;
+    if (payload.invite_locale) body.invite_locale = payload.invite_locale;
+
     const res = await fetch(`${resolvedApiBase()}/api/admin/corporate-credits/`, {
       method: "POST",
       headers: {
         ...clerkAuthHeaders(token),
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        profile_id: payload.profile_id,
-        amount: payload.amount,
-        transfer_reference: payload.transfer_reference,
-        note: payload.note ?? "",
-      }),
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { detail?: string }).detail ?? `Error ${res.status}`);
+    }
+    return res.json();
+  },
+
+  async resendAccess(
+    token: string,
+    payload: { profile_id?: number; email?: string; invite_locale?: "es" | "en" }
+  ): Promise<{ profile_id: number; profile_email: string; email_sent: boolean }> {
+    const body: Record<string, unknown> = {};
+    if (payload.profile_id != null) body.profile_id = payload.profile_id;
+    if (payload.email) body.email = payload.email;
+    if (payload.invite_locale) body.invite_locale = payload.invite_locale;
+
+    const res = await fetch(`${resolvedApiBase()}/api/admin/corporate-credits/resend-access/`, {
+      method: "POST",
+      headers: {
+        ...clerkAuthHeaders(token),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
